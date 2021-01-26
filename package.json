@@ -1,0 +1,24 @@
+{
+  "main": "mochimap.js",
+  "scripts": {
+    "restart": "npm run stop && npm run start",
+    "setup": "npm install pm2@latest -g && pm2 startup && pm2 install pm2-logrotate",
+    "start": "pm2 start mochimap.js --name MochiMapIO -l log.txt --time",
+    "stop": "pm2 stop MochiMapIO"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/chrisdigity/mochimap.com.git"
+  },
+  "author": "chrisdigity",
+  "license": "AGPL-3.0-only",
+  "bugs": {
+    "url": "https://github.com/chrisdigity/mochimap.com/issues"
+  },
+  "homepage": "https://github.com/chrisdigity/mochimap.com#readme",
+  "dependencies": {
+    "dotenv": "^8.2.0",
+    "mochimo": "^0.2.0",
+    "socket.io": "^3.0.4"
+  }
+}

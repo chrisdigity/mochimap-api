@@ -1,0 +1,222 @@
+<head>
+  <title>✿ MochiMap's Haiku Visualizations</title>
+  <meta name="description" content="Mochimo Cryptocurrency Network Haiku visualizations">
+  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+  <meta http-equiv="Content-Type" content="text/html; charset=ISO-8859-1">
+  <meta name="viewport" content="width=600, user-scalable=0">
+  <meta name="theme-color" content="#ffffff">
+  <!-- MochiMap & Dependencies -->
+  <script defer src="https://io.mochimap.com:2053/socket.io/socket.io.js"></script>
+  <script defer src="/js/github-corner.js"></script>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.gstatic.com">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Nunito+Sans&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Roboto&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Iceland&display=swap');
+    /* font preloading (for canvas) */
+    .preloadNunitoSans {
+      z-index: -2;
+      position: absolute;
+      color: black;
+      font-family: "Nunito Sans";
+    }
+    .preloadRoboto {
+      z-index: -2;
+      position: absolute;
+      color: black;
+      font-family: "Roboto";
+    }
+    /* preformatting */
+    html, body {
+      z-index: -2;
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      position: relative;
+      color: white;
+      background-color: black;
+      font-family: "Nunito Sans";
+      text-align: left;
+    }
+    /* Background formatting */
+    .bg {
+      z-index: -1;
+      position: fixed;
+      top: -25%;
+      left: -25%;
+      width: 150%;
+      height: 150%;
+      filter: blur(6px) brightness(40%);
+      animation: fadein 2s ease-in-out;
+    }
+    
+    /* Haiku visual */
+    #final, .preload, .loading {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      max-width: 80vw;
+      max-height: 80vh;
+      border-radius: 1em;
+      text-align: center;
+    }
+    #final {
+      opacity: 0;
+      box-shadow: 0 0 20px black, 0 0 40px black, 0 0 80px black, 0 0 160px black, 0 0 320px black, 0 60px 800px black;
+    }
+    .loading img {
+      filter:invert(1);
+    }
+    .loading span {
+      color: white;
+      font: 1.5em Iceland;
+    }
+    
+    /* Header/Footer formatting */
+    header, footer {
+      z-index: 3;
+      position: absolute;
+      font-weight: bold;
+      padding: 1% 2%;
+      left: 0;
+      width: 96%;
+    }
+    header {
+      top: 0;
+    }
+    footer {
+      bottom: 0;
+      text-align: center;
+    }
+    footer a {
+      color: white;
+    }
+    /* Animations */
+    @keyframes fadein {
+      0% {
+        opacity:0;
+      }
+      100% {
+        opacity:1;
+      }
+    }
+  </style>
+  <script type="text/javascript">
+    var socket, haikuJson, attribution, footer;
+    function connectio() {
+      var status = document.getElementById('status');
+      /* SocketIO initialize */
+      if(typeof io === 'undefined') {
+        status.innerHTML = 'Initializing...';
+        return setTimeout(connectio, 1000);
+      }
+      /* SocketIO connection attempt */
+      try {
+        status.innerHTML = 'Connecting...';
+        socket = io('https://io.mochimap.com:2053/');
+      } catch (error) { status.innerHTML = 'Failed to connect to server!'; }
+      /* SocketIO events */
+      socket.on('connect', function() {
+        status.innerHTML = 'Requesting...';
+        socket.emit('/haiku');
+      });
+      socket.on('connect_error', function (error) {
+        status.innerHTML = 'Connection ERROR<br><sub>(see console)</sub>';
+      });
+      socket.on('/haiku', function (json) {
+        status.innerHTML = 'Received!';
+        haiku = json;
+        attribution =
+          '血 Haiku #' + haiku.num + '\n✿ Mochimap Visualizations\nPhoto by ' +
+          haiku.img.author + ' on ' + haiku.img.srcid;
+        document.getElementsByTagName('footer')[0].innerHTML =
+          'Photo by <a href="' + haiku.img.authorurl + '">' + haiku.img.author +
+          '</a> on <a href="' + haiku.img.srcurl + '">Pexels</a>';
+        status.innerHTML = 'Downloading...';
+        document.getElementById('preload').src =
+          haiku.img.src + '?auto=compress&cs=tinysrgb&h=1200';
+      });
+    }
+    function drawHaiku(ctx, text = '', size = 12, font, type = 0) {
+      // split multiline text-
+      text = text.split('\n');
+      // predraw setup
+      var padding = size / 2;
+      var outline = size / 8;
+      var blur = outline * 2;
+      ctx.font = size + 'px "' + font + '"';
+      ctx.fillStyle = ['white', 'white'][type];
+      ctx.shadowColor = ['black', 'black'][type];
+      ctx.lineWidth = outline;
+      for (let i = 0; i < text.length; i++) {
+        var x = type ?
+            ctx.canvas.width - padding - ctx.measureText(text[i]).width : padding;
+        var y = ctx.canvas.height - padding - (1.15 * size * (text.length - 1 - i));
+        // draw shadows
+        ctx.shadowBlur = blur;
+        ctx.strokeText(text[i], x, y);
+        // draw text
+        ctx.shadowBlur = 0;
+        ctx.fillText(text[i], x, y);
+      }
+    }
+    /* Stamp image with haiku and attribution */
+    function stamp(img) {
+      // assign preloaded image to background
+      img.className = 'bg';
+      // store source image reference size
+      var ref = Math.min(img.naturalWidth, img.naturalHeight);
+      // create Haiku visualization
+      var canvas = document.getElementById('final');
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      var ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      // draw haiku
+      drawHaiku(ctx, haiku.str, Math.ceil(ref / 15), 'Roboto');
+      // draw attribution
+      drawHaiku(ctx, attribution, Math.ceil(ref / 40), 'Nunito Sans', 1);
+      // reveal canvas
+      canvas.style.opacity = 1;
+    }
+    /* Share image (mobile only) */
+    function share(canvas) {
+      if (!navigator.share) {
+        console.log('navigator.share functionality is unavailable.');
+        return;
+      }
+      var blob = canvas.toBlob(function() {
+        var file = new File([blob], 'haiku.webp', { type: blob.type });
+        navigator.share({
+          title: 'Mochimo Haiku Visualized',
+          text: 'Check out this haiku generated by the Mochimo Cryptocurrency Network!',
+          files: [file],
+        });
+      }, 'image/webp');
+    }
+    /* Add event listener */
+    window.onload = connectio;
+  </script>
+</head>
+<body>
+  <header>
+    <div>
+      <a href="https://www.mochimap.com/">
+        <img src="/img/mochimap-visualizations.png" />
+      </a>
+    </div>
+  </header>
+  <div class="preloadNunitoSans">Nunito Sans Font loaded for canvas drawing</div>
+  <div class="preloadRoboto">Roboto Font loaded for canvas drawing</div>
+  <img id="preload" class="preload" onload="stamp(this)" crossorigin="anonymous">
+  <div class="loading">
+    <img src="/img/ripples.gif" /><br>
+    <span id="status"></span>
+  </div>
+  <canvas id="final" onclick="share(this)"></canvas>
+  <footer></footer>
+</body>
