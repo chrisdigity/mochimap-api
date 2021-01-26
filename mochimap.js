@@ -21,7 +21,7 @@
 /* global BigInt */
 
 /* environment */
-console.log('\nLoad env.<variables>... ');
+console.log('\nLoad env.<variables>...');
 require('dotenv').config();
 [
   'CAPTCHA_SECRET',
@@ -39,7 +39,7 @@ require('dotenv').config();
 });
 
 /* requirements */
-console.log('Load required modules... ');
+console.log('Load required modules...');
 // core
 const os = require('os');
 const fs = require('fs');
@@ -57,8 +57,17 @@ const Archive = require('./.maparchive');
 const Mochimo = require('mochimo');
 const SocketIO = require('socket.io')();
 
+/* error types */
+console.log('Define error types...');
+class ServerError extends Error {
+  constructor (message) {
+    super(message);
+    this.name = 'ServerError';
+  }
+}
+
 /* (pre)promisification */
-console.log('Define promisification... ');
+console.log('Define promisification...');
 https.get[promisify.custom] = function getAsync (options) {
   return new Promise((resolve, reject) => {
     https.get(options, response => {
@@ -75,7 +84,7 @@ https.get[promisify.custom] = function getAsync (options) {
 const promiseGet = promisify(https.get); // returns JSON Object || string
 
 /* functions */
-console.log('Define utilities... '); /*
+console.log('Define utilities...'); /*
 const compareWeight = (weight1, weight2) => {
   // ensure both strings are equal length
   const maxLen = Math.max(weight1.length, weight2.length);
@@ -143,7 +152,7 @@ const SET_LIMIT = 0xff;
 const Timers = [];
 
 /* core */
-console.log('Define core... ');
+console.log('Define core...');
 const Auxiliary = {
   // auxiliary blockchain data
   // Haiku (expanded), Visualized Haiku URL (picture), ...
@@ -254,6 +263,7 @@ const Auxiliary = {
 }; // end const Auxiliary...
 const Block = {
   cache: new Set(),
+  chain: new Map(),
   current: null,
   check: async (peer, bnum, bhash) => {
     // check recent blockchain
@@ -288,6 +298,24 @@ const Block = {
     Block.check(peer, block.bnum - 1n, block.phash);
     // return block data for chaining
     return block;
+  },
+  get: async (bnum, bhash) => {
+    // if request is NOT specific, return current Auxiliary data
+    if (!bnum && !bhash && Block.current) return Block.current;
+    // build file query and search
+    const query = Archive.file.bc(bnum || '*', bhash || '*');
+    const results = await Archive.search.bc(query);
+    // handle results, if any
+    if (results.length) {
+      let block;
+      do {
+        try {
+          // read (next) latest data as JSON
+          block = new Mochimo.Block(await Archive.read.bc(results.shift()));
+        } catch (ignore) {}
+      } while (results.length && !block);
+      return block || null;
+    } else return null;
   },
   update: async (block) => {
     const now = Date.now();
@@ -358,8 +386,8 @@ const Network = {
       }
       // initiate asynchronouse check for block
       if (node.cblockhash) Block.check(ip, node.cblock, node.cblockhash);
-      // update the 'network' room with updated node
-      if (Server.io) Server.io.to('network').emit('updateNodeFull', node);
+      // broadcast node update to the 'network' room
+      Server.broadcast('network', 'updateNodeFull', node);
     } else if (node.lastTouch < updateOffset) {
       // update lastPing before next update check
       node.lastTouch = Date.now();
@@ -475,14 +503,40 @@ const Server = {
       // allocate requested connection room, if any
       switch (socket.handshake.query.room) {
         case 'network': socket.join('network'); break;
+        case 'explorer': socket.join('explorer'); break;
         case 'haiku': socket.join('haiku'); break;
       }
       socket.on('close', () => Server.sockets.delete(socket));
+      /*
+      socket.on('blocks', async (page, perpage) => {
+        try {
+          socket.emit('blocks', await Block.getSummary(page, perpage));
+        } catch (error) {
+          socket.emit('error',
+            new ServerError(`during blocks.p${page} request`));
+        }
+      });
+      */
+      socket.on('block', async (bnum, bhash) => {
+        if (typeof bnum !== 'bigint' && typeof bnum !== 'number') {
+          return socket.emit('error', new TypeError('invalid bnum type'));
+        }
+        if (typeof bnum !== 'string') {
+          return socket.emit('error', new TypeError('invalid bhash type'));
+        }
+        try {
+          socket.emit('block', await Block.get(bnum));
+        } catch (error) {
+          socket.emit('error', new ServerError(`during block#${bnum} request`));
+        }
+      });
       // legacy io
       socket.on('/haiku', async (bnum) => {
         try {
-          socket.emit('/haiku', await Auxiliary.getHaiku());
-        } catch (error) { console.trace('Error during /haiku request', error); }
+          socket.emit('/haiku', await Auxiliary.getHaiku(bnum));
+        } catch (error) {
+          socket.emit('error', new ServerError(`during haiku#${bnum} request`));
+        }
       });
     });
     SocketIO.attach(Server.https, socketioOpts);
@@ -490,11 +544,15 @@ const Server = {
     Server.https.listen(2053, '0.0.0.0');
     // server is ready for data transmission
     Server.io = SocketIO;
-  })
+  }),
+  broadcast: (room, type, data) => {
+    // check Server.io is ready for broadcasts before calling
+    if (Server.io) Server.io.to(room).emit(type, data);
+  }
 };
 
 /* cleanup */
-console.log('Configure cleanup... ');
+console.log('Configure cleanup...');
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
 process.on('uncaughtException', (err, origin) => {
