@@ -539,6 +539,7 @@ const Server = {
         try {
           socket.emit('block', await Block.get(bnum));
         } catch (error) {
+          console.error(error);
           socket.emit('error', `ServerError during block#${bnum} request`);
         }
       });
@@ -547,6 +548,7 @@ const Server = {
         try {
           socket.emit('/haiku', await Auxiliary.getHaiku(bnum));
         } catch (error) {
+          console.error(error);
           socket.emit('error', `ServerError during haiku#${bnum} request`);
         }
       });
