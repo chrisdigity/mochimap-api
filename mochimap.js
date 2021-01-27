@@ -543,7 +543,7 @@ const Server = {
       */
       socket.on('block', async (req) => {
         const err = cleanRequest(req);
-        if (err) socket.emit('error', err);
+        if (err) return socket.emit('error', 'reqRejected: ' + err);
         const reqMessage =
           `reqBlock#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
         try {
@@ -556,7 +556,7 @@ const Server = {
       });
       socket.on('haiku', async (req = {}) => {
         const err = cleanRequest(req);
-        if (err) socket.emit('error', err);
+        if (err) return socket.emit('error', 'reqRejected: ' + err);
         const reqMessage =
           `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
         try {
