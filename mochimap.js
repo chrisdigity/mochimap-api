@@ -19,6 +19,18 @@
  */
 
 /* global BigInt */
+/* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
+// reference: https://medium.com/@vitalytomilov/reversible-bigint-serialization-8cba9deefad7
+BigInt.prototype.toJSON = () => `${this.toString()}n`;
+BigInt.reviver = (_, value) => {
+  if (typeof value === 'string') {
+    const m = value.match(/(-?\d+)n/);
+    if (m && m[0] === value) {
+      value = BigInt(m[1]);
+    }
+  }
+  return value;
+};
 
 /* environment */
 console.log('\nLoad env.<variables>...');
