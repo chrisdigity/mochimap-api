@@ -70,15 +70,6 @@ const Archive = require('./.maparchive');
 const Mochimo = require('mochimo');
 const SocketIO = require('socket.io')();
 
-/* error types */
-console.log('Define error types...');
-class ServerError extends Error {
-  constructor (message) {
-    super(message);
-    this.name = 'ServerError';
-  }
-}
-
 /* (pre)promisification */
 console.log('Define promisification...');
 https.get[promisify.custom] = function getAsync (options) {
@@ -534,22 +525,21 @@ const Server = {
         try {
           socket.emit('blocks', await Block.getSummary(page, perpage));
         } catch (error) {
-          socket.emit('error',
-            new ServerError(`during blocks.p${page} request`));
+          socket.emit('error', `ServerError during blocks.p${page} request`);
         }
       });
       */
       socket.on('block', async (bnum, bhash) => {
         if (typeof bnum !== 'bigint' && typeof bnum !== 'number') {
-          return socket.emit('error', new TypeError('invalid bnum type'));
+          return socket.emit('error', 'invalid bnum type in request');
         }
         if (typeof bnum !== 'string') {
-          return socket.emit('error', new TypeError('invalid bhash type'));
+          return socket.emit('error', 'invalid bhash type in request');
         }
         try {
           socket.emit('block', await Block.get(bnum));
         } catch (error) {
-          socket.emit('error', new ServerError(`during block#${bnum} request`));
+          socket.emit('error', `ServerError during block#${bnum} request`);
         }
       });
       // legacy io
@@ -557,7 +547,7 @@ const Server = {
         try {
           socket.emit('/haiku', await Auxiliary.getHaiku(bnum));
         } catch (error) {
-          socket.emit('error', new ServerError(`during haiku#${bnum} request`));
+          socket.emit('error', `ServerError during haiku#${bnum} request`);
         }
       });
     });
