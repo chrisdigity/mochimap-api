@@ -113,6 +113,26 @@ const parseNetworkdata = (data, jsonType) => {
     });
   }
 };
+const cleanRequest = (req) => {
+  // confirm req is an object
+  if (typeof req !== 'object') return 'invalid request object';
+  // for every known request property, check and enforce acceptable types
+  if (req.bnum) {
+    // remove bnum from final checklist
+    const valid = ['bigint', 'number', 'string'];
+    if (!valid.includes(typeof req.bnum)) return 'invalid type, bnum';
+    try {
+      // force BigInt value for bnum
+      req.bnum = BigInt(req.bnum);
+    } catch (ignore) { return 'unconvertable data, bnum'; }
+  }
+  if (req.bhash && typeof req.bnum !== 'string') {
+    // string is the only acceptable type for bhash
+    return 'invalid type, bhash';
+  }
+  // all known properties are clean
+  return false;
+};
 const isPrivateIPv4 = (ip) => {
   const b = new ArrayBuffer(4);
   const c = new Uint8Array(b);
@@ -182,7 +202,7 @@ const Auxiliary = {
   getHaiku: async (bnum, bhash) => {
     // return haiku data or null, depending on results
     const results = await Auxiliary.get(bnum, bhash);
-    if (results.haiku) return results.haiku;
+    if (results && results.haiku) return results.haiku;
     return null;
   },
   update: async (block, checkback, file, now = Date.now()) => {
@@ -511,14 +531,6 @@ const Server = {
       // socket management
       Server.sockets.add(socket);
       socket.on('close', () => Server.sockets.delete(socket));
-      // handle room requests
-      socket.on('requestRoom', (room) => {
-        switch (room) {
-          case 'network': socket.join('network'); break;
-          case 'explorer': socket.join('explorer'); break;
-          case 'haiku': socket.join('haiku'); break;
-        }
-      });
       // handle once unique data requests
       /*
       socket.on('blocks', async (page, perpage) => {
@@ -529,27 +541,32 @@ const Server = {
         }
       });
       */
-      socket.on('block', async (bnum, bhash) => {
-        if (typeof bnum !== 'bigint' && typeof bnum !== 'number') {
-          return socket.emit('error', 'invalid bnum type in request');
-        }
-        if (typeof bnum !== 'string') {
-          return socket.emit('error', 'invalid bhash type in request');
-        }
+      socket.on('block', async (req) => {
+        const err = cleanRequest(req);
+        if (err) socket.emit('error', err);
+        const reqMessage =
+          `reqBlock#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
         try {
-          socket.emit('block', await Block.get(bnum));
+          socket.emit('block', await Block.get(req.bnum, req.bhash));
         } catch (error) {
-          console.error(error);
-          socket.emit('error', `ServerError during block#${bnum} request`);
+          const response = `ServerError during ${reqMessage}`;
+          console.error(response, error);
+          socket.emit('error', response);
         }
       });
-      // legacy io
-      socket.on('/haiku', async (bnum) => {
+      socket.on('haiku', async (req = {}) => {
+        const err = cleanRequest(req);
+        if (err) socket.emit('error', err);
+        const reqMessage =
+          `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
         try {
-          socket.emit('/haiku', await Auxiliary.getHaiku(bnum));
+          const haiku = await Auxiliary.getHaiku(req.bnum, req.bhash);
+          if (haiku) socket.emit('haiku', haiku);
+          else socket.emit('error', `no data for ${reqMessage}`);
         } catch (error) {
-          console.error(error);
-          socket.emit('error', `ServerError during haiku#${bnum} request`);
+          const response = `ServerError during ${reqMessage}`;
+          console.error(response, error);
+          socket.emit('error', response);
         }
       });
     });
