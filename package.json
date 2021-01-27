@@ -2,7 +2,6 @@
   "main": "mochimap.js",
   "scripts": {
     "restart": "npm run stop && npm run start",
-    "setup": "npm install pm2@latest -g && pm2 startup && pm2 install pm2-logrotate",
     "start": "pm2 start mochimap.js --name MochiMapIO -l log.txt --time",
     "stop": "pm2 stop MochiMapIO"
   },
