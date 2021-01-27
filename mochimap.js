@@ -58,6 +58,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 const net = require('net');
 const path = require('path');
+const http = require('http');
 const https = require('https');
 // const crypto = require('crypto');
 const querystring = require('querystring');
@@ -446,16 +447,21 @@ const Server = {
   io: null,
   sockets: new Set(),
   start: () => new Promise((resolve, reject) => {
-    console.log('Start server');
-    // create https server
-    Server.https = https.createServer({
-      key: fs.readFileSync('/etc/ssl/private/io.mochimap.com.key'),
-      cert: fs.readFileSync('/etc/ssl/certs/io.mochimap.com.pem')
-    }).on('listening', () => {
+    if (process.env.DEVELOPMENT) console.log('Start Development server');
+    else console.log('Start server');
+    // create http/s server
+    Server.https = process.env.DEVELOPMENT ? http.createServer()
+      : https.createServer({
+        key: fs.readFileSync('/etc/ssl/private/io.mochimap.com.key'),
+        cert: fs.readFileSync('/etc/ssl/certs/io.mochimap.com.pem')
+      });
+    // set https server events
+    Server.https.on('error', reject);
+    Server.https.on('listening', () => {
       const addr = Server.https.address();
       console.log(` + listening on ${addr.address} : ${addr.port}`);
       resolve();
-    }).on('error', reject);
+    });
     // create socket connection options
     const socketioOpts = {
       pingInterval: 10000,
@@ -466,6 +472,7 @@ const Server = {
         credentials: true
       }
     };
+    if (process.env.DEVELOPMENT) socketioOpts.cors.origin = true;
     // setup authentication and connection protocols and attach to server
     SocketIO.use((socket, next) => {
       // token is required
@@ -510,15 +517,18 @@ const Server = {
       } else next(new Error('Missing authentication token.'));
     });
     SocketIO.on('connection', (socket) => {
-      // add socket to socket management list
+      // socket management
       Server.sockets.add(socket);
-      // allocate requested connection room, if any
-      switch (socket.handshake.query.room) {
-        case 'network': socket.join('network'); break;
-        case 'explorer': socket.join('explorer'); break;
-        case 'haiku': socket.join('haiku'); break;
-      }
       socket.on('close', () => Server.sockets.delete(socket));
+      // handle room requests
+      socket.on('requestRoom', (room) => {
+        switch (room) {
+          case 'network': socket.join('network'); break;
+          case 'explorer': socket.join('explorer'); break;
+          case 'haiku': socket.join('haiku'); break;
+        }
+      });
+      // handle once unique data requests
       /*
       socket.on('blocks', async (page, perpage) => {
         try {

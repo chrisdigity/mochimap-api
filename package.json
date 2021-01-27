@@ -2,6 +2,7 @@
   "main": "mochimap.js",
   "scripts": {
     "restart": "npm run stop && npm run start",
+    "startDev": "DEVELOPMENT=true pm2 start mochimap.js --name MochiMapIO -l log.txt --time",
     "start": "pm2 start mochimap.js --name MochiMapIO -l log.txt --time",
     "stop": "pm2 stop MochiMapIO"
   },
