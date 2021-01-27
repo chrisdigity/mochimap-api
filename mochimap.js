@@ -547,7 +547,9 @@ const Server = {
         const reqMessage =
           `reqBlock#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
         try {
-          socket.emit('block', await Block.get(req.bnum, req.bhash));
+          const block = await Block.get(req.bnum, req.bhash);
+          if (block) socket.emit('block', block);
+          else socket.emit('error', `404: ${reqMessage}`);
         } catch (error) {
           const response = `ServerError during ${reqMessage}`;
           console.error(response, error);
@@ -562,7 +564,7 @@ const Server = {
         try {
           const haiku = await Auxiliary.getHaiku(req.bnum, req.bhash);
           if (haiku) socket.emit('haiku', haiku);
-          else socket.emit('error', `no data for ${reqMessage}`);
+          else socket.emit('error', `404: ${reqMessage}`);
         } catch (error) {
           const response = `ServerError during ${reqMessage}`;
           console.error(response, error);
