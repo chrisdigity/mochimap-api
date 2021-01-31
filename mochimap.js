@@ -118,7 +118,6 @@ const cleanRequest = (req) => {
   if (typeof req !== 'object') return 'invalid request object';
   // for every known request property, check and enforce acceptable types
   if (req.bnum) {
-    // remove bnum from final checklist
     const valid = ['bigint', 'number', 'string'];
     if (!valid.includes(typeof req.bnum)) return 'invalid type, bnum';
     try {
@@ -129,6 +128,14 @@ const cleanRequest = (req) => {
   if (req.bhash && typeof req.bnum !== 'string') {
     // string is the only acceptable type for bhash
     return 'invalid type, bhash';
+  }
+  if (req.page) {
+    const valid = ['number', 'string'];
+    if (!valid.includes(typeof req.page)) return 'invalid type, page';
+    try {
+      // force Number value for page
+      req.page = Number(req.page);
+    } catch (ignore) { return 'unconvertable data, page'; }
   }
   // all known properties are clean
   return false;
@@ -541,14 +548,33 @@ const Server = {
         }
       });
       */
-      socket.on('block', async (req) => {
+      // block data may only be requested in parts (summary & tx's)
+      socket.on('bsummary', async (req) => {
         const err = cleanRequest(req);
         if (err) return socket.emit('error', 'reqRejected: ' + err);
-        const reqMessage =
-          `reqBlock#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
+        const reqMessage = // reqBSummary#<blocknumber>.<blockhash>
+          `reqBSummary#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
         try {
           const block = await Block.get(req.bnum, req.bhash);
-          if (block) socket.emit('block', block);
+          if (block) {
+            socket.emit('bsummary', block.toSummary());
+            block.transactions.forEach(tx => socket.emit('btx', tx));
+          } else socket.emit('error', `404: ${reqMessage}`);
+        } catch (error) {
+          const response = `ServerError during ${reqMessage}`;
+          console.error(response, error);
+          socket.emit('error', response);
+        }
+      });
+      socket.on('btx', async (req) => {
+        const err = cleanRequest(req);
+        if (err) return socket.emit('error', 'reqRejected: ' + err);
+        const reqMessage = // reqBTx#<blocknumber>.<blockhash>.p<pagenumber>
+          `reqBTx#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}.p` +
+          (req.page || 1);
+        try {
+          const txs = await Block.getTxs(req.bnum, req.bhash, req.page);
+          if (txs) txs.forEach.forEach(tx => socket.emit('btx', tx));
           else socket.emit('error', `404: ${reqMessage}`);
         } catch (error) {
           const response = `ServerError during ${reqMessage}`;
@@ -559,7 +585,7 @@ const Server = {
       socket.on('haiku', async (req = {}) => {
         const err = cleanRequest(req);
         if (err) return socket.emit('error', 'reqRejected: ' + err);
-        const reqMessage =
+        const reqMessage = // reqHaiku#<blocknumber>.<blockhash>
           `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
         try {
           const haiku = await Auxiliary.getHaiku(req.bnum, req.bhash);
