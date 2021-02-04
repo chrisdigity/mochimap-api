@@ -20,7 +20,7 @@
 
 /* global BigInt */
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
-BigInt.prototype.toJSON = BigInt.prototype.toString;
+BigInt.prototype.toJSON = function () { return this.toString(); };
 
 /* environment */
 console.log('\nLoad env.<variables>...');
