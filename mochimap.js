@@ -416,7 +416,7 @@ const Network = {
       }
     });
     // return block data (assumes already downloaded), or null
-    if (consensus) return new Mochimo.Block(Archive.read.bc(consensus));
+    if (consensus) return new Mochimo.Block(await Archive.read.bc(consensus));
     return null;
   },
   parse: (data, jsonType) => {
