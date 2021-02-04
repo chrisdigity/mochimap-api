@@ -330,6 +330,22 @@ const Block = {
     } else return null;
   },
   latest: [],
+  refreshLatest: async () => {
+    // start with consensus block
+    let block = Network.getConsensusBlock();
+    if (block) {
+      do {
+        // push block to latest array
+        Block.latest.push(block);
+        // read next block until latest limit is reached
+        block = await Block.get(block.bnum - 1n, block.phash);
+      } while (Block.latest.length < 10 && block);
+      // indicate partial/full refresh success
+      return 0;
+    }
+    // indicate refresh failure
+    return -1;
+  },
   update: async (block) => {
     const now = Date.now();
     // handle block update
@@ -383,6 +399,25 @@ const Network = {
     './networkdata.json'
   ],
   map: new Map(),
+  getConsensusBlock: async () => {
+    const chains = new Map();
+    let consensus = null;
+    Network.map.forEach(node => {
+      // ensure node meets requirements
+      if (!node.bnum || !node.bhash) return;
+      // get file id
+      const fid = Archive.file.bc(node.bnum, node.bhash);
+      // increment consensus for chain
+      if (chains.has(fid)) chains.set(fid, chains.get(fid) + 1);
+      else chains.set(fid, 1);
+      // determine consensus
+      if (!consensus || chains.get(fid) > chains.get(consensus)) {
+        consensus = fid;
+      }
+    });
+    // return block data (assumes already downloaded), or null
+    return await Archive.read.bc(consensus);
+  },
   parse: (data, jsonType) => {
     // read *.json type data directly, else assume peerlist
     if (jsonType) {
@@ -462,12 +497,16 @@ const Server = {
     socket.on('latest', async () => {
       const reqMessage = 'reqLatest';
       try {
-        // send latest blocks in reverse
-        if (Block.latest.length) {
+        // check latest blocks exist
+        if (!Block.latest.length && await Block.refreshLatest()) {
+          // send 503 if data unavailable
+          socket.emit('error', '503: currently unavailable');
+        } else {
+          // send latest blocks
           Block.latest.reverse().forEach((block, index) => {
-            socket.emit('latestBlock', { block: block.toSummary(), index });
+            socket.emit('latestBlock', block.toSummary());
           });
-        } else socket.emit('error', '503: currently unavailable');
+        }
       } catch (error) {
         const response = `500: InternalServerError during ${reqMessage}`;
         console.error(response, error);
