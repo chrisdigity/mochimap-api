@@ -341,10 +341,10 @@ const Block = {
         block = await Block.get(block.bnum - 1n, block.phash);
       } while (Block.latest.length < 10 && block);
       // indicate partial/full refresh success
-      return 0;
+      return false;
     }
     // indicate refresh failure
-    return -1;
+    return true;
   },
   update: async (block) => {
     const now = Date.now();
@@ -403,10 +403,12 @@ const Network = {
     const chains = new Map();
     let consensus = null;
     Network.map.forEach(node => {
+      console.debug(node);
       // ensure node meets requirements
       if (!node.bnum || !node.bhash) return;
       // get file id
       const fid = Archive.file.bc(node.bnum, node.bhash);
+      console.debug(`fid: ${fid}`);
       // increment consensus for chain
       if (chains.has(fid)) chains.set(fid, chains.get(fid) + 1);
       else chains.set(fid, 1);
