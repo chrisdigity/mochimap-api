@@ -416,7 +416,8 @@ const Network = {
       }
     });
     // return block data (assumes already downloaded), or null
-    return await Archive.read.bc(consensus);
+    if (consensus) return new Mochimo.Block(Archive.read.bc(consensus));
+    return null;
   },
   parse: (data, jsonType) => {
     // read *.json type data directly, else assume peerlist
@@ -503,7 +504,7 @@ const Server = {
           socket.emit('error', '503: currently unavailable');
         } else {
           // send latest blocks
-          Block.latest.reverse().forEach((block, index) => {
+          Block.latest.reverse().forEach(block => {
             socket.emit('latestBlock', block.toSummary());
           });
         }
