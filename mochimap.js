@@ -99,20 +99,6 @@ const compareWeight = (weight1, weight2) => {
   if (weight1 < weight2) return -1;
   return 0;
 }; */
-const parseNetworkdata = (data, jsonType) => {
-  // read *.json type data directly, else assume peerlist
-  if (jsonType) {
-    Object.entries(data).forEach(([ip, node]) => {
-      if (net.isIPv4(ip)) Network.map.set(ip, node);
-    });
-  } else {
-    (data.match(/(^|(?<=\n))[\w.]+/g) || []).forEach(ip => {
-      if (net.isIPv4(ip)) {
-        Network.map.set(ip, new Mochimo.Node({ ip }).toJSON());
-      }
-    });
-  }
-};
 const cleanRequest = (req) => {
   // confirm req is an object
   if (typeof req !== 'object') return 'invalid request object';
@@ -129,13 +115,13 @@ const cleanRequest = (req) => {
     // string is the only acceptable type for bhash
     return 'invalid type, bhash';
   }
-  if (req.page) {
+  if (req.index) {
     const valid = ['number', 'string'];
-    if (!valid.includes(typeof req.page)) return 'invalid type, page';
+    if (!valid.includes(typeof req.index)) return 'invalid type, index';
     try {
-      // force Number value for page
-      req.page = Number(req.page);
-    } catch (ignore) { return 'unconvertable data, page'; }
+      // force Number value for index
+      req.index = Number(req.index);
+    } catch (ignore) { return 'unconvertable data, index'; }
   }
   // all known properties are clean
   return false;
@@ -293,9 +279,8 @@ const Auxiliary = {
   }
 }; // end const Auxiliary...
 const Block = {
-  cache: new Set(),
+  cache: new Set(), // TODO: custom Map() cache
   chain: new Map(),
-  current: null,
   check: async (peer, bnum, bhash) => {
     // check recent blockchain
     if (!Block.cache.has(bhash)) {
@@ -307,12 +292,18 @@ const Block = {
       }
       // check database for bnum/bhash
       if (!(await Archive.search.bc(Archive.file.bc(bnum, bhash))).length) {
-        Block.download(peer, bnum, bhash)
-          .then(Block.update).catch(console.error);
+        // download block and perform block/auxiliary updates
+        Block.dl(peer, bnum, bhash)
+          .then(Block.update)
+          .then(Auxiliary.update)
+          .catch(console.error);
       }
     }
-  },
-  download: async (peer, bnum, bhash) => {
+  }, /*
+  contention: (block) => {
+
+  }, */
+  dl: async (peer, bnum, bhash) => {
     // download block from advertising peer
     const block = await Mochimo.getBlock(peer, bnum);
     // check block is as advertised
@@ -332,7 +323,7 @@ const Block = {
   },
   get: async (bnum, bhash) => {
     // if request is NOT specific, return current Auxiliary data
-    if (!bnum && !bhash && Block.current) return Block.current;
+    if (!bnum && !bhash && Block.latest) return Block.latest;
     // build file query and search
     const query = Archive.file.bc(bnum || '*', bhash || '*');
     const results = await Archive.search.bc(query);
@@ -348,12 +339,9 @@ const Block = {
       return block || null;
     } else return null;
   },
+  latest: [],
   update: async (block) => {
     const now = Date.now();
-    // initiate asynchronous auxiliary block update
-    Auxiliary.update(block).catch(console.error);
-    // update current block
-    Block.current = block;
     // handle block update
     const filebc = Archive.file.bc(block.bnum, block.bhash);
     fsp.mkdtemp(path.join(os.tmpdir(), 'bc-'))
@@ -382,6 +370,16 @@ const Block = {
         const time = (Date.now() - now) / 1000;
         console.log(`${block.bnum} Archived ${num} *.tx in ${time} seconds.`);
       });
+    /*
+    // handle chain update
+    if (Block.chain.has(block.bnum)) Block.contention(block);
+    else Block.chain.set(block.bnum, block.trailer);
+    */
+    // update latest blocks
+    Block.latest.unshift(block);
+    if (Block.latest.length > 10) Block.latest.pop();
+    // broadcast update
+    Server.broadcast('blockUpdates', 'latestBlock', block.toSummary());
     // return block data for promise chaining
     return block;
   }
@@ -395,11 +393,19 @@ const Network = {
     './networkdata.json'
   ],
   map: new Map(),
-  checkPeer: (ip) => {
-    // ignore private or existing IPv4
-    if (isPrivateIPv4(ip) || Network.map.has(ip)) return;
-    // initialize new node
-    Network.updateMap(new Mochimo.Node({ ip }));
+  parse: (data, jsonType) => {
+    // read *.json type data directly, else assume peerlist
+    if (jsonType) {
+      Object.entries(data).forEach(([ip, node]) => {
+        if (net.isIPv4(ip)) Network.map.set(ip, node);
+      });
+    } else {
+      (data.match(/(^|(?<=\n))[\w.]+/g) || []).forEach(ip => {
+        if (net.isIPv4(ip)) {
+          Network.map.set(ip, new Mochimo.Node({ ip }).toJSON());
+        }
+      });
+    }
   },
   updateMap: (node, ip) => {
     const updateInterval = 30000; // 30 seconds between node updates
@@ -413,28 +419,192 @@ const Network = {
       Network.map.set(ip, Object.assign(Network.map.get(ip) || {}, node));
       // check for peer updates
       if (node.peers && node.peers.length) {
-        node.peers.forEach(Network.checkPeer);
+        node.peers.forEach(ip => {
+          // ignore private IPv4 or existing map nodes
+          if (isPrivateIPv4(ip) || Network.map.has(ip)) return;
+          // initialize new node
+          Network.updateMap(new Mochimo.Node({ ip }));
+        });
       }
-      // initiate asynchronouse check for block
+      // initiate asynchronouse block check
       if (node.cblockhash) Block.check(ip, node.cblock, node.cblockhash);
       // broadcast node update to the 'network' room
-      Server.broadcast('network', 'updateNodeFull', node);
+      Server.broadcast('networkUpdates', { type: 'full', node });
     } else if (node.lastTouch < updateOffset) {
-      // update lastPing before next update check
+      // update lastTouch before next update check
       node.lastTouch = Date.now();
-      // request peerlist
+      // request peerlist and update map
       Mochimo.Node.callserver({ ip, opcode: Mochimo.OP_GETIPL })
         .then(Network.updateMap).catch(console.error);
     }
   },
-  run: () => Network.map.forEach(Network.updateMap),
-  start: async () => {
+  run: () => Network.map.forEach(Network.updateMap)
+}; // end const Network...
+const Server = {
+  https: null,
+  io: null,
+  sockets: new Set(),
+  broadcast: (room, event, data) => {
+    // check Server.io is ready for broadcasts before calling
+    if (Server.io) Server.io.to(room).emit(event, data);
+  },
+  connection: (socket) => {
+    // socket management
+    Server.sockets.add(socket);
+    socket.on('close', () => Server.sockets.delete(socket));
+    // block data may only be requested in parts (summary & tx's)
+    socket.on('bsummary', async (req) => {
+      const err = cleanRequest(req);
+      if (err) return socket.emit('error', 'reqRejected: ' + err);
+      const reqMessage = // reqBSummary#<blocknumber>.<blockhash>
+        `reqBSummary#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
+      try {
+        const block = await Block.get(req.bnum, req.bhash);
+        if (block) {
+          socket.emit('bsummary', block.toSummary());
+        } else socket.emit('error', `404: ${reqMessage}`);
+      } catch (error) {
+        const response = `ServerError during ${reqMessage}`;
+        console.error(response, error);
+        socket.emit('error', response);
+      }
+    });
+    socket.on('latest', async () => {
+      const reqMessage = 'reqLatest';
+      try {
+        // get/send latest blocks
+        if (Block.latest.length) {
+          Block.latest.forEach((block, index) => {
+            socket.emit('latestBlock', { block: block.toSummary(), index });
+          });
+        } else socket.emit('error', `503: ${reqMessage} currently unavailable`);
+      } catch (error) {
+        const response = `500: InternalServerError during ${reqMessage}`;
+        console.error(response, error);
+        socket.emit('error', response);
+      }
+      // register socket for block updates
+      socket.join('blockUpdates');
+    });
+    socket.on('haiku', async (req = {}) => {
+      const err = cleanRequest(req);
+      if (err) return socket.emit('error', 'reqRejected: ' + err);
+      const reqMessage = // reqHaiku#<blocknumber>.<blockhash>
+        `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
+      try {
+        const haiku = await Auxiliary.getHaiku(req.bnum, req.bhash);
+        if (haiku) socket.emit('haiku', haiku);
+        else socket.emit('error', `404: ${reqMessage}`);
+      } catch (error) {
+        const response = `ServerError during ${reqMessage}`;
+        console.error(response, error);
+        socket.emit('error', response);
+      }
+    });
+  },
+  middleware: (socket, next) => {
+    // auth token is required
+    if (socket.handshake.auth && socket.handshake.auth.token) {
+      const token = socket.handshake.auth.token;
+      // build POST request
+      var postData = querystring.encode({
+        secret: process.env.CAPTCHA_SECRET,
+        response: token
+      });
+      // build request options
+      const options = {
+        hostname: 'recaptcha.net',
+        path: '/recaptcha/api/siteverify',
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Content-Length': Buffer.byteLength(postData)
+        }
+      };
+      // check authorization token against Google's reCaptcha
+      var req = https.request(options, res => {
+        var body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => {
+          body = JSON.parse(body);
+          // Simple verification for now...
+          if (!body) next(new Error('Server authentication failure'));
+          else if (!body.success) next(new Error('Authentication failure'));
+          else next(); // successful authentication
+        });
+      });
+      req.on('error', error => {
+        console.error('[reCAPTCHA Request]', error);
+        next(new Error('Server authentication error'));
+      });
+      req.write(postData);
+      req.end();
+    } else next(new Error('Missing authentication token.'));
+  }
+};
+
+/* cleanup */
+console.log('Configure cleanup...');
+process.on('SIGINT', gracefulShutdown);
+process.on('SIGTERM', gracefulShutdown);
+process.on('uncaughtException', (err, origin) => {
+  console.error(origin, err);
+  gracefulShutdown();
+});
+
+/* startup */
+console.log('Begin startup...');
+// check archive integrity
+Archive.check()
+// start io server
+  .then(() => new Promise((resolve, reject) => {
+    if (process.env.DEVELOPMENT) {
+      console.log('Start Development Server');
+    } else console.log('Start Production Server');
+    // create http/s server
+    Server.https = process.env.DEVELOPMENT
+      ? http.createServer() // insecure development server
+      : https.createServer({ // secure production server
+        key: fs.readFileSync('/etc/ssl/private/io.mochimap.com.key'),
+        cert: fs.readFileSync('/etc/ssl/certs/io.mochimap.com.pem')
+      });
+    // set https server events
+    Server.https.on('error', reject);
+    Server.https.on('listening', () => {
+      const addr = Server.https.address();
+      console.log(` + listening on ${addr.address} : ${addr.port}`);
+      // server is ready for data transmission
+      Server.io = SocketIO;
+      resolve();
+    });
+    // create socket connection options
+    const socketioOpts = {
+      serveClient: false,
+      // engine.IO options below
+      pingInterval: 10000,
+      pingTimeout: 5000,
+      cookie: false,
+      cors: {
+        origin: 'https://www.mochimap.com',
+        credentials: true
+      }
+    };
+    if (process.env.DEVELOPMENT) socketioOpts.cors.origin = true;
+    // setup middleware authentication and connection protocols and attach to server
+    SocketIO.use(Server.middleware);
+    SocketIO.on('connection', Server.connection);
+    SocketIO.attach(Server.https, socketioOpts);
+    // start https server
+    Server.https.listen(2053, '0.0.0.0');
+  })) // end start io server...
+// resume network scanning
+  .then(async () => {
     console.log('Loading network data...');
     // prioritise network data acquisition:
     //   (database -> fallback(jsondata/peerlist)) ...
     try {
       const fname = Archive.file.nt('', 'last');
-      await parseNetworkdata(await Archive.read.nt(fname), 1);
+      Network.parse(await Archive.read.nt(fname), 1);
       console.log(' + Successfully loaded last network data from Archive');
     } catch (error) { console.error(` - ${error}`); }
     // utilise fallback methods on absence of database
@@ -450,178 +620,16 @@ const Network = {
       try {
         // obtain and parse fallback data, type dependant
         if (fallback.startsWith('http')) {
-          parseNetworkdata(await promiseGet(fallback), jsonType);
-        } else parseNetworkdata(await fsp.readFile(fallback), jsonType);
+          Network.parse(await promiseGet(fallback), jsonType);
+        } else Network.parse(await fsp.readFile(fallback), jsonType);
         console.log(' + Success loading from', fallback);
       } catch (error) { console.error(` - ${error}`); }
     }
     // start run/backup loop
     console.log('Begin network scanning...');
     Timers.push(setInterval(Network.run, Network.interval));
-  } // end start: async () => ...
-}; // end const Network...
-const Server = {
-  https: null,
-  io: null,
-  sockets: new Set(),
-  start: () => new Promise((resolve, reject) => {
-    if (process.env.DEVELOPMENT) console.log('Start Development server');
-    else console.log('Start server');
-    // create http/s server
-    Server.https = process.env.DEVELOPMENT ? http.createServer()
-      : https.createServer({
-        key: fs.readFileSync('/etc/ssl/private/io.mochimap.com.key'),
-        cert: fs.readFileSync('/etc/ssl/certs/io.mochimap.com.pem')
-      });
-    // set https server events
-    Server.https.on('error', reject);
-    Server.https.on('listening', () => {
-      const addr = Server.https.address();
-      console.log(` + listening on ${addr.address} : ${addr.port}`);
-      resolve();
-    });
-    // create socket connection options
-    const socketioOpts = {
-      pingInterval: 10000,
-      pingTimeout: 5000,
-      cookie: false,
-      cors: {
-        origin: 'https://www.mochimap.com',
-        credentials: true
-      }
-    };
-    if (process.env.DEVELOPMENT) socketioOpts.cors.origin = true;
-    // setup authentication and connection protocols and attach to server
-    SocketIO.use((socket, next) => {
-      // token is required
-      if (socket.handshake.auth && socket.handshake.auth.token) {
-        const token = socket.handshake.auth.token;
-        // build POST request
-        var postData = querystring.encode({
-          secret: process.env.CAPTCHA_SECRET,
-          response: token
-        });
-        // build request options
-        const options = {
-          hostname: 'recaptcha.net',
-          path: '/recaptcha/api/siteverify',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Content-Length': Buffer.byteLength(postData)
-          }
-        };
-        // check authorization token against Google's reCaptcha
-        var req = https.request(options, res => {
-          var body = '';
-          res.on('data', chunk => {
-            body += chunk;
-          });
-          res.on('end', () => {
-            body = JSON.parse(body);
-            // Simple verification for now...
-            if (!body) next(new Error('Server authentication failure'));
-            else if (!body.success) next(new Error('Authentication failure'));
-            // successful authentication
-            else next();
-          });
-        });
-        req.on('error', error => {
-          console.error('[reCAPTCHA Request]', error);
-          next(new Error('Server authentication error'));
-        });
-        req.write(postData);
-        req.end();
-      } else next(new Error('Missing authentication token.'));
-    });
-    SocketIO.on('connection', (socket) => {
-      // socket management
-      Server.sockets.add(socket);
-      socket.on('close', () => Server.sockets.delete(socket));
-      // handle once unique data requests
-      /*
-      socket.on('blocks', async (page, perpage) => {
-        try {
-          socket.emit('blocks', await Block.getSummary(page, perpage));
-        } catch (error) {
-          socket.emit('error', `ServerError during blocks.p${page} request`);
-        }
-      });
-      */
-      // block data may only be requested in parts (summary & tx's)
-      socket.on('bsummary', async (req) => {
-        const err = cleanRequest(req);
-        if (err) return socket.emit('error', 'reqRejected: ' + err);
-        const reqMessage = // reqBSummary#<blocknumber>.<blockhash>
-          `reqBSummary#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
-        try {
-          const block = await Block.get(req.bnum, req.bhash);
-          if (block) {
-            socket.emit('bsummary', block.toSummary());
-            block.transactions.forEach(tx => socket.emit('btx', tx));
-          } else socket.emit('error', `404: ${reqMessage}`);
-        } catch (error) {
-          const response = `ServerError during ${reqMessage}`;
-          console.error(response, error);
-          socket.emit('error', response);
-        }
-      });
-      socket.on('btx', async (req) => {
-        const err = cleanRequest(req);
-        if (err) return socket.emit('error', 'reqRejected: ' + err);
-        const reqMessage = // reqBTx#<blocknumber>.<blockhash>.p<pagenumber>
-          `reqBTx#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}.p` +
-          (req.page || 1);
-        try {
-          const txs = await Block.getTxs(req.bnum, req.bhash, req.page);
-          if (txs) txs.forEach.forEach(tx => socket.emit('btx', tx));
-          else socket.emit('error', `404: ${reqMessage}`);
-        } catch (error) {
-          const response = `ServerError during ${reqMessage}`;
-          console.error(response, error);
-          socket.emit('error', response);
-        }
-      });
-      socket.on('haiku', async (req = {}) => {
-        const err = cleanRequest(req);
-        if (err) return socket.emit('error', 'reqRejected: ' + err);
-        const reqMessage = // reqHaiku#<blocknumber>.<blockhash>
-          `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
-        try {
-          const haiku = await Auxiliary.getHaiku(req.bnum, req.bhash);
-          if (haiku) socket.emit('haiku', haiku);
-          else socket.emit('error', `404: ${reqMessage}`);
-        } catch (error) {
-          const response = `ServerError during ${reqMessage}`;
-          console.error(response, error);
-          socket.emit('error', response);
-        }
-      });
-    });
-    SocketIO.attach(Server.https, socketioOpts);
-    // start https server
-    Server.https.listen(2053, '0.0.0.0');
-    // server is ready for data transmission
-    Server.io = SocketIO;
-  }),
-  broadcast: (room, type, data) => {
-    // check Server.io is ready for broadcasts before calling
-    if (Server.io) Server.io.to(room).emit(type, data);
-  }
-};
-
-/* cleanup */
-console.log('Configure cleanup...');
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
-process.on('uncaughtException', (err, origin) => {
-  console.error(origin, err);
-  gracefulShutdown();
-});
-
-/**
- * check archive, and start server and network communications */
-Archive.check().then(Server.start).then(Network.start).catch(error => {
-  console.error(error);
-  gracefulShutdown();
-});
+  }) // end resume network scanning...
+  .catch(error => {
+    console.error(error);
+    gracefulShutdown();
+  });
