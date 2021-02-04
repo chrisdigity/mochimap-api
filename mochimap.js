@@ -336,7 +336,7 @@ const Block = {
     if (block) {
       do {
         // push block to latest array
-        Block.latest.push(block);
+        Block.latest.unshift(block);
         // read next block until latest limit is reached
         block = await Block.get(block.bnum - 1n, block.phash);
       } while (Block.latest.length < 10 && block);
@@ -382,8 +382,8 @@ const Block = {
     else Block.chain.set(block.bnum, block.trailer);
     */
     // update latest blocks
-    Block.latest.unshift(block);
-    if (Block.latest.length > 10) Block.latest.pop();
+    Block.latest.push(block);
+    if (Block.latest.length > 10) Block.latest.shift();
     // broadcast update
     Server.broadcast('blockUpdates', 'latestBlock', block.toSummary());
     // return block data for promise chaining
@@ -504,7 +504,7 @@ const Server = {
           socket.emit('error', '503: currently unavailable');
         } else {
           // send latest blocks
-          Block.latest.reverse().forEach(block => {
+          Block.latest.forEach(block => {
             socket.emit('latestBlock', block.toSummary());
           });
         }
