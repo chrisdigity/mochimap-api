@@ -331,20 +331,16 @@ const Block = {
   },
   latest: [],
   refreshLatest: async () => {
-    // start with consensus block
-    let block = await Network.getConsensusBlock();
-    if (block) {
-      do {
-        // push block to latest array
-        Block.latest.unshift(block);
-        // read next block until latest limit is reached
-        block = await Block.get(block.bnum - 1n, block.phash);
-      } while (Block.latest.length < 10 && block);
-      // indicate partial/full refresh success
-      return false;
+    // fill Block.latest with stored blocks
+    let block = null;
+    while (Block.latest.length < 10) {
+      // start with consensus block, then get successive blocks
+      if (block === null) block = await Network.getConsensusBlock();
+      else block = await Block.get(block.bnum - 1n, block.phash);
+      // add block to latest, else exit loop
+      if (block) Block.latest.unshift(block);
+      else break;
     }
-    // indicate refresh failure
-    return true;
   },
   update: async (block) => {
     const now = Date.now();
@@ -496,12 +492,18 @@ const Server = {
       }
     });
     socket.on('latest', async () => {
-      const reqMessage = 'reqLatest';
+      // register socket for block updates
+      socket.join('blockUpdates');
       try {
         // check latest blocks exist
-        if (!Block.latest.length && await Block.refreshLatest()) {
-          // send 503 if data unavailable
-          socket.emit('error', '503: currently unavailable');
+        if (!Block.latest.length) {
+          socket.emit('wait', 'loading data...');
+          // attempt data refresh
+          await Block.refreshLatest();
+          if (!Block.latest.length) {
+            // send 503 if data unavailable
+            socket.emit('error', '503: currently unavailable');
+          }
         } else {
           // send latest blocks
           Block.latest.forEach(block => {
@@ -509,12 +511,10 @@ const Server = {
           });
         }
       } catch (error) {
-        const response = `500: InternalServerError during ${reqMessage}`;
+        const response = '500: Internal Server Error';
         console.error(response, error);
         socket.emit('error', response);
       }
-      // register socket for block updates
-      socket.join('blockUpdates');
     });
     socket.on('haiku', async (req = {}) => {
       const err = cleanRequest(req);
