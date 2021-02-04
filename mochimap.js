@@ -403,12 +403,10 @@ const Network = {
     const chains = new Map();
     let consensus = null;
     Network.map.forEach(node => {
-      console.debug(node);
       // ensure node meets requirements
-      if (!node.bnum || !node.bhash) return;
+      if (!node.cblock || !node.cblockhash) return;
       // get file id
-      const fid = Archive.file.bc(node.bnum, node.bhash);
-      console.debug(`fid: ${fid}`);
+      const fid = Archive.file.bc(node.cblock, node.cblockhash);
       // increment consensus for chain
       if (chains.has(fid)) chains.set(fid, chains.get(fid) + 1);
       else chains.set(fid, 1);
