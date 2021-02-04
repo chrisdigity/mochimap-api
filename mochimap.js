@@ -21,7 +21,7 @@
 /* global BigInt */
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
 // reference: https://medium.com/@vitalytomilov/reversible-bigint-serialization-8cba9deefad7
-BigInt.prototype.toJSON = () => `${this.toString()}n`;
+BigInt.prototype.toJSON = function () { return `${this.toString()}n`; };
 BigInt.reviver = (_, value) => {
   if (typeof value === 'string') {
     const m = value.match(/(-?\d+)n/);
@@ -477,7 +477,7 @@ const Server = {
           Block.latest.forEach((block, index) => {
             socket.emit('latestBlock', { block: block.toSummary(), index });
           });
-        } else socket.emit('error', `503: ${reqMessage} currently unavailable`);
+        } else socket.emit('error', '503: currently unavailable');
       } catch (error) {
         const response = `500: InternalServerError during ${reqMessage}`;
         console.error(response, error);
