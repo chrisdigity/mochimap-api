@@ -332,7 +332,7 @@ const Block = {
   latest: [],
   refreshLatest: async () => {
     // start with consensus block
-    let block = Network.getConsensusBlock();
+    let block = await Network.getConsensusBlock();
     if (block) {
       do {
         // push block to latest array
