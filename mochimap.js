@@ -500,16 +500,13 @@ const Server = {
           socket.emit('wait', 'loading data...');
           // attempt data refresh
           await Block.refreshLatest();
-          if (!Block.latest.length) {
-            // send 503 if data unavailable
-            socket.emit('error', '503: currently unavailable');
-          }
-        } else {
-          // send latest blocks
+        }
+        // send latest blocks, or 503 if data unavailable
+        if (Block.latest.length) {
           Block.latest.forEach(block => {
             socket.emit('latestBlock', block.toSummary());
           });
-        }
+        } else socket.emit('error', '503: currently unavailable');
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
