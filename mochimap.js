@@ -462,9 +462,9 @@ const Server = {
     socket.on('latest', async () => {
       const reqMessage = 'reqLatest';
       try {
-        // get/send latest blocks
+        // send latest blocks in reverse
         if (Block.latest.length) {
-          Block.latest.forEach((block, index) => {
+          Block.latest.reverse().forEach((block, index) => {
             socket.emit('latestBlock', { block: block.toSummary(), index });
           });
         } else socket.emit('error', '503: currently unavailable');
