@@ -244,13 +244,18 @@ const Network = {
   },
   run: () => Network.map.forEach(Network.updateMap),
   start: async () => {
-    console.log('Loading network data...');
+    console.log('Load network data');
     // prioritise network data acquisition:
     //   (database -> fallback(jsondata/peerlist)) ...
     try {
       const fname = Archive.file.nt('', 'last');
-      Network.parse(await Archive.read.nt(fname), 1);
-      console.log(' + Successfully loaded last network data from Archive');
+      if ((await Archive.search.nt(fname)).length) {
+        const netJSON = await Archive.read.nt(fname);
+        if (netJSON) {
+          Network.parse(netJSON, 1);
+          console.log(' + Successfully parsed network data from Archive');
+        }
+      }
     } catch (error) { console.error(` - ${error}`); }
     // utilise fallback methods on absence of database
     while (!Network.map.size) {
@@ -267,7 +272,7 @@ const Network = {
           ? await request(https, fallback)
           : await fsp.readFile(fallback), fallback.endsWith('.json'));
         console.log(' + Success loading from', fallback);
-      } catch (ignore) {}
+      } catch (error) { console.error(` - ${error}`); }
     }
     // start run/backup loop
     console.log('Begin network scanning...');
