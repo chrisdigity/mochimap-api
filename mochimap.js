@@ -150,13 +150,25 @@ const Block = {
     // handle transaction references
     const transactions = block.transactions;
     if (transactions) {
-      const writetx = transactions.reduce((acc, txe) => {
-        const addr = txe.srctag || txe.srcaddr;
-        const fnametx = Archive.file.tx(addr, txe.txid, block.bnum, block.bhash);
-        acc[fnametx] = Buffer.from(txe.toReference().buffer);
-        return acc;
-      }, {});
+      const writetx = {};
+      const writety = {};
+      transactions.forEach(txe => {
+        // build tx filedata
+        let fname = Archive.file.tx(txe.txid, block.bnum, block.bhash);
+        writetx[fname] = Buffer.from(txe.toReference().buffer);
+        // build ty files
+        let addr = txe.srctag || txe.srcaddr;
+        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'src');
+        writety[fname] = null;
+        addr = txe.dsttag || txe.dstaddr;
+        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'dst');
+        writety[fname] = null;
+        addr = txe.chgtag || txe.chgaddr;
+        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'chg');
+        writety[fname] = null;
+      });
       Archive.write.tx(writetx);
+      Archive.write.ty(writety);
     }
     // handle haiku visualization
     const writehk = {};
