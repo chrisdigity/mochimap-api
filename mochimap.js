@@ -154,6 +154,7 @@ const Block = {
         const addr = txe.srctag || txe.srcaddr;
         const fnametx = Archive.file.tx(addr, txe.txid, block.bnum, block.bhash);
         acc[fnametx] = Buffer.from(txe.toReference().buffer);
+        return acc;
       }, {});
       Archive.write.tx(writetx);
     }
@@ -161,7 +162,7 @@ const Block = {
     const writehk = {};
     const fnamehk = Archive.file.hk(block.bnum, block.bhash);
     writehk[fnamehk] = await visualizeHaiku(block);
-    if (writehk[fnamehk]) Archive.write.bc(writehk);
+    if (writehk[fnamehk]) Archive.write.hk(writehk);
     /*
     // handle chain update
     if (Block.chain.has(block.bnum)) Block.contention(block);
