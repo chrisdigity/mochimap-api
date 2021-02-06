@@ -58,9 +58,9 @@ const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
-const request = (module, options, postData) => {
+const request = (mod, options, postData) => {
   return new Promise((resolve, reject) => {
-    var req = module.request(options, res => {
+    var req = mod.request(options, res => {
       var body = [];
       res.on('data', body.push); // accumulate data chunks
       res.on('end', () => { // concatenate data chunks

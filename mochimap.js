@@ -399,11 +399,10 @@ const Server = {
           'Content-Type': 'application/x-www-form-urlencoded',
           'Content-Length': Buffer.byteLength(postData)
         }
-      }, postData).then(result => {
-        result = JSON.parse(result);
+      }, postData).then(json => {
         // simple verification for now...
-        if (!result) next(new Error('Server authentication failure'));
-        else if (!result.success) next(new Error('Authentication failure'));
+        if (!json) next(new Error('Server authentication failure'));
+        else if (!json.success) next(new Error('Authentication failure'));
         else next(); // successful authentication
       }).catch(error => {
         console.error('[reCAPTCHA Request]', error);
