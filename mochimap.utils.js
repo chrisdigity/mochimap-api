@@ -62,11 +62,9 @@ const request = (mod, options, postData) => {
   return new Promise((resolve, reject) => {
     var req = mod.request(options, res => {
       var body = [];
-      res.on('data', body.push); // accumulate data chunks
+      res.on('data', chunk => body.push(chunk)); // accumulate data chunks
       res.on('end', () => { // concatenate data chunks
-        console.debug('BEFORE: ', body);
         body = Buffer.concat(body).toString();
-        console.debug('AFTER: ', body);
         try { // pass JSON Object
           resolve(JSON.parse(body));
         } catch (ignore) { resolve(body); }
