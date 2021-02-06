@@ -33,7 +33,7 @@ const fs = require('fs');
 const fsp = fs.promises;
 /* dependancies */
 const { cleanRequest, isPrivateIPv4, request } = require('./mochimap.utils.js');
-const Archive = require('./maparchive'); // will remain proprietary...
+const Archive = require('./mochimap.archive'); // will remain proprietary...
 const Mochimo = require('mochimo');
 const SocketIO = require('socket.io')();
 
