@@ -75,7 +75,7 @@ header .page {
   letter-spacing: 0.0625em;
 }
 header #connection {
-  font-size: 0.875em;
+  font-size: 0.8125em;
   animation: flash-fade 2s infinite;
 }
 
@@ -86,15 +86,37 @@ footer {
   min-width: 36em;
   transform: translateX(-50%);
 }
-
-main {
+footer > .desc {
+  text-align: right;
+  font-size: 1.5em;
+  font-family: "Indie Flower", "Segoe UI", Helvetica, Arial, sans-serif;
+}
+footer > .desc:before {
+  content: '';
+  float: right;
+  width: 6em;
   height: 1em;
 }
-main:before {
-  content: '';
-  width:100vw;
-  height:100vh;
-  background: green;
+footer > .desc > a {
+  color: white;
+  font-size: 0.75em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+footer > .desc > a:hover {
+  text-shadow: 0 0 0.125em #000, 0 0 0.25em #fff, 0 0 0.5em #fff, 0 0 1em #fff;
+}
+footer > .desc > a:before {
+  content: ' - ';
+}
+
+main {
+  position: relative;
+  text-align: center;
+  margin: 0 auto;
+  max-width: 75%;
+  width: 100vw;
+  height: auto;
 }
 aside {
   display: inline-block;
@@ -107,22 +129,13 @@ aside {
   font-weight: bold;
   font-size: 2em;
 }
-#mentions {
-  text-align:center;
-  font-size: 1.5em;
-  font-family: "Indie Flower", "Segoe UI", Helvetica, Arial, sans-serif;
-}
-#mentions:before {
-  content: '';
-  float: right;
-  width: 6em;
-  height: 1em;
-}
 .unfont {
   font-family: "Segoe UI", Helvetica, Arial, sans-serif;
 }
 
-
+main div {
+  text-align: left;
+}
 
     
     
@@ -133,48 +146,6 @@ aside {
     .canvas-container canvas {
       width: 300px;
       height: 300px;
-    }
-
-    /* Page Descriptor Format */
-    .desc {
-      cursor: default;
-      z-index: 3;
-      position: absolute;
-      margin: 0;
-      bottom: 0;
-      left: 50%;
-      transform: translateX(-50%);
-      font: 1.25em 'Libre Baskerville', serif;
-      color: #E3E3EB;
-      text-align: center;
-      display: inline-block;
-      letter-spacing: 0.25em;
-    }
-    .desc span {
-      position: relative;
-      display: block;
-      font-size: 0.75em;
-      font-weight: bold;
-      font-style: italic;
-      color: darkgray;
-      letter-spacing: 0.125em;
-    }
-    .desc span:before,
-    .desc span:after {
-      content: "";
-      position: absolute;
-      right: 0;
-      top: 50%;
-      width: 40%;
-      height: 0.25em;
-      background: #E3E3EB;
-      transform: translateY(-50%);
-    }
-    .desc span:after {
-      left: 0;
-    }
-    .desc strong {
-      white-space: nowrap;
     }
     
     /* Social Links Bar */
@@ -231,73 +202,6 @@ aside {
       top: 2.25em;
       height: 1.125em;
     }
-
-    /* nav section */
-    nav {
-      overflow: hidden;
-      position: relative;
-      background: black;
-      height: 8em;
-    }
-    nav > * {
-      margin: 0 auto;
-    }
-    nav:before, nav:after {
-      content: '';
-      z-index: 2;
-      position: absolute;
-      transform: translateX(-50%);
-      left: 50%;
-      width: 0;
-      height: 0;
-      border-style: solid;
-    }
-    nav:before {
-      bottom: 0;
-      border-width: 0 15em 1.25em 15em;
-      border-color: transparent transparent white transparent;
-    }
-    nav:after {
-      bottom: 0;
-      border-width: 0 2.5em 2.5em 2.5em;
-      border-color: transparent transparent white transparent;
-    }
-    nav #lfx, nav #rfx, nav #loader {
-      z-index: -1;
-      position: absolute;
-      z-index: 1;
-      bottom: 0;
-      left: 50%;
-    }
-    nav #lfx {
-      transform: translate(-100%,40%) rotate(-10deg);
-    }
-    nav #rfx {
-      transform: translateY(35%) scale(-1, -1);
-    }
-    nav #loader {
-      transform: translateX(-50%);
-    }
-    nav #connection_status {
-      position: absolute;
-      z-index: 1;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      font: 2em Iceland;
-      animation: flash-fade 2s infinite;
-    }
-    nav ul {
-      position: absolute;
-    }
-    
-    /* Main content */
-    main {
-      overflow: hidden;
-      position: relative;
-      text-align: center;
-    }
-
     
     /* standard css */
     .unselectable {
@@ -380,21 +284,35 @@ aside {
     }
     /* animations */
     @keyframes flash-fade {
-      from, to { text-shadow: none; color: rgba(255,255,255,0.25); }
+      from, to { text-shadow: none; color: #fff; }
       20% {
         text-shadow: 
-          0 0 0.125em white, 0 0 0.25em white, 0 0 0.5em white,
+          0 0 0.125em #fff, 0 0 0.25em #fff, 0 0 0.5em #fff,
           0 0 0.25em black, 0 0 0.5em black, 0 0 1em black;
-        color: white;
       }
     }
     @keyframes flash-fade-red {
-      from, to { text-shadow: none; color: rgba(255,0,0,0.25); }
+      from, to { text-shadow: none; color: #f00; }
       20% {
         text-shadow: 
-          0 0 0.125em red, 0 0 0.25em red, 0 0 0.5em red,
+          0 0 0.125em #f00, 0 0 0.25em #f00, 0 0 0.5em #f00,
           0 0 0.25em black, 0 0 0.5em black, 0 0 1em black;
-        color: red;
+      }
+    }
+    @keyframes flash-fade-orange {
+      from, to { text-shadow: none; color: #f80; }
+      20% {
+        text-shadow: 
+          0 0 0.125em #f80, 0 0 0.25em #f80, 0 0 0.5em #f80,
+          0 0 0.25em black, 0 0 0.5em black, 0 0 1em black;
+      }
+    }
+    @keyframes flash-dim-green {
+      from, to { text-shadow: none; color: #0f0; }
+      20% {
+        text-shadow:
+          0 0 0.0625em #0f0, 0 0 0.125em #0f0, 0 0 0.25em #0f0,
+          0 0 0.125em black, 0 0 0.25em black, 0 0 0.5em black;
       }
     }
 }
