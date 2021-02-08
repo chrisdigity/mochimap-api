@@ -360,20 +360,20 @@ const Server = {
       // self-assign request parameters (latest network consensus)
       const req = Object.assign({}, Network.getConsensus());
       try {
-        socket.emit('wait', 'loading data...');
+        socket.emit('wait', 'processing request...');
         const blocks = [];
         // read latest blocks (x10)
         for (let i = 0; i < 10; i++) {
-          const fname = Archive.file.bc(req.bnum, req.bhash);
-          const block = await Archive.read.bc(fname);
+          const fname = Archive.file.bs(req.bnum, req.bhash);
+          const block = await Archive.read.bs(fname);
           if (!block) break; // cannot continue
-          blocks.push(block.toSummary());
+          blocks.unshift(block);
           req.bhash = block.phash;
           req.bnum -= 1n;
         }
         // emit latest blocks
         if (blocks.length) {
-          blocks.reverse().forEach(block => socket.emit('latestBlock', block));
+          blocks.forEach(block => socket.emit('latestBlock', block));
         } else socket.emit('error', '503: block data unavailable');
       } catch (error) {
         const response = '500: Internal Server Error';
