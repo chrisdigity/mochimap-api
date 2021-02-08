@@ -9,7 +9,7 @@ function drawHaiku(ctx, text, size, font, type) {
   // split multiline text-
   text = text.split('\n');
   // predraw setup
-  var padding = size / 3;
+  var padding = size / 2;
   var outline = size / 8;
   var blur = outline * 2;
   ctx.font = size + 'px "' + font + '"';
