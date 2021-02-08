@@ -104,7 +104,7 @@ const Timers = [];
 const Block = {
   cache: new Set(), // TODO: custom Map() cache
   chain: new Map(),
-  check: async (peer, bnum, bhash) => {
+  check: async (peer, bnum, bhash, checkback) => {
     // check recent blockchain
     if (!Block.cache.has(bhash)) {
       // add bhash to recent
@@ -113,8 +113,13 @@ const Block = {
       if (Block.cache.size > SET_LIMIT) {
         Block.cache.delete(Block.cache.values().next().value);
       }
-      // check database for bnum/bhash
-      if (!(await Archive.search.bc(Archive.file.bc(bnum, bhash))).length) {
+      // check archive only if check is an extension of a block update
+      let stored = 0;
+      if (checkback) {
+        // check database for bnum/bhash
+        stored = (await Archive.search.bc(Archive.file.bc(bnum, bhash))).length;
+      }
+      if (!stored) {
         // download block and perform block update procedure
         Block.dl(peer, bnum, bhash).then(Block.update).catch(console.error);
       }
@@ -137,7 +142,7 @@ const Block = {
                   'got invalid');
     }
     // initiate check for any previous blocks
-    Block.check(peer, block.bnum - 1n, block.phash);
+    Block.check(peer, block.bnum - 1n, block.phash, true);
     // return block data for chaining
     return block;
   },
