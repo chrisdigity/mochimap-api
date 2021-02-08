@@ -159,7 +159,7 @@ const Block = {
     // reduce maddr to 32 bytes
     if (bsummary.maddr) bsummary.maddr = bsummary.maddr.slice(0, 64);
     writebs[fnamebs] = JSON.stringify(bsummary);
-    Archive.write.bc(writebs);
+    Archive.write.bs(writebs);
     // broadcast block update
     Server.broadcast('blockUpdates', 'latestBlock', bsummary);
     // handle transaction references
