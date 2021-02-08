@@ -157,6 +157,8 @@ const Block = {
     const fnamebs = Archive.file.bs(block.bnum, block.bhash);
     const bsummary = block.toSummary();
     writebs[fnamebs] = bsummary;
+    // reduce maddr to 32 bytes
+    if (bsummary.maddr) bsummary.maddr = bsummary.maddr.slice(0, 64);
     Archive.write.bc(writebs);
     // broadcast block update
     Server.broadcast('blockUpdates', 'latestBlock', bsummary);
