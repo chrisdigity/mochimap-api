@@ -84,6 +84,8 @@ const visualizeHaiku = async (block, checkback, file) => {
       haiku.img.src = photo.src.original;
       haiku.img.srcid = 'Pexels';
       haiku.img.srcurl = photo.url;
+      // broadcast haiku update
+      Server.broadcast('haikuUpdates', 'haiku', haiku);
       // return stringified JSON
       return JSON.stringify(haiku);
     }
