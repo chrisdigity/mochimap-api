@@ -43,11 +43,7 @@ function connected(socket) { // eslint-disable-line no-unused-vars
     // remove any existing description class elements
     var footer = document.getElementsByTagName('footer')[0];
     var desc = footer.getElementsByClassName('desc');
-    if (desc.length) {
-      desc.forEach(function (el) {
-        footer.removeChild(el);
-      });
-    }
+    if (desc.length) footer.removeChild(desc[0]);
     // create new description from recv'd data
     desc = document.createElement('div');
     desc.className = 'desc';
