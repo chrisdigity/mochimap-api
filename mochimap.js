@@ -152,8 +152,14 @@ const Block = {
     const fnamebc = Archive.file.bc(block.bnum, block.bhash);
     writebc[fnamebc] = Buffer.from(block.buffer);
     Archive.write.bc(writebc);
+    // handle block summary
+    const writebs = {};
+    const fnamebs = Archive.file.bs(block.bnum, block.bhash);
+    const bsummary = block.toSummary();
+    writebs[fnamebs] = bsummary;
+    Archive.write.bc(writebs);
     // broadcast block update
-    Server.broadcast('blockUpdates', 'latestBlock', block.toSummary());
+    Server.broadcast('blockUpdates', 'latestBlock', bsummary);
     // handle transaction references
     const transactions = block.transactions;
     if (transactions) {
