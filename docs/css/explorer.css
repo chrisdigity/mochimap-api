@@ -1,0 +1,89 @@
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap');
+
+main > div {
+  display: inline-block;
+  max-width: 34em;
+  width: 100%;
+  text-shadow: 0 0 0.125em #000, 0 0 0.25em #000, 0 0 0.5em #000, 0 0 1em #000;
+}
+main dt {
+  position:relative;
+  margin-top: 1em;
+  padding: 0.25em 0.5em;
+  font-size: 1.25em;
+  background: rgba(0, 89, 255, 0.5);
+}
+main dt > a, main dd > a {
+  color: white;
+  font-family: 'Roboto Mono';
+  text-decoration: none;
+}
+main dt > a:hover, main dd > a:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 0.25em #fff, 0 0 0.5em #fff;
+}
+main dd {
+  margin-left: 2em;
+  padding: 0.25em;
+  font-family: 'Roboto Mono', monospace;
+  background: rgba(0, 89, 255, 0.25);
+}
+
+.btype-normal:before {
+  content: '\25a3  Normal ';
+}
+.btype-genesis:before {
+  content: '\25c8  Genesis ';
+}
+.btype-neogenesis:before {
+  content: '\25a6  Neogenesis ';
+}
+.btype-pseudo:before {
+  content: '\25a2  Pseudo ';
+}
+.stime {
+  display: inline-block;
+  float: right;
+  text-align: right;
+  font-size: 0.62em;
+}
+.haiku {
+  float: right;
+  margin-right: 0.5em;
+  white-space: pre-line;
+  text-align: right;
+}
+.bhash, .phash, .mroot, .nonce {
+  margin-right : 2em;
+  font-size: 0.75em;white-space: nowrap
+}
+.maddr:before {
+  content: '\26cf  Miner: ';
+}
+.mreward:before {
+  content: '\8840  Reward: ';
+}
+.mfee:before {
+  content: ' (';
+}
+.mfee:after {
+  content: ' nMCM Fee)';
+}
+.difficulty:before {
+  content: '\0394  Difficulty: ';
+}
+.tcount:before {
+  content: '\27aa  Transactions: ';
+}
+.bhash:before {
+  content: '# Block Hash: ';
+}
+.phash:before {
+  content: '# Prev. Hash: ';
+}
+.mroot:before {
+  content: '\03a8  Merkle: ';
+}
+.nonce:before {
+  content: '\03bb  Nonce: ';
+}

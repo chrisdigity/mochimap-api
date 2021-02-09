@@ -33,7 +33,8 @@ function drawHaiku(ctx, text, size, font, type) {
 function connected(socket) { // eslint-disable-line no-unused-vars
   var imgOptions = '?auto=compress&cs=tinysrgb&h=1200';
   // get query parameters
-  var bnum = window.location.search.slice(1);
+  var bnum = getUrlParameter('bnum');
+  var bhash = getUrlParameter('bhash');
   // set haiku event actions
   socket.on('haiku', function (haiku) {
     statusWait('downloading...');
@@ -85,8 +86,9 @@ function connected(socket) { // eslint-disable-line no-unused-vars
     img.src = haiku.img.src + imgOptions;
   });
   // request haiku
-  statusWait('reqHaiku#' + (bnum || 'latest'));
-  socket.emit('haiku', { bnum: bnum } || {});
+  var reqmsg = (bnum ? bnum + (bhash ? '.' + bhash.slice(0, 4) : '') : 'latest');
+  statusWait('reqHaiku#' + reqmsg + '...');
+  socket.emit('haiku', { bnum: bnum, bhash: bhash });
 }
     
 /* Share image (mobile only) */

@@ -114,7 +114,7 @@ main {
   position: relative;
   text-align: center;
   margin: 0 auto;
-  max-width: 75%;
+  max-width: 75em;
   width: 100vw;
   height: auto;
 }
