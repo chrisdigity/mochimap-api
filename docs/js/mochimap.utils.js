@@ -1,6 +1,21 @@
 /* eslint-env browser */
 /* eslint-disable no-unused-vars */
 
+function dCountIn(parent, depth) {
+  var count = 0;
+  var children = parent.childNodes.length;
+  // iterate children
+  for(var i = 0; i < children; i++) {
+    // ignore textNodes
+    if(parent.childNodes[i].nodeType != 3) {
+      // check depth
+      if(depth) count += dCountIn(parent.childNodes[i], depth - 1);
+      count++;
+    }
+  }
+  return count;
+}
+
 function dCreate(type, attr, text, html) {
   // set defaults
   type = type || 'div';
@@ -23,14 +38,24 @@ function dCreateIn(parent, type, attr, text, html) {
   return element;
 }
 
-function trunc(text, max) {
-  return text.substr(0, max - 1) + (text.length > max ? '...' : '');
+function bSize(size, bytes) {
+  size = size || 0;
+  var unit = 'Bytes';
+  if (size && !bytes) {
+    var k = 1000; // 1024 for Ki, Mi, Gi, etc...
+    var mult = Math.floor(Math.log(size) / Math.log(k));
+    size /= Math.pow(k, mult);
+    unit = ['','K','M','G','T','P','E','Z','Y'][mult] + unit;
+  }
+  return size.toLocaleString() + ' ' + unit;
 }
 
-function mochi(bigint) {
-  var whole = bigint.length > 9 ? bigint.slice(0, -9) : '0';
-  var decimal = bigint.slice(-9).padStart(9, '0').replace(/0+$/g, '');
-  return whole + (decimal ? '.' + decimal : '');
+function mcm(bigint, forceNano, nolocale) {
+  bigint = bigint || 0;
+  var unit = 'MCM';
+  if (bigint > 999999999 && !forceNano) bigint /= 1000000000;
+  else unit = 'η' + unit;
+  return (nolocale ? bigint : Number(bigint).toLocaleString()) + ' ' + unit;
 }
 
 function getUrlParameter(name) {

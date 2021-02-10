@@ -86,8 +86,8 @@ function connected(socket) { // eslint-disable-line no-unused-vars
     img.src = haiku.img.src + imgOptions;
   });
   // request haiku
-  var reqmsg = (bnum ? bnum + (bhash ? '.' + bhash.slice(0, 4) : '') : 'latest');
-  statusWait('reqHaiku#' + reqmsg + '...');
+  var reqmsg = (bnum ? bnum + (bhash ? '&' + bhash.slice(0, 6) : '') : 'latest');
+  statusWait('req#' + reqmsg + '...');
   socket.emit('haiku', { bnum: bnum, bhash: bhash });
 }
     
