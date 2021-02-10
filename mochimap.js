@@ -476,7 +476,7 @@ const Server = {
     SocketIO.on('connection', Server.connection);
     SocketIO.attach(Server.https, socketioOpts);
     // start https server
-    Server.https.listen(2053, '0.0.0.0');
+    Server.https.listen(process.env.DEVELOPMENT ? 80 : 443, '0.0.0.0');
   })
 };
 
