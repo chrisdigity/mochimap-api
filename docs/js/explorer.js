@@ -23,7 +23,7 @@ function connected(socket) { // eslint-disable-line no-unused-vars
     // build links
     var bquery = '?bnum=' + block.bnum + '&bhash=' + block.bhash.slice(0, 16);
     var blink = '/explorer/block/' + bquery;
-    var hlink = '/explorer/block/' + bquery;
+    var hlink = '/haiku/' + bquery;
     // append new block data as description list
     var dt = dCreate('dt');
     dCreateIn(dt, 'a', { class: 'btype-' + type, href: blink }, 'Block #' + bnum);
