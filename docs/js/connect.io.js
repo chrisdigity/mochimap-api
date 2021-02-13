@@ -1,6 +1,6 @@
 /* eslint-env browser */
 /* globals connected, io, grecaptcha */
-var serverio = 'https://io.mochimap.com:2053/';
+var serverio = 'https://io.mochimap.com/';
 
 var statusInfo = function (msg) {
   var status = document.getElementById('connection');
