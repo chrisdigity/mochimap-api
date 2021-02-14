@@ -12,7 +12,7 @@ function connected(socket) { // eslint-disable-line no-unused-vars
     var mfee = block.mfee || 0;
     var tcount = block.tcount || 0;
     var tmfee = tcount * mfee;
-    var tsendamount = block.tsendamount || 0;
+    var tamount = block.tamount || 0;
     var difficulty = block.difficulty || 0;
     //var time0 = block.time0 || 0;
     var stime = block.stime ? block.stime * 1000 : 0;
@@ -37,7 +37,7 @@ function connected(socket) { // eslint-disable-line no-unused-vars
       dCreateIn(mdata, 'sup', { title: tcount + ' Transactions x ' + mcm(mfee) + ' Network Fee' }, ' +' + mcm(tmfee, 1));
       dCreateIn(
         dCreateIn(dd, 'div', null, '血 Transactions: ' + tcount + ' ⥂ '),
-        'span', null, mcm(tsendamount) + ' sent');
+        'span', null, mcm(tamount) + ' sent');
       dCreateIn(dd, 'a', { class: 'haiku', href: hlink }, haiku);
     }
     dCreateIn(dd, 'div', null, '⚠ Difficulty: ' + difficulty);
