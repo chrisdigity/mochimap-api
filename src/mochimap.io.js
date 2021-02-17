@@ -116,7 +116,8 @@ const Block = {
       else {
         checkback++; // increase checkback
         // check for previous block summary
-        const prev = Archive.file.bs(hBlock.bnum - 1n, hBlock.phash);
+        const tempbnum = BigInt(hBlock.bnum);
+        const prev = Archive.file.bs(tempbnum - 1n, hBlock.phash);
         if ((await Archive.search.bs(prev)).includes(prev)) {
           // read previous block summary and start over
           hBlock = await Archive.read.bs(prev);
