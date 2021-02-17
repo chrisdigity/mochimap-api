@@ -32,67 +32,10 @@ const http = require('http');
 const fs = require('fs');
 const fsp = fs.promises;
 /* dependancies */
-const { cleanRequest, isPrivateIPv4, request } = require('./mochimap.utils.js');
-const Archive = require('./mochimap.archive'); // will remain proprietary...
+const Archive = require('./mochimap.archive'); // Proprietary Archive storage...
+const Utility = require('./mochimap.util'); // Utility functions
 const Mochimo = require('mochimo');
 const SocketIO = require('socket.io')();
-
-const visualizeHaiku = async (block, checkback, file) => {
-  const shadow = Boolean(checkback);
-  // define filepath if undefined
-  file = file || Archive.file.hk(block.bnum, block.bhash);
-  // if checkback on normal block, reduce checkback
-  if (checkback > 0 && block.type === Mochimo.Block.NORMAL) checkback--;
-  // check block type is normal
-  if (checkback > 0 || block.type !== Mochimo.Block.NORMAL) {
-    checkback++; // increase checkback
-    // start over with previous block
-    const prev = Archive.file.bc(block.bnum - 1n, block.phash);
-    block = await Archive.read.bc(prev);
-    // check block data and retry...
-    if (block) return await visualizeHaiku(block, checkback, file);
-  } else { // heuristically determine best picture query for haiku
-    const haikuStr = Mochimo.Trigg.expand(block.nonce, shadow);
-    const search = haikuStr.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
-    const query = search.join('%20');
-    let pexels;
-    try { // request results from Pexels
-      pexels = await request(https, {
-        hostname: 'api.pexels.com',
-        path: `/v1/search?query=${query}&per_page=80`,
-        headers: { Authorization: process.env.PEXELS_SECRET }
-      });
-      if (pexels.error) throw new Error(pexels.error);
-    } catch (error) { console.trace(`Pexels request for ${file} gave`, error); }
-    // check results exist
-    if (!pexels.error && pexels) {
-      let pi, ps, is;
-      const ts = haikuStr.match(/\b\w{3,}\b/g);
-      for (let i = pi = ps = is = 0; i < pexels.photos.length; i++, is = 0) {
-        ts.forEach(t => {
-          is += (pexels.photos[i].url.match(new RegExp(t, 'g')) || []).length;
-        });
-        if (is > ps) { ps = is; pi = i; }
-      }
-      const photo = pexels.photos[pi];
-      const haiku = { img: {} };
-      haiku.num = BigInt('0x' + file.split('.')[0]).toString();
-      haiku.str = haikuStr;
-      haiku.img.author = photo.photographer || 'Unknown';
-      haiku.img.authorurl = photo.photographer_url || 'pexels.com';
-      haiku.img.desc = photo.url.match(/\w+(?=-)/g).join(' ');
-      haiku.img.src = photo.src.original;
-      haiku.img.srcid = 'Pexels';
-      haiku.img.srcurl = photo.url;
-      // broadcast haiku update
-      Server.broadcast('haikuUpdates', 'haiku', haiku);
-      // return stringified JSON
-      return JSON.stringify(haiku);
-    }
-  }
-  console.log(`Could not process ${file} at this time...`);
-  return null;
-};
 
 /* pre-core */
 // const GENESIS_HASH =
@@ -147,53 +90,89 @@ const Block = {
     return block;
   },
   update: async (block) => {
-    // handle block update
+    // store block properties accessed often
+    const bnum = block.bnum;
+    const bhash = block.bhash;
+    // archive block update
     const writebc = {};
-    const fnamebc = Archive.file.bc(block.bnum, block.bhash);
+    const fnamebc = Archive.file.bc(bnum, bhash);
     writebc[fnamebc] = Buffer.from(block.buffer);
-    Archive.write.bc(writebc);
-    // handle block summary
+    Archive.write.bc(writebc); // async
+    // archive block summary
     const writebs = {};
-    const fnamebs = Archive.file.bs(block.bnum, block.bhash);
-    const bsummary = block.toSummary();
-    // reduce maddr to 32 bytes
-    if (bsummary.maddr) bsummary.maddr = bsummary.maddr.slice(0, 64);
+    const fnamebs = Archive.file.bs(bnum, bhash);
+    const bsummary = Utility.summarizeBlock(block);
     writebs[fnamebs] = JSON.stringify(bsummary);
-    Archive.write.bs(writebs);
-    // broadcast block update
+    Archive.write.bs(writebs); // async
+    // broadcast initial block summary as block update
     Server.broadcast('blockUpdates', 'latestBlock', bsummary);
-    // handle transaction references
+    // find appropriate block to use for haiku visualization
+    let hBlock = bsummary;
+    let checkback = 0;
+    let shadow = 0;
+    while (hBlock.typeStr !== 'normal' || checkback > 0) {
+      shadow |= checkback;
+      if (hBlock.typeStr === 'normal') checkback--; // decrease checkback
+      else {
+        checkback++; // increase checkback
+        // check for previous block summary
+        const prev = Archive.file.bs(hBlock.bnum - 1n, hBlock.phash);
+        if ((await Archive.search.bs(prev)).includes(prev)) {
+          // read previous block summary and start over
+          hBlock = await Archive.read.bs(prev);
+          continue;
+        } else {
+          // cannot determine appropriate block at this time
+          hBlock = null;
+          break;
+        }
+      }
+    }
+    // visualize Haiku from appropriate block summary
+    if (hBlock) {
+      shadow = Boolean(shadow);
+      const haiku = Mochimo.Trigg.expand(hBlock.nonce, shadow);
+      Utility.visualizeHaiku(haiku, https).then(data => {
+        // add block data
+        data.num = bnum;
+        data.shadow = shadow;
+        data.str = haiku;
+        // broadcast haiku update
+        Server.broadcast('haikuUpdates', 'haiku', data);
+        // archive haiku visualization
+        const writehk = {};
+        const fnamehk = Archive.file.hk(bnum, bhash);
+        writehk[fnamehk] = JSON.stringify(data);
+        Archive.write.hk(writehk); // async
+      }).catch(console.trace);
+    } else console.log('cannot visualize Haiku for bnum', bnum, 'at this time');
+    // handle block deconstruction (performance untested with large blocks)
     const transactions = block.transactions;
     if (transactions) {
       const writetx = {};
       const writety = {};
       transactions.forEach(txe => {
         // build tx filedata
-        let fname = Archive.file.tx(txe.txid, block.bnum, block.bhash);
+        let fname = Archive.file.tx(txe.txid, bnum, bhash);
         writetx[fname] = Buffer.from(txe.toReference().buffer);
         // build ty files
         let addr = txe.srctag || txe.srcaddr;
-        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'src');
+        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'src');
         writety[fname] = null;
         addr = txe.dsttag || txe.dstaddr;
-        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'dst');
+        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'dst');
         writety[fname] = null;
         addr = txe.chgtag || txe.chgaddr;
-        fname = Archive.file.ty(addr, block.bnum, block.bhash, txe.txid, 'chg');
+        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'chg');
         writety[fname] = null;
       });
       Archive.write.tx(writetx);
       Archive.write.ty(writety);
     }
-    // handle haiku visualization
-    const writehk = {};
-    const fnamehk = Archive.file.hk(block.bnum, block.bhash);
-    writehk[fnamehk] = await visualizeHaiku(block);
-    if (writehk[fnamehk]) Archive.write.hk(writehk);
     /*
     // handle chain update
-    if (Block.chain.has(block.bnum)) Block.contention(block);
-    else Block.chain.set(block.bnum, block.trailer);
+    if (Block.chain.has(bnum)) Block.contention(block);
+    else Block.chain.set(bnum, block.trailer);
     */
     // return block data for promise chaining
     return block;
@@ -253,7 +232,7 @@ const Network = {
       if (node.peers && node.peers.length) {
         node.peers.forEach(ip => {
           // ignore private IPv4 or existing map nodes
-          if (isPrivateIPv4(ip) || Network.map.has(ip)) return;
+          if (Utility.isPrivateIPv4(ip) || Network.map.has(ip)) return;
           // initialize new node
           Network.updateMap(new Mochimo.Node({ ip }));
         });
@@ -297,7 +276,7 @@ const Network = {
       try {
         // obtain and parse fallback data, type dependant
         Network.parse(fallback.startsWith('http')
-          ? await request(https, fallback)
+          ? await Utility.request(https, fallback)
           : await fsp.readFile(fallback), fallback.endsWith('.json'));
         console.log(' + Success loading from', fallback);
       } catch (error) { console.error(` - ${error}`); }
@@ -382,7 +361,7 @@ const Server = {
       }
     });
     socket.on('haiku', async (req = {}) => {
-      const err = cleanRequest(req);
+      const err = Utility.cleanRequest(req);
       if (err) return socket.emit('error', 'reqRejected: ' + err);
       const reqMessage = // reqHaiku#<blocknumber>.<blockhash>
         `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;
@@ -419,7 +398,7 @@ const Server = {
         response: socket.handshake.auth.token
       });
       // check authorization token against Google's reCaptcha
-      request(https, {
+      Utility.request(https, {
         hostname: 'recaptcha.net',
         path: '/recaptcha/api/siteverify',
         method: 'POST',

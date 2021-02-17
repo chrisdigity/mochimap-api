@@ -94,4 +94,79 @@ const request = (mod, options, postData) => {
   });
 };
 
-module.exports = { cleanRequest, compareWeight, isPrivateIPv4, request };
+// Block functions
+const summarizeBlock = (block) => {
+  const summary = {};
+  // add hash data
+  summary.bhash = block.bhash;
+  summary.phash = block.phash;
+  // add mining data, if available
+  const maddr = block.maddr;
+  if (maddr) {
+    summary.mroot = block.mroot;
+    summary.nonce = block.nonce;
+    summary.haiku = block.haiku;
+    summary.maddr = maddr.slice(0, 64); // reduce mining address to 32 bytes
+    summary.mreward = block.mreward;
+    summary.mfee = block.mfee;
+    summary.tcount = block.tcount;
+  }
+  const tamount = block.tamount;
+  if (tamount) summary.tamount = tamount;
+  // add remaining trailer data
+  summary.difficulty = block.difficulty;
+  summary.time0 = block.time0;
+  summary.stime = block.stime;
+  summary.bnum = block.bnum;
+  // add block type as string
+  summary.type = block.typeStr;
+  // add block size, in byte
+  summary.size = block.byteLength;
+  // return finalized summary
+  return summary;
+};
+const visualizeHaiku = async (haiku, requestModule) => {
+  // heuristically determine best picture query for haiku
+  const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
+  const query = search.join('%20');
+  let pexels;
+  try { // request results from Pexels
+    pexels = await request(requestModule, {
+      hostname: 'api.pexels.com',
+      path: `/v1/search?query=${query}&per_page=80`,
+      headers: { Authorization: process.env.PEXELS_SECRET }
+    });
+    if (pexels.error) throw new Error(pexels.error);
+  } catch (error) { console.trace('Pexels request ERROR:', pexels, error); }
+  // check results exist
+  if (!pexels.error && pexels) {
+    let pi, ps, is;
+    const ts = haiku.match(/\b\w{3,}\b/g);
+    for (let i = pi = ps = is = 0; i < pexels.photos.length; i++, is = 0) {
+      ts.forEach(t => {
+        is += (pexels.photos[i].url.match(new RegExp(t, 'g')) || []).length;
+      });
+      if (is > ps) { ps = is; pi = i; }
+    }
+    const photo = pexels.photos[pi];
+    const data = { img: {} };
+    data.img.author = photo.photographer || 'Unknown';
+    data.img.authorurl = photo.photographer_url || 'pexels.com';
+    data.img.desc = photo.url.match(/\w+(?=-)/g).join(' ');
+    data.img.src = photo.src.original;
+    data.img.srcid = 'Pexels';
+    data.img.srcurl = photo.url;
+    // return stringified JSON
+    return haiku;
+  }
+  return null;
+};
+
+module.exports = {
+  cleanRequest,
+  compareWeight,
+  isPrivateIPv4,
+  request,
+  summarizeBlock,
+  visualizeHaiku
+};

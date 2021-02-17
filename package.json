@@ -1,5 +1,5 @@
 {
-  "main": "mochimap.js",
+  "main": "src/mochimap.io.js",
   "scripts": {
     "restart": "npm run stop && npm run start",
     "start": "pm2 start mochimap.js --name MochiMapIO -l log.txt --time",
