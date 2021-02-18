@@ -174,9 +174,9 @@ const visualizeHaiku = async (haiku, requestModule) => {
     data.img.srcid = 'Pexels';
     data.img.srcurl = photo.url;
     // return stringified JSON
-    return haiku;
+    return data;
   }
-  return null;
+  throw new Error('failed to visualize Haiku');
 };
 
 module.exports = {
