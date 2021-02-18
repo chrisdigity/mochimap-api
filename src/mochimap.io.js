@@ -362,12 +362,11 @@ const Server = {
           req.bhash = block.phash;
           req.bnum -= 1n;
         }
-        // emit latest blocks
-        if (blocks.length) {
+        // emit latest data
+        if (!blocks.length && !transactions.length) {
+          socket.emit('error', '503: data unavailable');
+        } else {
           blocks.forEach(block => socket.emit('latestBlock', block));
-        } else socket.emit('error', '503: block data unavailable');
-        // emit latest transactions
-        if (transactions.length) {
           transactions.forEach(txe => socket.emit('latestTransaction', txe));
         }
       } catch (error) {
