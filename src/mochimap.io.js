@@ -149,10 +149,17 @@ const Block = {
     } else console.log('cannot visualize Haiku for bnum', bnum, 'at this time');
     // handle block deconstruction (performance untested with large blocks)
     const transactions = block.transactions;
-    if (transactions) {
+    if (transactions.length) {
       const writetx = {};
       const writety = {};
-      transactions.forEach(txe => {
+      let tcount = block.tcount;
+      while (transactions.length) {
+        const txe = transactions.pop();
+        if (tcount-- > 10) {
+          // broadcast transaction summary as transaction update
+          const tsummary = Utility.summarizeTXEntry(txe, bnum, bhash);
+          Server.broadcast('blockUpdates', 'latestTransaction', tsummary);
+        }
         // build tx filedata
         let fname = Archive.file.tx(txe.txid, bnum, bhash);
         writetx[fname] = Buffer.from(txe.toReference().buffer);
@@ -166,7 +173,8 @@ const Block = {
         addr = txe.chgtag || txe.chgaddr;
         fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'chg');
         writety[fname] = null;
-      });
+      }
+      // archive tx data
       Archive.write.tx(writetx);
       Archive.write.ty(writety);
     }
@@ -351,9 +359,12 @@ const Server = {
             const fname = Archive.file.bc(req.bnum, req.bhash);
             const block = await Archive.read.bc(fname);
             if (block) bsummary = Utility.summarizeBlock(block);
-            const transactions = block.transactions;
-            while (transactions.length && tcount++ < 10) {
-              socket.emit('latestTransaction', transactions.pop());
+            const txs = block.transactions;
+            while (txs.length && tcount++ < 10) {
+              // emit latest transaction summary data
+              const tsummary =
+                Utility.summarizeTXEntry(txs.pop(), block.bnum, block.bhash);
+              socket.emit('latestTransaction', tsummary);
             }
           } else { // otherwise use block summary
             const fname = Archive.file.bs(req.bnum, req.bhash);
@@ -365,7 +376,7 @@ const Server = {
           req.bhash = bsummary.phash;
           req.bnum -= 1n;
         }
-        // emit latest block data
+        // emit latest block summary data
         if (blocks.length) {
           blocks.forEach(block => socket.emit('latestBlock', block));
           socket.emit('ok', 'connected');

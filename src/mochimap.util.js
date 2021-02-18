@@ -125,6 +125,23 @@ const summarizeBlock = (block) => {
   // return finalized summary
   return summary;
 };
+const summarizeTXEntry = (txe, bnum, bhash) => {
+  const summary = {
+    src: txe.srctag || txe.srcaddr,
+    dst: txe.dsttag || txe.dstaddr,
+    chg: txe.chgtag || txe.chgaddr,
+    sendtotal: txe.sendtotal,
+    changetotal: txe.changetotal,
+    txfee: txe.txfee,
+    txsig: txe.txsig,
+    txid: txe.txid
+  };
+  // add bhash and bnum, if available
+  if (bhash) summary.bhash = bhash;
+  if (bnum) summary.bnum = bnum;
+  // return finalized summary
+  return summary;
+};
 const visualizeHaiku = async (haiku, requestModule) => {
   // heuristically determine best picture query for haiku
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
@@ -168,5 +185,6 @@ module.exports = {
   isPrivateIPv4,
   request,
   summarizeBlock,
+  summarizeTXEntry,
   visualizeHaiku
 };
