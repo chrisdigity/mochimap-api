@@ -341,34 +341,35 @@ const Server = {
       const req = Object.assign({}, Network.getConsensus());
       try {
         socket.emit('wait', 'processing request...');
-        const blocks = [];
-        const transactions = [];
         // read latest blocks (x10) and latest transactions (x10)
-        for (let i = 0; i < 10; i++) {
-          const fname = Archive.file.bs(req.bnum, req.bhash);
-          const block = await Archive.read.bs(fname);
-          if (!block) break; // cannot continue
-          blocks.unshift(block);
-          // fill transactions
-          if (transactions.length < 10) {
-            const query = Archive.file.tx('*', req.bnum, req.bhash);
-            const txs = await Archive.search.tx(query);
-            while (txs.length && transactions.length < 10) {
-              const txe = await Archive.read.tx(txs.pop());
-              transactions.push(txe);
+        let tcount = 0;
+        const blocks = [];
+        while (blocks.length < 10) {
+          // utilise blockchain until latest transactions are filled
+          let bsummary = null;
+          if (tcount < 10) {
+            const fname = Archive.file.bc(req.bnum, req.bhash);
+            const block = await Archive.read.bc(fname);
+            if (block) bsummary = Utility.summarizeBlock(block);
+            const transactions = block.transactions;
+            while (transactions.length && tcount++ < 10) {
+              socket.emit('latestTransaction', transactions.pop());
             }
+          } else { // otherwise use block summary
+            const fname = Archive.file.bs(req.bnum, req.bhash);
+            bsummary = await Archive.read.bs(fname);
           }
+          if (!bsummary) break; // cannot continue
+          blocks.unshift(bsummary);
           // continue search of previous block
-          req.bhash = block.phash;
+          req.bhash = bsummary.phash;
           req.bnum -= 1n;
         }
-        // emit latest data
-        if (!blocks.length && !transactions.length) {
-          socket.emit('error', '503: data unavailable');
-        } else {
+        // emit latest block data
+        if (blocks.length) {
           blocks.forEach(block => socket.emit('latestBlock', block));
-          transactions.forEach(txe => socket.emit('latestTransaction', txe));
-        }
+          socket.emit('ok', 'connected');
+        } else socket.emit('error', '503: block data unavailable');
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
