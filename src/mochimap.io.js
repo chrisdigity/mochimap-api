@@ -110,9 +110,9 @@ const Block = {
     let hBlock = bsummary;
     let checkback = 0;
     let shadow = 0;
-    while (hBlock.typeStr !== 'normal' || checkback > 0) {
+    while (hBlock.type !== 'normal' || checkback > 0) {
       shadow |= checkback;
-      if (hBlock.typeStr === 'normal') checkback--; // decrease checkback
+      if (hBlock.type === 'normal') checkback--; // decrease checkback
       else {
         checkback++; // increase checkback
         // check for previous block summary
