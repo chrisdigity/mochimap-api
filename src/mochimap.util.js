@@ -127,14 +127,14 @@ const summarizeBlock = (block) => {
 };
 const summarizeTXEntry = (txe, bnum, bhash) => {
   const summary = {
-    src: txe.srctag || txe.srcaddr,
-    dst: txe.dsttag || txe.dstaddr,
-    chg: txe.chgtag || txe.chgaddr,
+    src: txe.srctag || txe.srcaddr.slice(0, 32),
+    dst: txe.dsttag || txe.dstaddr.slice(0, 32),
+    chg: txe.chgtag || txe.chgaddr.slice(0, 32),
     sendtotal: txe.sendtotal,
     changetotal: txe.changetotal,
     txfee: txe.txfee,
-    txsig: txe.txsig,
-    txid: txe.txid
+    txsig: txe.txsig.slice(0, 32),
+    txid: txe.txid.slice(0, 32)
   };
   // add bhash and bnum, if available
   if (bhash) summary.bhash = bhash;
