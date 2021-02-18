@@ -155,7 +155,7 @@ const Block = {
       let tcount = block.tcount;
       while (transactions.length) {
         const txe = transactions.pop();
-        if (tcount-- > 10) {
+        if (tcount-- < 10) {
           // broadcast transaction summary as transaction update
           const tsummary = Utility.summarizeTXEntry(txe, bnum, bhash);
           Server.broadcast('blockUpdates', 'latestTransaction', tsummary);
