@@ -342,12 +342,23 @@ const Server = {
       try {
         socket.emit('wait', 'processing request...');
         const blocks = [];
-        // read latest blocks (x10)
+        const transactions = [];
+        // read latest blocks (x10) and latest transactions (x10)
         for (let i = 0; i < 10; i++) {
           const fname = Archive.file.bs(req.bnum, req.bhash);
           const block = await Archive.read.bs(fname);
           if (!block) break; // cannot continue
           blocks.unshift(block);
+          // fill transactions
+          if (transactions.length < 10) {
+            const query = Archive.file.tx('*', req.bnum, req.bhash);
+            const txs = await Archive.search.tx(query);
+            while (txs.length && transactions.length < 10) {
+              const txe = await Archive.read.tx(txs.pop());
+              transactions.push(txe);
+            }
+          }
+          // continue search of previous block
           req.bhash = block.phash;
           req.bnum -= 1n;
         }
@@ -355,6 +366,10 @@ const Server = {
         if (blocks.length) {
           blocks.forEach(block => socket.emit('latestBlock', block));
         } else socket.emit('error', '503: block data unavailable');
+        // emit latest transactions
+        if (transactions.length) {
+          transactions.forEach(txe => socket.emit('latestTransaction', txe));
+        }
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
