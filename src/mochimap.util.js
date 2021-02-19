@@ -21,15 +21,25 @@
 
 const cleanRequest = (req) => {
   // confirm req is an object
-  if (typeof req !== 'object') return 'invalid request';
+  if (typeof req !== 'object') return 'invalid request parameter';
   // for every known request property, check and enforce acceptable types
-  if (req.bnum) {
-    const valid = ['bigint', 'number', 'string'];
-    if (!valid.includes(typeof req.bnum)) return 'invalid type, bnum';
-    try {
-      // force BigInt value for bnum
-      req.bnum = BigInt(req.bnum);
-    } catch (ignore) { return 'invalid data, bnum'; }
+  if (req.activities) {
+    if (!Array.isArray(req.activities)) {
+      // activities must be an array of strings
+      return 'invalid type, activities';
+    } else {
+      // the only acceptable data type for array contents is a string
+      for (let i = req.activities.length; i >= 0; i--) {
+        if (typeof req.activities[i] !== 'string') {
+          return 'invalid type, activities[' + i + ']';
+        }
+        const copy = req.activities[i].repeat(1); // force string copy
+        // check for remaining data after removing valid lowercase characters
+        if (copy.replace(/[a-f]/g, '')) {
+          return 'invalid data, activities[' + i + ']';
+        }
+      }
+    }
   }
   if (req.bhash) {
     if (typeof req.bhash !== 'string') {
@@ -38,10 +48,24 @@ const cleanRequest = (req) => {
     } else {
       const copy = req.bhash.repeat(1); // force string copy
       // check for remaining data after removing valid hexadecimal characters
-      if (copy.replace(/[0-9A-Fa-f]/g, '')) {
-        return 'invalid data, bhash';
-      }
+      if (copy.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, bhash';
     }
+  }
+  if (req.bnum) {
+    const valid = ['bigint', 'number', 'string'];
+    if (!valid.includes(typeof req.bnum)) return 'invalid type, bnum';
+    try {
+      // force BigInt value for bnum
+      req.bnum = BigInt(req.bnum);
+    } catch (ignore) { return 'invalid data, bnum'; }
+  }
+  if (req.count) {
+    const valid = ['bigint', 'number', 'string'];
+    if (!valid.includes(typeof req.bnum)) return 'invalid type, count';
+    try {
+      // force Number value for count
+      req.count = Number(req.count);
+    } catch (ignore) { return 'invalid data, count'; }
   }
   // all known properties are clean
   return false;

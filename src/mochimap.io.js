@@ -44,6 +44,45 @@ const SET_LIMIT = 0xff;
 const Timers = [];
 
 /* core */
+const Activity = {
+  _data: [],
+  _tLimit: 0xff, // per data type
+  _blockCount: 0,
+  _haikuCount: 0,
+  _networkCount: 0,
+  _transactionCount: 0,
+  add: (type, data) => {
+    // ensure activity type exists
+    const cVar = '_' + type + 'Count';
+    if (typeof Activity[cVar] !== 'undefined') {
+      // maintain activity limit
+      if (++Activity[cVar] > Activity._tLimit) Activity.pop(type);
+      // place latest data at beginning of list
+      Activity._data.unshift({ type, data });
+      // broadcast latest data
+      Server.broadcast(type + 'Updates', type + 'Update', data);
+    } // else ignore data
+  },
+  emit: (socket, types, count) => {
+    // scan for applicable elements
+    const len = Activity._data.length;
+    for (let i = 0; i < len && count > 0; i++) {
+      const activity = Activity._data[i];
+      // emit matching types
+      if (types.includes(activity.type)) {
+        count--; // decrement count
+        socket.emit(activity.type + 'Update', activity.data);
+      }
+    }
+  },
+  pop: (type) => {
+    // reverse scan for first element matching type
+    for (let i = Activity._data.length; i >= 0; i--) {
+      // remove found last-element-of-type
+      if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
+    }
+  }
+};
 const Block = {
   cache: new Set(), // TODO: custom Map() cache
   chain: new Map(),
@@ -104,8 +143,8 @@ const Block = {
     const bsummary = Utility.summarizeBlock(block);
     writebs[fnamebs] = JSON.stringify(bsummary);
     Archive.write.bs(writebs); // async
-    // broadcast initial block summary as block update
-    Server.broadcast('blockUpdates', 'latestBlock', bsummary);
+    // update latest block activity
+    Activity.add('block', bsummary);
     // find appropriate block to use for haiku visualization
     let hBlock = bsummary;
     let checkback = 0;
@@ -138,8 +177,8 @@ const Block = {
         data.num = bnum;
         data.shadow = shadow;
         data.str = haiku;
-        // broadcast haiku update
-        Server.broadcast('haikuUpdates', 'haiku', data);
+        // update latest haiku activity
+        Activity.add('haiku', data);
         // archive haiku visualization
         const writehk = {};
         const fnamehk = Archive.file.hk(bnum, bhash);
@@ -152,14 +191,8 @@ const Block = {
     if (transactions.length) {
       const writetx = {};
       const writety = {};
-      let tcount = block.tcount;
       while (transactions.length) {
         const txe = transactions.pop();
-        if (tcount-- < 10) {
-          // broadcast transaction summary as transaction update
-          const tsummary = Utility.summarizeTXEntry(txe, bnum, bhash);
-          Server.broadcast('blockUpdates', 'latestTransaction', tsummary);
-        }
         // build tx filedata
         let fname = Archive.file.tx(txe.txid, bnum, bhash);
         writetx[fname] = Buffer.from(txe.toReference().buffer);
@@ -248,8 +281,8 @@ const Network = {
       }
       // initiate asynchronouse block check
       if (node.cblockhash) Block.check(ip, node.cblock, node.cblockhash);
-      // broadcast node update to the 'network' room
-      Server.broadcast('networkUpdates', { type: 'full', node });
+      // update latest network activity
+      Activity.add('network', node);
     } else if (node.lastTouch < updateOffset) {
       // update lastTouch before next update check
       node.lastTouch = Date.now();
@@ -342,13 +375,20 @@ const Server = {
       } else return null;
     });
     */
-    socket.on('explorer', async () => {
-      // register socket for block updates
-      socket.join('blockUpdates');
-      // self-assign request parameters (latest network consensus)
-      const req = Object.assign({}, Network.getConsensus());
+    socket.on('explorer', async (req) => {
+      const err = Utility.cleanRequest(req);
+      if (err) return socket.emit('error', 'reqRejected: ' + err);
+      const reqMessage = // reqExplorer#<count>x[<activities]>
+        `reqExplorer#${req.count || 0}.${req.activities.toString() || '[]'}`;
+      socket.emit('wait', 'processing ' + reqMessage);
+      // reset room registrations
+      socket.rooms.forEach(room => socket.leave(room));
+      if (req.activities && req.count) {
+        Activity.emit(socket, req.activities, req.count);
+      }
+      socket.emit('done');
+      /*
       try {
-        socket.emit('wait', 'processing request...');
         // read latest blocks (x10) and latest transactions (x10)
         let tcount = 0;
         const blocks = [];
@@ -379,13 +419,14 @@ const Server = {
         // emit latest block summary data
         if (blocks.length) {
           blocks.forEach(block => socket.emit('latestBlock', block));
-          socket.emit('ok', 'connected');
+          socket.emit('done', 'connected');
         } else socket.emit('error', '503: block data unavailable');
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
         socket.emit('error', response);
       }
+      */
     });
     socket.on('haiku', async (req = {}) => {
       const err = Utility.cleanRequest(req);
