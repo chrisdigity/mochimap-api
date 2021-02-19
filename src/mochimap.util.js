@@ -62,7 +62,7 @@ const cleanRequest = (req) => {
   }
   if (req.count) {
     const valid = ['bigint', 'number', 'string'];
-    if (!valid.includes(typeof req.bnum)) return 'invalid type, count';
+    if (!valid.includes(typeof req.count)) return 'invalid type, count';
     try {
       // force Number value for count
       req.count = Number(req.count);
