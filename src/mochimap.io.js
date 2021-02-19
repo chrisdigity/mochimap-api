@@ -66,7 +66,7 @@ const Activity = {
   },
   deleteOne: (type) => {
     // reverse scan for first element matching type
-    for (let i = Activity._data.length; i >= 0; i--) {
+    for (let i = Activity._data.length - 1; i >= 0; i--) {
       // remove found last-element-of-type
       if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
     }
