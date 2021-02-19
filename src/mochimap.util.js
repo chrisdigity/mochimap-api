@@ -29,7 +29,8 @@ const cleanRequest = (req) => {
       return 'invalid type, activities';
     } else {
       // the only acceptable data type for array contents is a string
-      for (let i = req.activities.length; i >= 0; i--) {
+      const len = req.activities.length;
+      for (let i = 0; i < len; i++) {
         if (typeof req.activities[i] !== 'string') {
           return 'invalid type, activities[' + i + ']';
         }
