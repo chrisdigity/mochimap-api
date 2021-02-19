@@ -36,7 +36,7 @@ const cleanRequest = (req) => {
         }
         const copy = req.activities[i].repeat(1); // force string copy
         // check for remaining data after removing valid lowercase characters
-        if (copy.replace(/[a-f]/g, '')) {
+        if (copy.replace(/[a-z]/g, '')) {
           return 'invalid data, activities[' + i + ']';
         }
       }
