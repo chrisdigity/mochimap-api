@@ -56,30 +56,31 @@ const Activity = {
     const cVar = '_' + type + 'Count';
     if (typeof Activity[cVar] !== 'undefined') {
       // maintain activity limit
-      if (++Activity[cVar] > Activity._tLimit) Activity.pop(type);
+      if (Activity[cVar] >= Activity._tLimit) Activity.deleteOne(type);
+      else Activity[cVar]++;
       // place latest data at beginning of list
       Activity._data.unshift({ type, data });
       // broadcast latest data
       Server.broadcast(type + 'Updates', type + 'Update', data);
     } // else ignore data
   },
-  emit: (socket, types, count) => {
+  deleteOne: (type) => {
+    // reverse scan for first element matching type
+    for (let i = Activity._data.length; i >= 0; i--) {
+      // remove found last-element-of-type
+      if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
+    }
+  },
+  request: (socket, types, count) => {
     // scan for applicable elements
-    const len = Activity._data.length;
-    for (let i = 0; i < len && count > 0; i++) {
+    const len = Activity._data.length < count ? Activity._data.length : count;
+    for (let i = len; i >= 0; i--) {
       const activity = Activity._data[i];
       // emit matching types
       if (types.includes(activity.type)) {
         count--; // decrement count
         socket.emit(activity.type + 'Update', activity.data);
       }
-    }
-  },
-  pop: (type) => {
-    // reverse scan for first element matching type
-    for (let i = Activity._data.length; i >= 0; i--) {
-      // remove found last-element-of-type
-      if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
     }
   }
 };
@@ -384,7 +385,9 @@ const Server = {
       // reset room registrations
       socket.rooms.forEach(room => socket.leave(room));
       if (req.activities && req.count) {
-        Activity.emit(socket, req.activities, req.count);
+        // register for applicable data type updates
+        req.activities.forEach(activity => socket.join(activity + 'Updates'));
+        Activity.request(socket, req.activities, req.count); // process.request
       }
       socket.emit('done');
       /*
