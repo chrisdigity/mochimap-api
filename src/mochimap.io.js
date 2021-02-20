@@ -58,7 +58,7 @@ const Activity = {
       // maintain activity limit
       if (Activity[cVar] >= Activity._tLimit) Activity.deleteOne(type);
       else Activity[cVar]++;
-      // place latest data at beginning of list
+      // place latest data at end of list
       Activity._data.push({ type, data });
       // broadcast latest data
       Server.broadcast(type + 'Updates', type + 'Update', data);
@@ -68,14 +68,13 @@ const Activity = {
     // reverse scan for first element matching type
     const len = Activity._data.length;
     for (let i = 0; i < len; i++) {
-      // remove found last-element-of-type
+      // remove first-element-of-type
       if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
     }
   },
   request: (socket, types, count) => {
-    // scan for applicable elements
-    const len = Activity._data.length;
-    for (let i = 0; i < len && count > 0; i++) {
+    // scan for latest applicable elements
+    for (let i = Activity._data.length - 1; i >= 0 && count > 0; i--) {
       const activity = Activity._data[i];
       // emit matching types
       if (types.includes(activity.type)) {
