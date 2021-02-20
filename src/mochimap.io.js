@@ -44,46 +44,6 @@ const SET_LIMIT = 0xff;
 const Timers = [];
 
 /* core */
-const Activity = {
-  _data: [],
-  _tLimit: 0xff, // per data type
-  _blockCount: 0,
-  _haikuCount: 0,
-  _networkCount: 0,
-  _transactionCount: 0,
-  add: (type, data) => {
-    // ensure activity type exists
-    const cVar = '_' + type + 'Count';
-    if (typeof Activity[cVar] !== 'undefined') {
-      // maintain activity limit
-      if (Activity[cVar] >= Activity._tLimit) Activity.deleteOne(type);
-      else Activity[cVar]++;
-      // place latest data at end of list
-      Activity._data.push({ type, data });
-      // broadcast latest data
-      Server.broadcast(type + 'Updates', type + 'Update', data);
-    } // else ignore data
-  },
-  deleteOne: (type) => {
-    // reverse scan for first element matching type
-    const len = Activity._data.length;
-    for (let i = 0; i < len; i++) {
-      // remove first-element-of-type
-      if (Activity._data[i].type === type) return Activity._data.splice(i, 1);
-    }
-  },
-  request: (socket, types, count) => {
-    // scan for latest applicable elements
-    for (let i = Activity._data.length - 1; i >= 0 && count > 0; i--) {
-      const activity = Activity._data[i];
-      // emit matching types
-      if (types.includes(activity.type)) {
-        count--; // decrement count
-        socket.emit(activity.type + 'Update', activity.data);
-      }
-    }
-  }
-};
 const Block = {
   cache: new Set(), // TODO: custom Map() cache
   chain: new Map(),
@@ -145,7 +105,7 @@ const Block = {
     writebs[fnamebs] = JSON.stringify(bsummary);
     Archive.write.bs(writebs); // async
     // update latest block activity
-    Activity.add('block', bsummary);
+    Server.broadcast('bsummaryUpdates', 'bsummary', bsummary);
     // find appropriate block to use for haiku visualization
     let hBlock = bsummary;
     let checkback = 0;
@@ -172,18 +132,18 @@ const Block = {
     // visualize Haiku from appropriate block summary
     if (hBlock) {
       shadow = Boolean(shadow);
-      const haiku = Mochimo.Trigg.expand(hBlock.nonce, shadow);
-      Utility.visualizeHaiku(haiku, https).then(data => {
+      const haikuStr = Mochimo.Trigg.expand(hBlock.nonce, shadow);
+      Utility.visualizeHaiku(haikuStr, https).then(haiku => {
         // add block data
-        data.num = bnum;
-        data.shadow = shadow;
-        data.str = haiku;
+        haiku.num = bnum;
+        haiku.shadow = shadow;
+        haiku.str = haikuStr;
         // update latest haiku activity
-        Activity.add('haiku', data);
+        Server.broadcast('haikuUpdates', 'haiku', haiku);
         // archive haiku visualization
         const writehk = {};
         const fnamehk = Archive.file.hk(bnum, bhash);
-        writehk[fnamehk] = JSON.stringify(data);
+        writehk[fnamehk] = JSON.stringify(haiku);
         Archive.write.hk(writehk); // async
       }).catch(console.trace);
     } else console.log('cannot visualize Haiku for bnum', bnum, 'at this time');
@@ -283,7 +243,7 @@ const Network = {
       // initiate asynchronouse block check
       if (node.cblockhash) Block.check(ip, node.cblock, node.cblockhash);
       // update latest network activity
-      Activity.add('network', node);
+      Server.boradcast('networkUpdates', 'network', node);
     } else if (node.lastTouch < updateOffset) {
       // update lastTouch before next update check
       node.lastTouch = Date.now();
@@ -342,94 +302,54 @@ const Server = {
     Server.sockets.add(socket);
     socket.on('close', () => Server.sockets.delete(socket));
     // block data may only be requested in parts (summary & tx's)
-    /*
     socket.on('bsummary', async (req) => {
-      const err = cleanRequest(req);
-      if (err) return socket.emit('error', 'reqRejected: ' + err);
-      const reqMessage = // reqBSummary#<blocknumber>.<blockhash>
-        `reqBSummary#${(req.bnum || '')}.${(req.bhash || '').slice(0, 16)}`;
-      try {
-        const block = await Block.get(req.bnum, req.bhash);
-        if (block) {
-          socket.emit('bsummary', block.toSummary());
-        } else socket.emit('error', `404: ${reqMessage}`);
-      } catch (error) {
-        const response = `ServerError during ${reqMessage}`;
-        console.error(response, error);
-        socket.emit('error', response);
-      }
-      // if request is NOT specific, return current Auxiliary data
-      if (!bnum && !bhash && Block.latest) return Block.latest;
-      // build file query and search
-      const query = Archive.file.bc(bnum || '*', bhash || '*');
-      const results = await Archive.search.bc(query);
-      // handle results, if any
-      if (results.length) {
-        let block;
-        do {
-          try {
-            // read (next) latest data as JSON
-            block = new Mochimo.Block(await Archive.read.bc(results.shift()));
-          } catch (ignore) {}
-        } while (results.length && !block);
-        return block || null;
-      } else return null;
-    });
-    */
-    socket.on('explorer', async (req) => {
       const err = Utility.cleanRequest(req);
       if (err) return socket.emit('error', 'reqRejected: ' + err);
-      const reqMessage = // reqExplorer#<count>x[<activities]>
-        `reqExplorer#${req.count || 0}.${req.activities.toString() || '[]'}`;
-      socket.emit('wait', 'processing ' + reqMessage);
-      // reset room registrations
-      socket.rooms.forEach(room => socket.leave(room));
-      if (req.activities && req.count) {
-        // register for applicable data type updates
-        req.activities.forEach(activity => socket.join(activity + 'Updates'));
-        Activity.request(socket, req.activities, req.count); // process.request
+      // register for realtime updates
+      socket.join('bsummaryUpdates');
+      // check for empty request
+      if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
+        req = Network.getConsensus();
+        if (!req.count) req.count = 0xf;
       }
-      socket.emit('done');
-      /*
+      // processing request message
+      const reqMessage = // reqBSummary#(<count>)x<blocknumber>.<blockhash>
+        `reqBSummary#(${req.count})x${req.bnum}.${req.bhash.slice(0, 8)}...`;
+      socket.emit('wait', 'processing ' + reqMessage);
       try {
-        // read latest blocks (x10) and latest transactions (x10)
-        let tcount = 0;
-        const blocks = [];
-        while (blocks.length < 10) {
-          // utilise blockchain until latest transactions are filled
-          let bsummary = null;
-          if (tcount < 10) {
-            const fname = Archive.file.bc(req.bnum, req.bhash);
-            const block = await Archive.read.bc(fname);
-            if (block) bsummary = Utility.summarizeBlock(block);
-            const txs = block.transactions;
-            while (txs.length && tcount++ < 10) {
-              // emit latest transaction summary data
-              const tsummary =
-                Utility.summarizeTXEntry(txs.pop(), block.bnum, block.bhash);
-              socket.emit('latestTransaction', tsummary);
-            }
-          } else { // otherwise use block summary
-            const fname = Archive.file.bs(req.bnum, req.bhash);
-            bsummary = await Archive.read.bs(fname);
+        let emissions = 0;
+        do {
+          const fname = Archive.file.bs(req.bnum, '*');
+          // search for data with matching block numbers
+          const blocks = await Archive.search.bs(fname);
+          // reverse array for efficiency
+          if (blocks.length > 1) blocks.reverse();
+          // fastforward to block with matching bhash
+          while (req.bhash && blocks.length) {
+            if (blocks[blocks.length - 1].includes('.' + req.bhash)) break;
+            blocks.pop();
           }
-          if (!bsummary) break; // cannot continue
-          blocks.unshift(bsummary);
-          // continue search of previous block
-          req.bhash = bsummary.phash;
+          if (req.bhash) delete req.bhash;
+          // read remaining blocks
+          while (req.count-- > 0 && blocks.length) {
+            const bsummary = await Archive.read.bs(blocks.pop());
+            // ensure socket is still connected before sending
+            if (!socket.connected) break;
+            socket.emit('bsummary', bsummary);
+            emissions++;
+          }
+          // decrement bnum
           req.bnum -= 1n;
-        }
-        // emit latest block summary data
-        if (blocks.length) {
-          blocks.forEach(block => socket.emit('latestBlock', block));
-          socket.emit('done', 'connected');
-        } else socket.emit('error', '503: block data unavailable');
+        } while (req.count > 0 && socket.connected);
+        // send 503 if not data was sent
+        if (emissions < 1) {
+          socket.emit('error', '503: no data unavailable');
+        } else socket.emit('done');
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
         socket.emit('error', response);
       }
-      */
     });
     socket.on('haiku', async (req = {}) => {
       const err = Utility.cleanRequest(req);
