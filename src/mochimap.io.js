@@ -243,7 +243,7 @@ const Network = {
       // initiate asynchronouse block check
       if (node.cblockhash) Block.check(ip, node.cblock, node.cblockhash);
       // update latest network activity
-      Server.boradcast('networkUpdates', 'network', node);
+      Server.broadcast('networkUpdates', 'network', node);
     } else if (node.lastTouch < updateOffset) {
       // update lastTouch before next update check
       node.lastTouch = Date.now();
