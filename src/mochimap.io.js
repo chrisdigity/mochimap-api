@@ -303,14 +303,15 @@ const Server = {
     socket.on('close', () => Server.sockets.delete(socket));
     // block data may only be requested in parts (summary & tx's)
     socket.on('bsummary', async (req) => {
+      if (typeof req === 'undefined') req = {};
       const err = Utility.cleanRequest(req);
       if (err) return socket.emit('error', 'reqRejected: ' + err);
       // register for realtime updates
       socket.join('bsummaryUpdates');
       // check for empty request
       if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
-        req = Network.getConsensus();
-        if (!req.count) req.count = 0xf;
+        Object.assign(req, Network.getConsensus());
+        if (!req.count) req.count = 4;
       }
       // processing request message
       const reqMessage = // reqBSummary#(<count>)x<blocknumber>.<blockhash>
