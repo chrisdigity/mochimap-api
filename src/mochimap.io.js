@@ -345,9 +345,9 @@ const Server = {
         }
         // build request for more data
         const more = {
-          type: 'bsummary',
           message: 'connected',
-          data: {
+          type: 'bsummary',
+          request: {
             bnum: req.bnum - 1n
           }
         };
