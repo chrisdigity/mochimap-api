@@ -312,8 +312,10 @@ const Server = {
       // check for empty request properties
       if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
         // self-assign empty request
-        Object.assign(req, Network.getConsensus());
         if (typeof req.depth === 'undefined') req.depth = 1;
+        Object.assign(req, Network.getConsensus());
+        // limit size of bhash
+        req.bhash = req.bhash.slice(0, 16);
       }
       // processing request message
       const reqMessage = // reqBSummary#<depth>.<blocknumber>.<blockhash>
@@ -331,12 +333,9 @@ const Server = {
           if (req.bhash && blocks[i].includes('.' + req.bhash)) {
             delete req.bhash;
           } else continue;
-          // ensure socket is still connected before reading
+          // ensure socket is still connected before sending
           if (socket.connected) {
-            const bsummary = await Archive.read.bs(blocks[i]);
-            // ensure socket is still connected before sending
-            if (!socket.connected) break;
-            socket.emit('bsummary', bsummary);
+            socket.emit('bsummary', await Archive.read.bs(blocks[i]));
             sent++;
           }
         }
