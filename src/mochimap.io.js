@@ -325,14 +325,18 @@ const Server = {
         let sent = 0;
         const fname = Archive.file.bs(req.bnum, '*');
         // search for data matching query
-        const blocks = (await Archive.search.bs(fname, req.depth)).reverse();
+        const blocks = await Archive.search.bs(fname, req.depth);
+        // fastforward to block with matching bhash
+        while (blocks.length && req.bhash) {
+          if (blocks[blocks.length - 1].includes('.' + req.bhash)) {
+            delete req.bhash;
+          } else blocks.pop();
+        }
+        // reverse remaining results
+        blocks.reverse();
         // iterate results
         const len = blocks.length;
         for (let i = 0; i < len; i++) {
-          // fastforward to block with matching bhash
-          if (req.bhash && blocks[i].includes('.' + req.bhash)) {
-            delete req.bhash;
-          } else continue;
           // ensure socket is still connected before sending
           if (socket.connected) {
             socket.emit('bsummary', await Archive.read.bs(blocks[i]));
