@@ -320,30 +320,28 @@ const Server = {
         `reqBSummary#${req.depth}.${req.bnum}.${req.bhash.slice(0, 8)}...`;
       socket.emit('wait', 'processing ' + reqMessage);
       try {
-        let emissions = 0;
-        do {
-          const fname = Archive.file.bs(req.bnum, '*');
-          // search for data with matching block numbers
-          const blocks = await Archive.search.bs(fname, req.depth);
+        let sent = 0;
+        const fname = Archive.file.bs(req.bnum, '*');
+        // search for data matching query
+        const blocks = (await Archive.search.bs(fname, req.depth)).reverse();
+        // iterate results
+        const len = blocks.length;
+        for (let i = 0; i < len; i++) {
           // fastforward to block with matching bhash
-          while (req.bhash && blocks.length) {
-            if (blocks[blocks.length - 1].includes('.' + req.bhash)) break;
-            blocks.pop();
-          }
-          if (req.bhash) delete req.bhash;
-          // read remaining blocks
-          while (req.count > 0 && blocks.length) {
-            const bsummary = await Archive.read.bs(blocks.pop());
+          if (req.bhash && blocks[i].includes('.' + req.bhash)) {
+            delete req.bhash;
+          } else continue;
+          // ensure socket is still connected before reading
+          if (socket.connected) {
+            const bsummary = await Archive.read.bs(blocks[i]);
             // ensure socket is still connected before sending
             if (!socket.connected) break;
             socket.emit('bsummary', bsummary);
-            emissions++;
+            sent++;
           }
-          // decrement bnum
-          req.bnum -= 1n;
-        } while (req.count > 0 && socket.connected);
-        // send 503 if not data was sent
-        if (emissions < 1) {
+        }
+        // send 503 if no data was sent
+        if (sent < 1) {
           socket.emit('error', '503: no data unavailable');
         } else socket.emit('done');
       } catch (error) {
