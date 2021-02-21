@@ -344,7 +344,13 @@ const Server = {
           }
         }
         // build request for more data
-        const more = { type: 'bsummary', data: { bnum: req.bnum - 1n } };
+        const more = {
+          type: 'bsummary',
+          message: 'connected',
+          data: {
+            bnum: req.bnum - 1n
+          }
+        };
         // send 503 if no data was sent
         if (sent < 1) {
           socket.emit('error', '503: no data unavailable');
