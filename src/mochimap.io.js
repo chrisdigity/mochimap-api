@@ -342,12 +342,12 @@ const Server = {
         // return "more data" request or 503 if no data was sent
         if (i > 0) {
           // build request for more data
-          const more = { message: 'connected', type: 'bsummary' };
+          const more = { message: 'connected', type: 'bsummary', request: {} };
           if (req.depth) {
             const depthBigInt = BigInt(req.depth);
-            more.bnum = ((req.bnum >> depthBigInt) - 1n) << depthBigInt;
-            more.depth = req.depth;
-          } else more.bnum = req.bnum - 1n;
+            more.request.bnum = ((req.bnum >> depthBigInt) - 1n) << depthBigInt;
+            more.request.depth = req.depth;
+          } else more.request.bnum = req.bnum - 1n;
           socket.emit('done', more);
         } else socket.emit('error', '503: no data unavailable');
       } catch (error) {
