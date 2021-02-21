@@ -1,78 +1,146 @@
 /* eslint-env browser */
-/* globals dCountIn, dCreate, dCreateIn, statusOk, bSize, mcm */
+/* globals dCreate, dCreateIn, dAppendNamed, asUint64String, bSize, mcm */
 
-function connected(socket) { // eslint-disable-line no-unused-vars
-  socket.on('latestBlock', function (block) {
-    statusOk('connected');
-    // assign defaults to missing data
-    var bhash = block.bhash ? block.bhash.slice(0, 16) : 'no_bhash';
-    var phash = block.phash ? block.phash.slice(0, 16) : 'no_phash';
-    var maddr = block.maddr ? block.maddr.slice(0, 16) : 'no_maddr';
-    var mreward = block.mreward || 0;
-    var mfee = block.mfee || 0;
-    var tcount = block.tcount || 0;
-    var tmfee = tcount * mfee;
-    var tamount = block.tamount || 0;
-    var difficulty = block.difficulty || 0;
-    //var time0 = block.time0 || 0;
-    var stime = block.stime ? block.stime * 1000 : 0;
-    var bnum = block.bnum || 0;
-    var size = block.size || 0;
-    var type = block.type || 'invalid';
-    var haiku = block.haiku || 'no_haiku';
-    // build links
-    var bquery = '?bnum=' + block.bnum + '&bhash=' + block.bhash.slice(0, 16);
-    var blink = '/explorer/block/' + bquery;
-    var hlink = '/haiku/' + bquery;
-    // append new block data as description list
-    var dt = dCreate('dt');
-    dCreateIn(dt, 'a', { class: 'btype-' + type, href: blink }, 'Block #' + bnum);
-    dCreateIn(dt, 'span', { class: 'stime', name: 'stime', 'data-stime': stime });
-    // create description list for block
-    var dd = dCreate('dd');
-    if (type === 'normal') {
-      var mdata = dCreateIn(dd, 'div', null, '⛏ Miner: ');
-      dCreateIn(mdata, 'a', { href: '/address/?addr=' + maddr }, maddr + '...');
-      dCreateIn(mdata, 'span', { title: 'Block Reward: ' + mcm(mreward, 0, 1)}, ' ' + mcm(mreward));
-      dCreateIn(mdata, 'sup', { title: tcount + ' Transactions x ' + mcm(mfee) + ' Network Fee' }, ' +' + mcm(tmfee, 1));
-      dCreateIn(
-        dCreateIn(dd, 'div', null, '血 Transactions: ' + tcount + ' ⥂ '),
-        'span', null, mcm(tamount) + ' sent');
-      dCreateIn(dd, 'a', { class: 'haiku', href: hlink }, haiku);
-    }
-    dCreateIn(dd, 'div', null, '⚠ Difficulty: ' + difficulty);
-    var o = dCreateIn(dd, 'div', { class: 'smaller' });
-    dCreateIn(o, 'div', { title: bSize(size, 1) }, '⚖ Block Size: ' + bSize(size));
-    dCreateIn(o, 'div', { title: block.bhash }, '# Block Hash: ' + bhash + '...');
-    dCreateIn(o, 'div', { title: block.phash }, '# Prev. Hash: ' + phash + '...');
-    // append block data elements
-    var parent = document.getElementById('blocks');
-    if (parent.firstElementChild) {
-      parent.insertBefore(dd, parent.firstElementChild);
-    } else parent.appendChild(dd);
-    parent.insertBefore(dt, dd);
-    // remove excess elements
-    var excess = dCountIn(parent) - 10;
-    for (var i = 0; i < excess; i++) {
-      parent.removeChild(parent.lastChild);
-    }
-  });
-  // request latest data
-  socket.emit('explorer');
-}
+var SOCKET = false;
+var SocketMore = false;
 
 function timeAgo(msecs) {
-  var now = Date.now();
-  return Math.floor((now - msecs) / 1000) + ' seconds ago';
+  var sup = function(str) { return '<sup>' + str + '</sup>' };
+  var post = function(val) { return val > 1 ? 's' : '' };
+  var now = Math.floor(((new Date).getTime() - msecs) / 1000);
+  var min = (now / 60) | 0;
+  var minStr = (min ? min + sup('min' + post(min)) : '') + ' ';
+  var sec = now % 60;
+  var secStr = (sec ? sec + sup('min' + post(sec)) : '') + ' ';
+  return '<span>' + minStr + secStr + 'ago</span>';
 }
-
+function checkBottom() {
+  var dElement = document.documentElement;
+  var scrollTop = (dElement && dElement.scrollTop) || document.body.scrollTop;
+  var scrollHeight = (dElement && dElement.scrollHeight) || document.body.scrollHeight;
+  if ((scrollTop + window.innerHeight) >= scrollHeight) {
+    if (SocketMore && SocketMore.type && SocketMore.request) {
+      document.getElementById('loading').style.display = 'block';
+      SOCKET.emit(SocketMore.type, SocketMore.request);
+      SocketMore = false;
+    }
+  }
+}
+function socketSearch(e, form) {
+  e.preventDefault();
+  if (!SOCKET) return false;
+  // get form values
+  var filter = form.elements.namedItem('filter').value;
+  var query = form.elements.namedItem('search').value;
+  var content = document.getElementById('content');
+  content.className = 'search';
+  content.innerHTML = '';
+  document.getElementById('loading').style.display = 'block';
+  SOCKET.emit('bsummary', { bnum: query, depth: 1 });
+  return false;
+}
+function connected(socket) { // eslint-disable-line no-unused-vars
+  SOCKET = socket;
+  socket.onAny(function (e, data) {
+    switch (e) {
+      case 'bsummary':
+        // assign defaults to missing data
+        var bhash = data.bhash || 'no_bhash';
+        var phash = data.phash || 'no_phash';
+        var maddr = data.maddr || 'no_maddr';
+        var mreward = data.mreward || 0;
+        var mfee = data.mfee || 0;
+        var tcount = data.tcount || 0;
+        var lcount = data.lcount || 0;
+        var tmfee = tcount * mfee;
+        var tamount = data.tamount || 0;
+        var difficulty = data.difficulty || 0;
+        //var time0 = data.time0 || 0;
+        var stime = data.stime ? data.stime * 1000 : 0;
+        var bnum = data.bnum || 0;
+        var size = data.size || 0;
+        var type = data.type || 'invalid';
+        var haiku = data.haiku || 'no_haiku';
+        var blockIcon = type === 'normal' ? 'cube' : type === 'pseudo' ? 'vector-square' : 'th';
+        // build strings
+        var elink = '/explorer/';
+        var bquery = '?bnum=' + data.bnum + '&bhash=' + data.bhash.slice(0, 16);
+        var mlink = elink + 'address/?addr=' + maddr.slice(0, 16);
+        var blink = elink + 'block/' + bquery;
+        var hlink = '/haiku/' + bquery;
+        // append new block data as div
+        var bup = dCreate({ class: 'grid-container ' + type, name: asUint64String(bnum) });
+        dCreateIn(bup, { class: 'icon' }, '<i class="fas fa-3x fa-' + blockIcon + '"></i>');
+        dCreateIn(bup, { class: 'bnum' }, '<span title="0x' + Number(bnum).toString(16) + '">' + bnum + '</span>');
+        dCreateIn(bup, { class: 'tstamp' }, (new Date(stime)).toISOString().replace(/[.]\d+/, ''));
+        dCreateIn(bup, { class: 'stime', name: 'stime', 'data-stime': stime }, '<span>' + timeAgo(stime) + '</span>');
+        dCreateIn(bup, { class: 'bhash' }, '<span><span>Hash: 0x' + bhash + '"</span><span>Prev: 0x' + phash + '</span></span');
+        if (type !== 'genesis' && type !== 'neogenesis') {
+          dCreateIn(bup, { class: 'diff' }, '<span>⚠ Difficulty: ' + difficulty + '</span>');
+        }
+        if (type === 'normal') {
+          dCreateIn(bup, { class: 'mdata' }, '<span>⛏  Miner: <a href="' + mlink + '">' + maddr + '</a></span>');
+          dCreateIn(bup, { class: 'mreward' }, '<span><i class="fas fa-donate"></i> <span title="Block Reward: ' + mcm(mreward, false, true) + '">' + mcm(mreward) + '</span> <sup title="' + tcount + 'Transactions x ' + mcm(mfee) +' Transaction Fee">+' + mcm(tmfee) + '</sup></span>');
+          dCreateIn(bup, { class: 'tcount' }, '<span>血 Transactions: ' + tcount.toLocaleString() + ' <i class="fas fa-exchange-alt"></i> ' + mcm(tamount) + '</span>');
+          dCreateIn(bup, { class: 'bsize' }, '<span>⚖ Block Size: ' + bSize(size) + '</span>');
+        } else if (type === 'genesis' || type === 'neogenesis') {
+          dCreateIn(bup, { class: 'lcount' }, '<span>血 Ledger Entries: ' + lcount + '</span>');
+          dCreateIn(bup, { class: 'supply' }, '<span><i class="fas fa-piggy-bank"></i> Supply: ' + mcm(tamount) + '</span>');
+          dCreateIn(bup, { class: 'bsize' }, '<span>⚖ Block Size: ' + bSize(size) + '</span>');
+        }
+        // prepend block data elements
+        var parent = document.getElementById('content');
+        dAppendNamed(parent, bup);
+        break;
+      case 'done':
+        document.getElementById('loading').style.display = 'none';
+        SocketMore = data;
+        break;
+    }
+  });
+  /*
+  socket.on('transactionUpdate', function (txe) {
+    var txid = txe.txid || 'no_txid';
+    var src = txe.src || 'no_source';
+    var dst = txe.dst || 'no_destination';
+    var chg = txe.chg || 'no_change';
+    var sendtotal = txe.sendtotal || 0;
+    // build links
+    var bquery = '?bnum=' + txe.bnum + '&bhash=' + txe.bhash.slice(0, 16);
+    var tlink = '/explorer/transaction/' + bquery + '&txid=' + txid.slice(0, 16);
+    var slink = '/explorer/address/?addr=' + src.slice(0, 16);
+    var dlink = '/explorer/address/?addr=' + dst.slice(0, 16);
+    var clink = '/explorer/address/?addr=' + chg.slice(0, 16);
+    // append new block data as description list
+    var dt = dCreate('dt');
+    dCreateIn(dt, 'a', { href: tlink }, 'TxID 0x' + txe.txid.slice(0, 16) + '...');
+    dCreateIn(dt, 'span', { class: 'stime' }, 'on Block #' + txe.bnum);
+    // create description list for block
+    var dd = dCreate('dd');
+    if (src.length > 24) {
+      dCreateIn(dd, 'a', { title: 'WOTS+ Address: ' + src + '...' }, 'ω+' + src.slice(0, 24) + '...');
+    } else dCreateIn(dd, 'a', { title: 'Tagged Address: ' + src }, 'τ.' + src);
+    var dest = dCreateIn(dd, 'div', null, '⤷ sent ' + mcm(sendtotal) + ' to ');
+    if (dst.length > 24) {
+      dCreateIn(dest, 'a', { title: 'WOTS+ Address: ' + dst + '...' }, 'ω+' + dst.slice(0, 24) + '...');
+    } else dCreateIn(dest, 'a', { title: 'Tagged Address: ' + dst }, 'τ.' + dst);
+    // append block data elements
+    var parent = document.getElementById('transactions');
+    dAppendNamed(parent, bup, 16);
+  });
+  */
+  // request latest data
+  socket.emit('bsummary');
+}
+// detect bottom of the page and load more
+window.addEventListener('wheel', checkBottom);
+window.addEventListener('touchMove', checkBottom);
+// update stime cells using timeAgo()
 window.addEventListener('load', function updateStime() {
   var elements = document.getElementsByName('stime');
   if (elements.length) {
     elements.forEach(function (element) {
-      var msecs = Number(element.getAttribute('data-stime'));
-      var sdate = new Date(msecs);
-      element.innerHTML = sdate.toUTCString() + '<br>' + timeAgo(msecs);
+      element.innerHTML = timeAgo(Number(element.getAttribute('data-stime')));
     });
   }
   setTimeout(updateStime, 1000);

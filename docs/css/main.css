@@ -7,7 +7,14 @@ body, img, h1 {
   margin: 0;
   padding: 0;
 }
-
+a {
+  color: #fff;
+  text-decoration: none;
+}
+a:hover {
+  text-decoration: underline;
+  text-shadow: 0 0 0.0625em white, 0 0 0.125em white, 0 0 0.25em white;
+}
 
 body {
   position: relative;
@@ -18,7 +25,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-.body {
+#body {
   position: relative;
   margin: 0 auto;
   width: 100vw;
@@ -29,6 +36,7 @@ header {
   position: relative;
   width: 100%;
   padding: 0.5em 0.25em;
+  background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 75%);
 }
 header > *:not(video) {
   cursor: default;
@@ -40,7 +48,7 @@ header > *:not(video) {
   color: white;
 }
 header > video {
-  z-index:-1;
+  z-index: -1;
   position: absolute;
   top: 14em;
   left: -2em;
@@ -54,7 +62,6 @@ header > a {
 }
 header > a:hover {
   color: white;
-  text-shadow: 0 0 0.125em #0059ff, 0 0 0.25em #0059ff, 0 0 0.5em #0059ff;
 }
 header h1 {
   display: inline-block;
@@ -80,13 +87,77 @@ header #connection {
 }
 
 footer {
-  position: absolute;
+  position: fixed;
+  width: 100vw;
   bottom: 0;
-  left: 50%;
-  min-width: 36em;
+  left: 0;
+  text-align: center;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(0,0,0,1) 75%);
+  transition: opacity 560ms ease, transform 560ms ease;
+}
+footer .content {
+  position:absolute;
+  bottom:0;
+  left:50%;
   transform: translateX(-50%);
 }
+footer .gh {
+  z-index: 98;
+  position: absolute;
+  width: 0;
+  height: 0;
+  bottom: 0;
+  left: 0;
+  border-style: solid;
+  border-width: 5em 0 0 5em;
+  border-color: transparent transparent transparent #fff;
+}
+footer .gh:before, footer .gh:after {
+  content: '';
+  z-index: 98;
+  position: absolute;
+  width: 0;
+  height: 0;
+  bottom: 4.5em;
+  right: 3.75em;
+  border-style: solid;
+  border-width: 1.25em 0 0 1.25em;
+  border-color: transparent transparent transparent #fff;
+}
+footer .gh:after {
+  bottom: 0;
+  right: -0.75em;
+}
+footer .github {
+  z-index: 99;
+  position: absolute;
+  margin-bottom: -0.28125em;
+  bottom: 0;
+  left: 0;
+}
+footer .github a:hover .octo-arm {
+  animation: octocat-wave 560ms ease-in-out;
+}
+@keyframes octocat-wave{
+  0%, 100% { transform: rotate(0) }
+  20%, 60% { transform: rotate(-25deg) }
+  40%, 80% { transform: rotate(10deg) }
+}
+
+@media (max-width:500px) {
+  footer .github:hover .octo-arm{animation:none}
+  footer .github .octo-arm{animation:octocat-wave 560ms ease-in-out}
+}
+.discord {
+  position: absolute;
+  height: 1.0625em;
+  left: 3.5em;
+  top: 2.5em;
+}
+
 footer > .desc {
+  margin: 0 auto;
+  max-width: 24em;
   text-align: right;
   font-size: 1.5em;
   font-family: "Indie Flower", "Segoe UI", Helvetica, Arial, sans-serif;
@@ -98,13 +169,8 @@ footer > .desc:before {
   height: 1em;
 }
 footer > .desc > a {
-  color: white;
   font-size: 0.75em;
-  text-decoration: none;
   white-space: nowrap;
-}
-footer > .desc > a:hover {
-  text-shadow: 0 0 0.125em #000, 0 0 0.25em #fff, 0 0 0.5em #fff, 0 0 1em #fff;
 }
 footer > .desc > a:before {
   content: ' - ';

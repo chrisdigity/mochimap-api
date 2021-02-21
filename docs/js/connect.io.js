@@ -51,6 +51,7 @@ var connectio = function (token) {
     socket = io(serverio, options);
   } catch (error) { statusError(error); }
   // SocketIO events
+  socket.on('done', function (data) { statusOk((data && data.message) || 'connected'); });
   socket.on('wait', function (message) { statusWait(message); });
   socket.on('error', function (error) { statusError(error.message || error); });
   socket.on('disconnect', function () { statusError('disconnected'); });

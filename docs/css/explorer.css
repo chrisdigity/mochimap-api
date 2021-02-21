@@ -1,8 +1,171 @@
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Mono&display=swap');
 
+#content {
+  position: relative;
+  margin: 2em auto;
+  max-width: 56em;
+}
+#content.block:before {
+  content: 'Latest Block Activity...';
+}
+#content.search:before {
+  content: 'Search Results...';
+}
+#content > div {
+  padding: 0.5em;
+}
+#loading {
+  text-align: center;
+}
+main {
+  text-align: center;
+}
+
+form {
+  display: table;
+  position: relative;
+  margin: 2em 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+form select, form input, form button {
+  border: 0;
+  box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  -webkit-box-sizing: border-box;
+}
+form select {
+  display: table-cell;
+  padding: 0.5em 1em;
+  width: 9em;
+  font-weight: bold;
+  font-size: 1.125em;
+  border-top-left-radius: 1em;
+  border-bottom-left-radius: 1em;
+}
+form input[type='text'] {
+  display: table-cell;
+  padding: 0.5em 1em;
+  width: 22em;
+  height: 2.22875em; /* force same height as select */
+  font-size: 1.125em;
+  border-top-right-radius: 1em;
+  border-bottom-right-radius: 1em;
+}
+input[type='text']:not(:placeholder-shown) + button {
+  transform: scale(0.75);
+}
+input[type='text']:not(:-ms-input-placeholder) + button {
+  transform: scale(0.75);
+}
+form button {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  padding: 0.5em 1em;
+  font-size: 1.125em;
+  border-radius: 1em;
+  transform: scale(0);
+  transition: transform 250ms cubic-bezier(0, 0, 0.43, 1.49);
+}
+.grid-container {
+  display: grid;
+  grid-template-rows: 1fr 1fr 1fr;
+  font-family: "Roboto Mono";
+  transition: transform 250ms ease;
+}
+.grid-container:hover {
+  cursor: default;
+  transform: scale(1.05);
+}
+.grid-container.normal {
+  grid-template-columns: 1fr 2.5fr 2.5fr 2.5fr 3.5fr;
+  grid-template-areas:
+    "icon bnum tstamp mdata mreward"
+    "icon bnum stime tcount tcount"
+    "icon bhash bhash diff bsize";
+  max-width: 56em;
+}
+.grid-container.neogenesis {
+  grid-template-columns: 1fr 2.5fr 2.5fr 4fr;
+  grid-template-areas:
+    "icon bnum tstamp lcount"
+    "icon bnum stime supply"
+    "icon bhash bhash bsize";
+  max-width: 45.75em;
+}
+.grid-container.pseudo {
+  grid-template-columns: 1fr 2.5fr 2.5fr;
+  grid-template-areas:
+    "icon bnum tstamp"
+    "icon bnum stime"
+    "icon bhash diff";
+  max-width: 28em;
+}
+.grid-container > div {
+  display: grid;
+  align-items: center;
+  font-size: 0.875em;
+  padding: 0.125em 0.5em;
+}
+.grid-container > div > span {
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.icon {
+  grid-area: icon;
+  text-align: center;
+  background: #0041b9;
+}
+.bhash { grid-area: bhash; }
+.stime { grid-area: stime; }
+.tstamp { grid-area: tstamp; }
+.mdata { grid-area: mdata; }
+.tcount { grid-area: tcount; }
+.diff { grid-area: diff; }
+.bsize { grid-area: bsize; }
+.mreward { grid-area: mreward; }
+.lcount { grid-area: lcount; }
+.supply { grid-area: supply; }
+.bnum {
+  grid-area: bnum;
+  font-size: 2em !important;
+  font-weight: bold;
+  text-align: center;
+  color: black;
+  background: white;
+}
+.bhash, .mdata, .tcount, .diff, .bsize, .lcount, .supply {
+  border-left: 1px solid white;
+}
+.bhash, .diff, .bsize {
+  background: #333;
+  border-top: 1px solid white;
+}
+.bhash > span > span:first-of-type {
+  opacity: 1;
+  transition: opacity 560ms ease;
+}
+.bhash > span > span:last-of-type {
+  opacity: 0;
+  transition: opacity 560ms ease;
+}
+.bhash:hover > span > span:first-of-type {
+  display: none;
+  opacity: 0;
+}
+.bhash:hover > span > span:last-of-type {
+  opacity: 1;
+}
+.stime, .tstamp, .mdata, .tcount {
+  background: #111;
+}
+
+/*
 main > div {
   display: inline-block;
-  max-width: 34em;
+  max-width: 32em;
   width: 100%;
   text-shadow: 0 0 0.125em #000, 0 0 0.25em #000, 0 0 0.5em #000, 0 0 1em #000;
 }
@@ -56,6 +219,7 @@ main dd i, .smaller {
   margin-right: 0.5em;
   white-space: pre-line;
   text-align: right;
+  font-size: 0.875em;
 }
 .bhash, .phash, .mroot, .nonce {
   margin-right : 2em;
@@ -92,3 +256,4 @@ main dd i, .smaller {
 .nonce:before {
   content: '\03bb  Nonce: ';
 }
+*/

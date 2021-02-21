@@ -1,5 +1,11 @@
 /* eslint-env browser */
 /* eslint-disable no-unused-vars */
+/* global BigInt */
+
+function asUint64String (bigint) {
+  // force unsigned 64bigint value
+  return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
+}
 
 function dCountIn(parent, depth) {
   var count = 0;
@@ -16,24 +22,45 @@ function dCountIn(parent, depth) {
   return count;
 }
 
-function dCreate(type, attr, text, html) {
+function dAppendNamed(parent, child, max) {
+  // sort through children to find insertion position
+  var children = parent.children;
+  var len = children.length;
+  var insertBefore = null;
+  for (var i = 0; i < len; i++) {
+    if (!children[i].getAttribute('name')) continue;
+    if (children[i].getAttribute('name').localeCompare(child.getAttribute('name')) < 1) {
+      insertBefore = children[i];
+      break;
+    }
+  }
+  // if no position found, append
+  if (insertBefore === null) parent.appendChild(child);
+  else parent.insertBefore(child, insertBefore);
+  // remove excess elements
+  if (typeof max === 'undefined') return;
+  var excess = dCountIn(parent) - max;
+  for (var j = 0; j < excess; j++) {
+    parent.removeChild(parent.lastChild);
+  }
+}
+
+function dCreate(attr, html) {
   // set defaults
-  type = type || 'div';
   attr = attr || {};
   // create element type
-  var element = document.createElement(type);
+  var element = document.createElement('div');
   //set attributes
   Object.keys(attr).forEach(function (key) {
     element.setAttribute(key, attr[key]);
   });
-  // set text or html
-  if (text) element.textContent = text;
-  else if (html) element.innerHTML = html;
+  // set html
+  if (html) element.innerHTML = html;
   return element;
 }
 
-function dCreateIn(parent, type, attr, text, html) {
-  var element = dCreate(type, attr, text, html);
+function dCreateIn(parent, attr, html) {
+  var element = dCreate(attr, html);
   parent.appendChild(element);
   return element;
 }

@@ -1,5 +1,5 @@
 /* eslint-env browser */
-/* globals statusOk, statusWait */
+/* globals statusOk, statusWait, getUrlParameter */
 
 function drawHaiku(ctx, text, size, font, type) {
   // set defaults
@@ -92,7 +92,7 @@ function connected(socket) { // eslint-disable-line no-unused-vars
 }
     
 /* Share image (mobile only) */
-function share(canvas) {
+function share(canvas) { // eslint-disable-line no-unused-vars
   if (!navigator.share) {
     alert('navigator.share functionality is unavailable.');
     return;

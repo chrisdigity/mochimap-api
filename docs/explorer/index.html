@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com">
     <link rel="stylesheet" type="text/css" href="/css/main.css">
     <link rel="stylesheet" type="text/css" href="/css/explorer.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.2/css/all.min.css" integrity="sha512-HK5fgLBL+xu6dm/Ii3z4xhlSUyZgTT9tuc/hSrtw6uzJOvgRr2a9jyxxT1ely+B+xFAmJKVSTbpM/CuL7qxO8w==" crossorigin="anonymous" />
     <script defer src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/3.1.0/socket.io.min.js" integrity="sha512-ZqQWGugamKhlSUqM1d/HMtwNG+hITmd/ptoof91lt5ojFZ+2bKlkvlzkmnDIrnikDY+UDVZVupLf6MNbuhtFSw==" crossorigin="anonymous"></script>
     <script defer src="/js/mochimap.utils.js"></script>
     <script defer src="/js/github.corner.js"></script>
@@ -18,9 +19,9 @@
     <script defer src="/js/explorer.js"></script>
   </head>
   <body>
-    <div class="body">
+    <div id="body">
       <header class="unfont">
-        <video class="tl" src="/img/flower.mp4"  src="/img/flower.mp4" type="video/mp4"autoplay preload muted playsinline></video>
+        <video class="tl" src="/img/flower.mp4" type="video/mp4" autoplay preload muted playsinline></video>
         <div>
           <img src="/img/mochimap-logo.png">
           <h1>MochiMap</h1>
@@ -34,10 +35,19 @@
         <a href="https://mochimo.org/">What is Mochimo?</a>
       </header>
       <main>
-        <div id="blocks"></div>
-        <div id=transactions>Latest Transactions</div>
+        <form onsubmit="return socketSearch(event, this)">
+          <h2>Search the Mochimo Blockchain</h2>
+          <select name="filter" onchange="this.form.elements.namedItem('search').placeholder = this.options[this.selectedIndex].getAttribute('data-ph')">
+            <option value="block" data-ph="Type block number (e.g. 95 or 0x5f) ...">Block</option>
+            <option value="ledger" data-ph="Type WOTS+ address or Tag ...">Ledger</option>
+            <option value="network" data-ph="Type IPv4 address (e.g. 101.202.36.48) ...">Network</option>
+            <option value="transaction" data-ph="Type WOTS+ address, Tag or TxID ...">Transaction</option>
+          </select><input type="text" name="search" placeholder="Type block number or change filter ...">
+          <button type="submit" id="submit"><i class="fa fa-search"></i></button>
+        </form>
+        <div id="content" class="block"></div>
+        <div id="loading"><img src="/img/spinner.gif"></div>
       </main>
-      <footer></footer>
     </div>
   </body>
 </html>
