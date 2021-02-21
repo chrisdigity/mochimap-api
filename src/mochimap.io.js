@@ -303,26 +303,25 @@ const Server = {
     socket.on('close', () => Server.sockets.delete(socket));
     // block data may only be requested in parts (summary & tx's)
     socket.on('bsummary', async (req) => {
-      if (typeof req === 'undefined') req = {};
-      const err = Utility.cleanRequest(req);
-      if (err) return socket.emit('error', 'reqRejected: ' + err);
-      // leave all rooms and register for realtime bsummary updates
-      socket.rooms.forEach(room => socket.leave(room));
-      socket.join('bsummaryUpdates');
-      // check critical request properties exist
-      if (typeof req.depth === 'undefined') req.depth = 1;
-      if (typeof req.bnum === 'undefined') {
-        req.bnum = Network.getConsensus().bnum;
-      }
-      // reqBSummary#<blocknumber-depth>*.<blockhash>...
-      const reqMessage = 'reqBSummary#' +
-        (req.depth ? req.bnum.slice(0, -(req.depth)) + '*' : req.bnum) +
-        (req.bhash ? '.' + req.bhash.slice(0, 8) : '') + '...';
-      socket.emit('wait', 'processing ' + reqMessage);
       try {
-        let sent = 0;
-        const fname = Archive.file.bs(req.bnum, '*');
+        if (typeof req === 'undefined') req = {};
+        const err = Utility.cleanRequest(req);
+        if (err) return socket.emit('error', 'reqRejected: ' + err);
+        // leave all rooms and register for realtime bsummary updates
+        socket.rooms.forEach(room => socket.leave(room));
+        socket.join('bsummaryUpdates');
+        // check critical request properties exist
+        if (typeof req.depth === 'undefined') req.depth = 1;
+        if (typeof req.bnum === 'undefined') {
+          req.bnum = Network.getConsensus().bnum;
+        }
+        // reqBSummary#<blocknumber-depth>*.<blockhash>...
+        const reqMessage = 'reqBSummary#' +
+          (req.depth ? `${req.bnum}`.slice(0, -(req.depth)) + '*' : req.bnum) +
+          (req.bhash ? '.' + req.bhash.slice(0, 8) : '') + '...';
+        socket.emit('wait', 'processing ' + reqMessage);
         // search for data matching query
+        const fname = Archive.file.bs(req.bnum, '*');
         const blocks = await Archive.search.bs(fname, req.depth);
         // fastforward to block with matching bhash
         while (blocks.length && req.bhash) {
@@ -333,16 +332,15 @@ const Server = {
         // reverse remaining results
         blocks.reverse();
         // iterate results
+        let i;
         const len = blocks.length;
-        for (let i = 0; i < len; i++) {
+        for (i = 0; i < len; i++) {
           // ensure socket is still connected before sending
-          if (socket.connected) {
-            socket.emit('bsummary', await Archive.read.bs(blocks[i]));
-            sent++;
-          }
+          if (!socket.connected) return;
+          socket.emit('bsummary', await Archive.read.bs(blocks[i]));
         }
         // return "more data" request or 503 if no data was sent
-        if (sent > 0) {
+        if (i > 0) {
           // build request for more data
           const more = { message: 'connected', type: 'bsummary' };
           if (req.depth) {
