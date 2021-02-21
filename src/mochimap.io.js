@@ -344,7 +344,7 @@ const Server = {
           // build request for more data
           const more = { message: 'connected', type: 'bsummary', request: {} };
           if (req.depth) {
-            const depthBigInt = BigInt(req.depth);
+            const depthBigInt = BigInt(req.depth * 4);
             more.request.bnum = ((req.bnum >> depthBigInt) - 1n) << depthBigInt;
             more.request.depth = req.depth;
           } else more.request.bnum = req.bnum - 1n;
