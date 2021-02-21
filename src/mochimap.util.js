@@ -62,13 +62,13 @@ const cleanRequest = (req) => {
       req.bnum = BigInt(req.bnum);
     } catch (ignore) { return 'invalid data, bnum'; }
   }
-  if (req.count) {
-    const valid = ['bigint', 'number', 'string'];
-    if (!valid.includes(typeof req.count)) return 'invalid type, count';
+  if (req.depth) {
+    const valid = ['number', 'string'];
+    if (!valid.includes(typeof req.depth)) return 'invalid type, depth';
     try {
-      // force Number value for count
-      req.count = Number(req.count);
-    } catch (ignore) { return 'invalid data, count'; }
+      // force Number value for depth
+      req.depth = Number(req.depth);
+    } catch (ignore) { return 'invalid data, depth'; }
   }
   // all known properties are clean
   return false;

@@ -309,22 +309,22 @@ const Server = {
       // leave all rooms and register for realtime bsummary updates
       socket.rooms.forEach(room => socket.leave(room));
       socket.join('bsummaryUpdates');
-      // check for empty request
+      // check for empty request properties
       if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
         // self-assign empty request
         Object.assign(req, Network.getConsensus());
-        if (!req.count) req.count = 4;
+        if (typeof req.depth === 'undefined') req.depth = 1;
       }
       // processing request message
-      const reqMessage = // reqBSummary#(<count>)x<blocknumber>.<blockhash>
-        `reqBSummary#(${req.count})x${req.bnum}.${req.bhash.slice(0, 8)}...`;
+      const reqMessage = // reqBSummary#<depth>.<blocknumber>.<blockhash>
+        `reqBSummary#${req.depth}.${req.bnum}.${req.bhash.slice(0, 8)}...`;
       socket.emit('wait', 'processing ' + reqMessage);
       try {
         let emissions = 0;
         do {
           const fname = Archive.file.bs(req.bnum, '*');
           // search for data with matching block numbers
-          const blocks = await Archive.search.bs(fname);
+          const blocks = await Archive.search.bs(fname, req.depth);
           // fastforward to block with matching bhash
           while (req.bhash && blocks.length) {
             if (blocks[blocks.length - 1].includes('.' + req.bhash)) break;
