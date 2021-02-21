@@ -124,19 +124,23 @@ const request = (mod, options, postData) => {
 // Block functions
 const summarizeBlock = (block) => {
   const summary = {};
+  // get block block type (string)
+  const typeStr = block.typeStr;
   // add hash data
   summary.bhash = block.bhash;
   summary.phash = block.phash;
-  // add mining data, if available
-  const maddr = block.maddr;
-  if (maddr) {
+  // add associated mining / ledger data on normal / neogenesis blocks
+  if (typeStr === 'normal') {
     summary.mroot = block.mroot;
     summary.nonce = block.nonce;
     summary.haiku = block.haiku;
-    summary.maddr = maddr.slice(0, 64); // reduce mining address to 32 bytes
+    summary.maddr = block.maddr.slice(0, 64); // reduce maddr to 32 bytes
     summary.mreward = block.mreward;
     summary.mfee = block.mfee;
     summary.tcount = block.tcount;
+  } else if (typeStr === 'neogenesis') {
+    const hdrlen = block.hdrlen;
+    summary.lcount = parseInt((hdrlen - 4) / 2216);
   }
   const tamount = block.tamount;
   if (tamount) summary.tamount = tamount;
