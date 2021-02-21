@@ -50,6 +50,8 @@ const cleanRequest = (req) => {
       const copy = req.bhash.repeat(1); // force string copy
       // check for remaining data after removing valid hexadecimal characters
       if (copy.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, bhash';
+      // reduce bhash length
+      req.bhash = req.bhash.slice(0, 16);
     }
   }
   if (req.bnum) {

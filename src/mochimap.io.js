@@ -306,10 +306,12 @@ const Server = {
       if (typeof req === 'undefined') req = {};
       const err = Utility.cleanRequest(req);
       if (err) return socket.emit('error', 'reqRejected: ' + err);
-      // register for realtime updates
+      // leave all rooms and register for realtime bsummary updates
+      socket.rooms.forEach(room => socket.leave(room));
       socket.join('bsummaryUpdates');
       // check for empty request
       if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
+        // self-assign empty request
         Object.assign(req, Network.getConsensus());
         if (!req.count) req.count = 4;
       }
@@ -323,8 +325,6 @@ const Server = {
           const fname = Archive.file.bs(req.bnum, '*');
           // search for data with matching block numbers
           const blocks = await Archive.search.bs(fname);
-          // reverse array for efficiency
-          if (blocks.length > 1) blocks.reverse();
           // fastforward to block with matching bhash
           while (req.bhash && blocks.length) {
             if (blocks[blocks.length - 1].includes('.' + req.bhash)) break;
@@ -332,7 +332,7 @@ const Server = {
           }
           if (req.bhash) delete req.bhash;
           // read remaining blocks
-          while (req.count-- > 0 && blocks.length) {
+          while (req.count > 0 && blocks.length) {
             const bsummary = await Archive.read.bs(blocks.pop());
             // ensure socket is still connected before sending
             if (!socket.connected) break;
