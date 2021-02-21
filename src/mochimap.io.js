@@ -309,17 +309,15 @@ const Server = {
       // leave all rooms and register for realtime bsummary updates
       socket.rooms.forEach(room => socket.leave(room));
       socket.join('bsummaryUpdates');
-      // check for empty request properties
-      if (typeof req.bnum === 'undefined' && typeof req.bhash === 'undefined') {
-        // self-assign empty request
-        if (typeof req.depth === 'undefined') req.depth = 1;
-        Object.assign(req, Network.getConsensus());
-        // limit size of bhash
-        req.bhash = req.bhash.slice(0, 16);
+      // check critical request properties exist
+      if (typeof req.depth === 'undefined') req.depth = 1;
+      if (typeof req.bnum === 'undefined') {
+        req.bnum = Network.getConsensus().bnum;
       }
-      // processing request message
-      const reqMessage = // reqBSummary#<depth>.<blocknumber>.<blockhash>
-        `reqBSummary#${req.depth}.${req.bnum}.${req.bhash.slice(0, 8)}...`;
+      // reqBSummary#<blocknumber-depth>*.<blockhash>...
+      const reqMessage = 'reqBSummary#' +
+        (req.depth ? req.bnum.slice(0, -(req.depth)) + '*' : req.bnum) +
+        (req.bhash ? '.' + req.bhash.slice(0, 8) : '') + '...';
       socket.emit('wait', 'processing ' + reqMessage);
       try {
         let sent = 0;
@@ -343,18 +341,16 @@ const Server = {
             sent++;
           }
         }
-        // build request for more data
-        const more = {
-          message: 'connected',
-          type: 'bsummary',
-          request: {
-            bnum: req.bnum - 1n
-          }
-        };
-        // send 503 if no data was sent
-        if (sent < 1) {
-          socket.emit('error', '503: no data unavailable');
-        } else socket.emit('done', more);
+        // return "more data" request or 503 if no data was sent
+        if (sent > 0) {
+          // build request for more data
+          const more = { message: 'connected', type: 'bsummary' };
+          if (req.depth) {
+            more.bnum = ((req.bnum >> req.depth) - 1n) << req.depth;
+            more.depth = req.depth;
+          } else more.bnum = req.bnum - 1n;
+          socket.emit('done', more);
+        } else socket.emit('error', '503: no data unavailable');
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
