@@ -343,10 +343,12 @@ const Server = {
             sent++;
           }
         }
+        // build request for more data
+        const more = { type: 'bsummary', data: { bnum: req.bnum - 1n } };
         // send 503 if no data was sent
         if (sent < 1) {
           socket.emit('error', '503: no data unavailable');
-        } else socket.emit('done');
+        } else socket.emit('done', more);
       } catch (error) {
         const response = '500: Internal Server Error';
         console.error(response, error);
