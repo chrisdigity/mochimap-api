@@ -41,21 +41,24 @@ const checkRequest = (req, defaults) => {
     for (const [key, value] of Object.entries(defaults)) {
       // apply defaults if possible
       if (typeof req[key] === 'undefined') {
-        if (value !== null && !Array.isArray(value)) req[key] = value;
-        else return 'missing default,' + key;
-        // indicate if default has been applied or not
-        defaulted[key] = true;
+        if (value !== null && !Array.isArray(value)) {
+          // indicate if default has been applied or not
+          defaulted[key] = true;
+          req[key] = value;
+        } else return 'missing default, ' + key;
       }
       // if "value" is Array, request[key] MUST include one of "value" items
-      if (Array.isArray(value) && !value.includes(req[key])) {
-        return 'invalid default, ' + key;
-        // else indicated if checked against defaults
-      } else defaulted[key] = true;
+      if (Array.isArray(value)) {
+        if (!value.includes(req[key])) {
+          return 'invalid default, ' + key;
+          // else indicate if checked against defaults
+        } else defaulted[key] = true;
+      }
     }
   }
   // for remaining request properies, check and enforce acceptable values
   if (typeof req.address !== 'undefined' && !defaulted.address) {
-    const invalid = invalidHexString(req.addr, 'addr');
+    const invalid = invalidHexString(req.address, 'address');
     if (invalid) return invalid;
     // addr must be a hexadecimal string of length > 1
     if (req.address.length < 2) return 'insufficient address length';
