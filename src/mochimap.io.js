@@ -322,41 +322,41 @@ const Server = {
           console.error(node.toJSON());
           return socket.emit('error', '503: Unavailable at this time');
         } else if (!socket.connected) return;
-        // copy req.addr string to TypedArray where necessary ( tag vs. wots )
+        // copy address string to appropriate position of TypedArray
         const addressArray = new Uint8Array(Mochimo.TXADDRLEN);
         // use request address length -1 to avoid odd address length issues
-        let len = req.tag ? 2196 : 0;
-        const maxlen = len + req.address.length - 1;
-        while (len < maxlen && len < Mochimo.TXADDRLEN) {
-          addressArray[len] = parseInt(req.address.slice(len, len + 2), 16);
-          len += 2;
-        }
-        // reduce len to represent number of bytes to search
-        len -= req.tag ? 2196 : 0;
-        len >>>= 1;
+        let bytes = req.addressType === 'tag' ? 2196 : 0;
+        const maxlen = req.address.length - 1;
+        for (let i = 0; i < maxlen && bytes < Mochimo.TXADDRLEN; i += 2) {
+          addressArray[bytes++] = parseInt(req.address.slice(i, i + 2), 16);
+        } // reduce byte if adjusted for tag copy
+        bytes -= req.addressType === 'tag' ? 2196 : 0;
         // update node tx with request parameters and send request
-        node.tx.len = len;
-        if (req.tag) node.tx.dstaddr = addressArray;
-        else node.tx.srcaddr = addressArray;
-        const opcode = req.tag ? Mochimo.OP_RESOLVE : Mochimo.OP_BALANCE;
-        await Mochimo.Node.sendop(node, opcode);
+        node.tx.len = bytes;
+        if (req.addressType === 'tag') {
+          node.tx.dstaddr = addressArray;
+          await Mochimo.Node.sendop(node, Mochimo.OP_RESOLVE);
+        } else {
+          node.tx.srcaddr = addressArray;
+          await Mochimo.Node.sendop(node, Mochimo.OP_BALANCE);
+        }
         // check operation success
         if (node.status) {
-          console.error('sendop(OP_BALANCE) request failed!');
+          console.error('sendop() balance request failed!');
           console.error(node.toJSON());
           return socket.emit('error', '503: Unavailable at this time');
         } else if (!socket.connected) return;
         // obtain full tag (if found) and balance (regardless of result), emit
         if (node.tx.opcode === Mochimo.OP_RESOLVE) {
           const found = node.tx.sendtotal;
-          const tag = found ? node.tx.dstaddr.slice(2196) : req.address;
-          const wots = found ? node.tx.dstaddr.slice(0, 2196) : '';
+          const tag = found ? node.tx.dstaddr.slice(4392) : req.address;
+          const wots = found ? node.tx.dstaddr.slice(0, 4392) : '';
           const balance = node.tx.changetotal;
           socket.emit('balance', { found, tag, wots, balance });
         } else { // .. assume OP_SEND_BAL
           const found = node.tx.changetotal;
-          const tag = found ? node.tx.srcaddr.slice(2196) : '';
-          const wots = found ? node.tx.srcaddr.slice(0, 2196) : req.address;
+          const tag = found ? node.tx.srcaddr.slice(4392) : '';
+          const wots = found ? node.tx.srcaddr.slice(0, 4392) : req.address;
           const balance = node.tx.changetotal;
           socket.emit('balance', { found, tag, wots, balance });
         }
