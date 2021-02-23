@@ -158,14 +158,17 @@ const Block = {
         let fname = Archive.file.tx(txe.txid, bnum, bhash);
         writetx[fname] = Buffer.from(txe.toReference().buffer);
         // build ty files
-        let addr = txe.srctag || txe.srcaddr;
-        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'src');
+        let tag = txe.srctag;
+        let wots = tag ? null : txe.srcaddr;
+        fname = Archive.file.ty({ tag, wots }, bnum, bhash, txe.txid, 'src');
         writety[fname] = null;
-        addr = txe.dsttag || txe.dstaddr;
-        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'dst');
+        tag = txe.dsttag;
+        wots = tag ? null : txe.dstaddr;
+        fname = Archive.file.ty({ tag, wots }, bnum, bhash, txe.txid, 'dst');
         writety[fname] = null;
-        addr = txe.chgtag || txe.chgaddr;
-        fname = Archive.file.ty(addr, bnum, bhash, txe.txid, 'chg');
+        tag = txe.chgtag;
+        wots = tag ? null : txe.chgaddr;
+        fname = Archive.file.ty({ tag, wots }, bnum, bhash, txe.txid, 'chg');
         writety[fname] = null;
       }
       // archive tx data
@@ -301,12 +304,76 @@ const Server = {
     // socket management
     Server.sockets.add(socket);
     socket.on('close', () => Server.sockets.delete(socket));
-    // block data may only be requested in parts (summary & tx's)
+    socket.on('balance', async (req) => {
+      try {
+        // check incoming request data
+        const defaults = { address: null, addressType: ['tag', 'wots'] };
+        const err = Utility.checkRequest(req, defaults);
+        if (err) return socket.emit('error', 'reqRejected: ' + err);
+        // reqBalance#<blocknumber-depth>*.<blockhash>...
+        const reqMessage = `reqBalance#${req.address.slice(0, 8)}*...`;
+        socket.emit('wait', 'processing ' + reqMessage);
+        // consult compatible node for balance and full address
+        const ip = process.env.CUSTOM_NODE;
+        const node = await Mochimo.Node.callserver({ ip });
+        // check connection to node
+        if (node.status) {
+          console.error('Failed to connect to a balance query node!');
+          console.error(node.toJSON());
+          return socket.emit('error', '503: Unavailable at this time');
+        } else if (!socket.connected) return;
+        // copy req.addr string to TypedArray where necessary ( tag vs. wots )
+        const addressArray = new Uint8Array(Mochimo.TXADDRLEN);
+        // use request address length -1 to avoid odd address length issues
+        let len = req.tag ? 2196 : 0;
+        const maxlen = len + req.address.length - 1;
+        while (len < maxlen && len < Mochimo.TXADDRLEN) {
+          addressArray[len] = parseInt(req.address.slice(len, len + 2), 16);
+          len += 2;
+        }
+        // reduce len to represent number of bytes to search
+        len -= req.tag ? 2196 : 0;
+        len >>>= 1;
+        // update node tx with request parameters and send request
+        node.tx.len = len;
+        if (req.tag) node.tx.dstaddr = addressArray;
+        else node.tx.srcaddr = addressArray;
+        const opcode = req.tag ? Mochimo.OP_RESOLVE : Mochimo.OP_BALANCE;
+        await Mochimo.Node.sendop(node, opcode);
+        // check operation success
+        if (node.status) {
+          console.error('sendop(OP_BALANCE) request failed!');
+          console.error(node.toJSON());
+          return socket.emit('error', '503: Unavailable at this time');
+        } else if (!socket.connected) return;
+        // obtain full tag (if found) and balance (regardless of result), emit
+        if (node.tx.opcode === Mochimo.OP_RESOLVE) {
+          const found = node.tx.sendtotal;
+          const tag = found ? node.tx.dstaddr.slice(2196) : req.address;
+          const wots = found ? node.tx.dstaddr.slice(0, 2196) : '';
+          const balance = node.tx.changetotal;
+          socket.emit('balance', { found, tag, wots, balance });
+        } else { // .. assume OP_SEND_BAL
+          const found = node.tx.changetotal;
+          const tag = found ? node.tx.srcaddr.slice(2196) : '';
+          const wots = found ? node.tx.srcaddr.slice(0, 2196) : req.address;
+          const balance = node.tx.changetotal;
+          socket.emit('balance', { found, tag, wots, balance });
+        }
+        socket.emit('done', 'finised ' + reqMessage);
+      } catch (error) {
+        const response = '500: Internal Server Error';
+        console.error(response, error);
+        socket.emit('error', response);
+      }
+    });
     socket.on('bsummary', async (req) => {
       try {
         if (typeof req === 'undefined') req = {};
-        const err = Utility.cleanRequest(req);
-        if (err) return socket.emit('error', 'reqRejected: ' + err);
+        else {
+          const err = Utility.checkRequest(req);
+          if (err) return socket.emit('error', 'reqRejected: ' + err);
+        }
         // leave all rooms and register for realtime bsummary updates
         socket.rooms.forEach(room => socket.leave(room));
         socket.join('bsummaryUpdates');
@@ -357,7 +424,7 @@ const Server = {
       }
     });
     socket.on('haiku', async (req = {}) => {
-      const err = Utility.cleanRequest(req);
+      const err = Utility.checkRequest(req);
       if (err) return socket.emit('error', 'reqRejected: ' + err);
       const reqMessage = // reqHaiku#<blocknumber>.<blockhash>
         `reqHaiku#${req.bnum || ''}.${(req.bhash || '').slice(0, 16)}`;

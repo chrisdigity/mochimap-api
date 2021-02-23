@@ -19,42 +19,52 @@
 
 /* global BigInt */
 
-const cleanRequest = (req) => {
-  // confirm req is an object
-  if (typeof req !== 'object') return 'invalid request parameter';
-  // for every known request property, check and enforce acceptable types
-  if (req.activities) {
-    if (!Array.isArray(req.activities)) {
-      // activities must be an array of strings
-      return 'invalid type, activities';
-    } else {
-      // the only acceptable data type for array contents is a string
-      const len = req.activities.length;
-      for (let i = 0; i < len; i++) {
-        if (typeof req.activities[i] !== 'string') {
-          return 'invalid type, activities[' + i + ']';
-        }
-        const copy = req.activities[i].repeat(1); // force string copy
-        // check for remaining data after removing valid lowercase characters
-        if (copy.replace(/[a-z]/g, '')) {
-          return 'invalid data, activities[' + i + ']';
-        }
+const invalidHexString = (hexStr, name) => {
+  if (typeof hexStr !== 'string') {
+    // string is the only acceptable type for hexStr
+    return 'invalid type, ' + name;
+  } else {
+    // check for remaining data after removing valid hexadecimal characters
+    if (hexStr.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, ' + name;
+  }
+  return false;
+};
+
+const checkRequest = (req, defaults) => {
+  // ensure request is an object
+  if (typeof req === 'undefined') req = {};
+  else if (typeof req !== 'object') return 'invalid request parameter';
+  // check defaults
+  const defaulted = {};
+  if (typeof defaults !== 'undefined') {
+    if (typeof defaults !== 'object') throw new Error('Invalid defaults usage');
+    for (const [key, value] of Object.entries(defaults)) {
+      // apply defaults if possible
+      if (typeof req[key] === 'undefined') {
+        if (value !== null && !Array.isArray(value)) req[key] = value;
+        else return 'missing default,' + key;
+        // indicate if default has been applied or not
+        defaulted[key] = true;
       }
+      // if "value" is Array, request[key] MUST include one of "value" items
+      if (Array.isArray(value) && !value.includes(req[key])) {
+        return 'invalid default, ' + key;
+        // else indicated if checked against defaults
+      } else defaulted[key] = true;
     }
   }
-  if (req.bhash) {
-    if (typeof req.bhash !== 'string') {
-      // string is the only acceptable type for bhash
-      return 'invalid type, bhash';
-    } else {
-      const copy = req.bhash.repeat(1); // force string copy
-      // check for remaining data after removing valid hexadecimal characters
-      if (copy.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, bhash';
-      // reduce bhash length
-      req.bhash = req.bhash.slice(0, 16);
-    }
+  // for remaining request properies, check and enforce acceptable values
+  if (typeof req.address !== 'undefined' && !defaulted.address) {
+    const invalid = invalidHexString(req.addr, 'addr');
+    if (invalid) return invalid;
+    // addr must be a hexadecimal string of length > 1
+    if (req.address.length < 2) return 'insufficient address length';
   }
-  if (req.bnum) {
+  if (typeof req.bhash !== 'undefined' && !defaulted.bhash) {
+    const invalid = invalidHexString(req.bhash, 'bhash');
+    if (invalid) return invalid;
+  }
+  if (typeof req.bnum !== 'undefined' && !defaulted.bnum) {
     const valid = ['bigint', 'number', 'string'];
     if (!valid.includes(typeof req.bnum)) return 'invalid type, bnum';
     try {
@@ -62,13 +72,22 @@ const cleanRequest = (req) => {
       req.bnum = BigInt(req.bnum);
     } catch (ignore) { return 'invalid data, bnum'; }
   }
-  if (req.depth) {
+  if (typeof req.depth !== 'undefined' && !defaulted.depth) {
     const valid = ['number', 'string'];
     if (!valid.includes(typeof req.depth)) return 'invalid type, depth';
     try {
       // force Number value for depth
       req.depth = Number(req.depth);
     } catch (ignore) { return 'invalid data, depth'; }
+  }
+  if (typeof req.addressType !== 'undefined' && !defaulted.addressType) {
+    if (typeof req.addressType !== 'string') {
+      // string is the only acceptable type for req.type
+      return 'invalid type, type';
+    } else {
+      // check for remaining data after removing valid alpha-characters
+      if (req.addressType.replace(/[A-Fa-f]/g, '')) return 'invalid data, type';
+    }
   }
   // all known properties are clean
   return false;
@@ -211,7 +230,7 @@ const visualizeHaiku = async (haiku, requestModule) => {
 };
 
 module.exports = {
-  cleanRequest,
+  checkRequest,
   compareWeight,
   isPrivateIPv4,
   request,
