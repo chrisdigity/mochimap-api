@@ -357,7 +357,7 @@ const Server = {
           const found = node.tx.changetotal;
           const tag = found ? node.tx.srcaddr.slice(4392) : '';
           const wots = found ? node.tx.srcaddr.slice(0, 4392) : req.address;
-          const balance = node.tx.changetotal;
+          const balance = node.tx.sendtotal;
           socket.emit('balance', { found, tag, wots, balance });
         }
         socket.emit('done', 'finised ' + reqMessage);
