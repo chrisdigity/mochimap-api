@@ -265,7 +265,7 @@ const Network = {
             Server.broadcast('networkUpdates', 'network', updates);
           }
         } else Server.broadcast('networkUpdates', 'network', node);
-        Network._nodes.set(ip, Object.assign(oldNode || {}, node)); // update
+        Network.node._list.set(ip, Object.assign(oldNode || {}, node)); // update
       } else if (node.lastTouch < updateOffset) {
         // update lastTouch and request peerlist
         node.lastTouch = Date.now();
