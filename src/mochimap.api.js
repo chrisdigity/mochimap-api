@@ -322,24 +322,24 @@ const Server = {
 
     switch (path.shift()) {
       case 'balance': {
-        if (Server._valid.method(req, res)) { // ensure request method is GET
-          let isTag = true;
-          let address = path.shift();
-          if (address === 'wots') {
-            address = path.shift();
-            isTag = false;
-          } // else if (address === '<next address type>') ...
-          if (Server._valid.hex(req, res, { address })) { // check parameters
-            try {
+        try {
+          if (Server._valid.method(req, res)) { // ensure request method is GET
+            let isTag = true;
+            let address = path.shift();
+            if (address === 'wots') {
+              address = path.shift();
+              isTag = false;
+            } // else if (address === '<next address type>') ...
+            if (Server._valid.hex(req, res, { address })) { // check parameters
               // query ledger via node
               const lentry = Mochimo.getBalance(CUSTOMNODE, address, isTag);
               if (lentry === null) {
                 const error = 'Address could not be found in ledger';
                 return Server._response(res, { error }, 404);
               } else return Server._response(res, lentry, 200);
-            } catch (error) { return Server._response(res, undefined, 500); }
+            }
           }
-        }
+        } catch (error) { return Server._response(res, undefined, 500); }
         break;
       } /*
       case 'block': {
@@ -399,4 +399,4 @@ process.on('uncaughtException', gracefulShutdown);
 /* startup */
 console.log('Begin startup...');
 // start api server and network scanning
-Server.start().then(Network.scan).catch(gracefulShutdown);
+Server.start().then(Network.node.scan).catch(gracefulShutdown);
