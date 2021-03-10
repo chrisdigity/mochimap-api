@@ -18,6 +18,31 @@
  */
 
 /* global BigInt */
+const https = require('https');
+
+function objectIsEmpty (obj) {
+  for (var prop in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
+  }
+  return true;
+}
+
+function objectDifference (objA, objB, depth = 0) {
+  if (typeof objA !== 'object' || typeof objB !== 'object') {
+    throw new TypeError('comparison parameters MUST BE objects');
+  } else if (typeof depth !== 'number') {
+    throw new TypeError('depth parameter CANNOT be assigned a non-number type');
+  }
+  return Object.entries(objB)
+    .filter(([key, value]) => objA[key] !== value)
+    .reduce((objC, [key, value]) => {
+      if (typeof value === 'object' && (depth - 1)) {
+        value = objectDifference(objA[key], value, depth - 1);
+        if (objectIsEmpty(value)) return objC;
+      }
+      return { ...objC, [key]: value };
+    }, {});
+}
 
 const invalidHexString = (hexStr, name) => {
   if (typeof hexStr !== 'string') {
@@ -125,10 +150,10 @@ const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
-const request = (mod, options, postData) => {
+const request = (options, postData) => {
   return new Promise((resolve, reject) => {
-    var req = mod.request(options, res => {
-      var body = [];
+    const req = https.request(options, res => {
+      let body = [];
       res.on('data', chunk => body.push(chunk)); // accumulate data chunks
       res.on('end', () => { // concatenate data chunks
         body = Buffer.concat(body).toString();
@@ -143,65 +168,13 @@ const request = (mod, options, postData) => {
   });
 };
 
-// Block functions
-const summarizeBlock = (block) => {
-  const summary = {};
-  // get block block type (string)
-  const typeStr = block.typeStr;
-  // add hash data
-  summary.bhash = block.bhash;
-  summary.phash = block.phash;
-  // add associated mining / ledger data on normal / neogenesis blocks
-  if (typeStr === 'normal') {
-    summary.mroot = block.mroot;
-    summary.nonce = block.nonce;
-    summary.haiku = block.haiku;
-    summary.maddr = block.maddr.slice(0, 64); // reduce maddr to 32 bytes
-    summary.mreward = block.mreward;
-    summary.mfee = block.mfee;
-    summary.tcount = block.tcount;
-  } else if (typeStr === 'neogenesis') {
-    const hdrlen = block.hdrlen;
-    summary.lcount = parseInt((hdrlen - 4) / 2216);
-  }
-  const tamount = block.tamount;
-  if (tamount) summary.tamount = tamount;
-  // add remaining trailer data
-  summary.difficulty = block.difficulty;
-  summary.time0 = block.time0;
-  summary.stime = block.stime;
-  summary.bnum = block.bnum;
-  // add block type as string
-  summary.type = block.typeStr;
-  // add block size, in byte
-  summary.size = block.byteLength;
-  // return finalized summary
-  return summary;
-};
-const summarizeTXEntry = (txe, bnum, bhash) => {
-  const summary = {
-    src: txe.srctag || txe.srcaddr.slice(0, 32),
-    dst: txe.dsttag || txe.dstaddr.slice(0, 32),
-    chg: txe.chgtag || txe.chgaddr.slice(0, 32),
-    sendtotal: txe.sendtotal,
-    changetotal: txe.changetotal,
-    txfee: txe.txfee,
-    txsig: txe.txsig.slice(0, 32),
-    txid: txe.txid.slice(0, 32)
-  };
-  // add bhash and bnum, if available
-  if (bhash) summary.bhash = bhash;
-  if (bnum) summary.bnum = bnum;
-  // return finalized summary
-  return summary;
-};
-const visualizeHaiku = async (haiku, requestModule) => {
+const visualizeHaiku = async (haiku, shadow) => {
   // heuristically determine best picture query for haiku
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
   const query = search.join('%20');
   let pexels;
   try { // request results from Pexels
-    pexels = await request(requestModule, {
+    pexels = await request({
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
       headers: { Authorization: process.env.PEXELS_SECRET }
@@ -223,6 +196,8 @@ const visualizeHaiku = async (haiku, requestModule) => {
     data.img.author = photo.photographer || 'Unknown';
     data.img.authorurl = photo.photographer_url || 'pexels.com';
     data.img.desc = photo.url.match(/\w+(?=-)/g).join(' ');
+    data.img.haiku = haiku;
+    data.img.shadow = shadow;
     data.img.src = photo.src.original;
     data.img.srcid = 'Pexels';
     data.img.srcurl = photo.url;
@@ -233,11 +208,11 @@ const visualizeHaiku = async (haiku, requestModule) => {
 };
 
 module.exports = {
+  objectIsEmpty,
+  objectDifference,
   checkRequest,
   compareWeight,
   isPrivateIPv4,
   request,
-  summarizeBlock,
-  summarizeTXEntry,
   visualizeHaiku
 };
