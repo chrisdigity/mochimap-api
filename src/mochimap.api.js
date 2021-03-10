@@ -359,8 +359,8 @@ const Server = {
     // create http/s server
     Server._api = process.env.PRODUCTION
       ? https.createServer({ // secure production server
-        key: fs.readFileSync('/etc/ssl/private/io.mochimap.com.key'),
-        cert: fs.readFileSync('/etc/ssl/certs/io.mochimap.com.pem')
+        key: fs.readFileSync('/etc/ssl/private/mochimap.com.key'),
+        cert: fs.readFileSync('/etc/ssl/certs/mochimap.com.pem')
       }) : http.createServer(); // insecure development server
     // set http server events
     Server._api.on('request', Server.request);
