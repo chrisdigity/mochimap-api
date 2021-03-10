@@ -36,9 +36,11 @@ function objectDifference (objA, objB, depth = 0) {
   return Object.entries(objB)
     .filter(([key, value]) => objA[key] !== value)
     .reduce((objC, [key, value]) => {
-      if (typeof value === 'object' && (depth - 1)) {
-        value = objectDifference(objA[key], value, depth - 1);
-        if (objectIsEmpty(value)) return objC;
+      if (typeof value === 'object' && typeof objA[key] === 'object') {
+        if (depth - 1 !== 0) {
+          value = objectDifference(objA[key], value, depth - 1);
+          if (objectIsEmpty(value)) return objC;
+        }
       }
       return { ...objC, [key]: value };
     }, {});
