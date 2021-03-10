@@ -150,7 +150,7 @@ const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
-const request = (options, postData) => {
+const readWeb = (options, postData) => {
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
       let body = [];
@@ -174,7 +174,7 @@ const visualizeHaiku = async (haiku, shadow) => {
   const query = search.join('%20');
   let pexels;
   try { // request results from Pexels
-    pexels = await request({
+    pexels = await readWeb({
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
       headers: { Authorization: process.env.PEXELS_SECRET }
@@ -213,6 +213,6 @@ module.exports = {
   checkRequest,
   compareWeight,
   isPrivateIPv4,
-  request,
+  readWeb,
   visualizeHaiku
 };

@@ -37,7 +37,7 @@ const {
   isPrivateIPv4,
   objectDifference,
   objectIsEmpty,
-  request,
+  readWeb,
   visualizeHaiku
 } = require('./mochimap.util');
 const Mongo = require('./mochimap.mongo');
@@ -163,7 +163,8 @@ const Network = {
     _start: [
       path.join(DATADIR, 'startnodes.lst'),
       'https://www.mochimap.com/startnodes.lst',
-      'https://mochimo.org/startnodes.lst'
+      'https://mochimo.org/startnodes.lst',
+      'https://www.mochimap.net/startnodes.lst'
     ],
     _timer: null,
     consensus: () => {
@@ -184,7 +185,7 @@ const Network = {
       return consensus;
     },
     scan: async () => {
-      const fid = 'Network.scan():';
+      const fid = 'Network.node.scan():';
       let active = 0;
       const len = Network.node._list.size;
       Network.node._list.forEach((jsonNode, ip) => {
@@ -202,7 +203,7 @@ const Network = {
           console.log(fid, 'trying', source);
           try {
             let data = source.startsWith('http')
-              ? await request(https, source) : await fsp.readFile(source);
+              ? await readWeb(source) : await fsp.readFile(source);
             if (data && typeof data === 'string') {
               data = data.match(/(^|(?<=\n))[\w.]+/g);
               if (data.length) {
