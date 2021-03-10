@@ -161,7 +161,7 @@ const Network = {
     _intervalUpdate: 20000,
     _list: new Map(),
     _start: [
-      './startnodes.lst',
+      path.join(DATADIR, 'startnodes.lst'),
       'https://www.mochimap.com/startnodes.lst',
       'https://mochimo.org/startnodes.lst'
     ],
