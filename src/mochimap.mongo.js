@@ -40,6 +40,7 @@ const asUint64String = (bigint) => {
 
 const Mongo = {
   _client: null, // for caching client
+  _clientURI: process.env.MONGO_URI,
   _connecting: false, // for identifying client connection in progress
   _connectingWait: (poll) => new Promise((resolve) => {
     const checkConnecting = () => {
@@ -127,8 +128,7 @@ const Mongo = {
   },
   get: {
     _client: async (connect = true) => {
-      const mURL = process.env.MONGOURL;
-      const fid = 'Mongo.get._client():';
+      const fid = `Mongo.get._client(${Mongo._clientURI}):`;
       if (Mongo._connecting) {
         DEBUG(fid, 'client connection in progress, wait...');
         await Mongo._connectingWait(50);
@@ -137,7 +137,7 @@ const Mongo = {
         DEBUG(fid, 'client not connected, connecting...');
         Mongo._connecting = true;
         try {
-          await Mongo._client.connect(mURL);
+          await Mongo._client.connect(Mongo._clientURI);
           DEBUG(fid, 'client connected succesfully.');
         } catch (error) {
           Mongo._client = null;
@@ -148,7 +148,7 @@ const Mongo = {
         DEBUG(fid, 'client not found, create new client connection...');
         Mongo._connecting = true;
         try {
-          Mongo._client = await MongoClient.connect(mURL);
+          Mongo._client = await MongoClient.connect(Mongo._clientURI);
           DEBUG(fid, 'new client connection created successfully.');
         } catch (error) {
           TRACE(fid, 'new client connection failed;', error);
