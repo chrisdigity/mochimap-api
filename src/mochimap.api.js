@@ -186,27 +186,27 @@ const Network = {
     },
     scan: async () => {
       const fid = 'Network.node.scan():';
-      let active = 0;
       const len = Network.node._list.size;
-      Network.node._list.forEach((jsonNode, ip) => {
-        if (jsonNode.status === Mochimo.VEOK) active++;
-        Network.node.update(jsonNode, ip); // asynchronous update
+      let active = 0;
+      Network.node._list.forEach((nodeJSON, ip) => {
+        if (nodeJSON.status === Mochimo.VEOK) active++;
+        Network.node.update(nodeJSON, ip); // asynchronous update
       });
       // complete network blackout failsafe and fresh start trigger
       if (!active && !Network.node._idle) Network.node._idle = Date.now();
       else if (active) Network.node._idle = 0;
       const idleTime = Network.node._idle ? Date.now() - Network.node._idle : 0;
       if (idleTime > Network.node._intervalUpdate || len === 0) {
-        console.log(`Active/Total Nodes: ${active}/${len}; get startnodes...`);
+        console.log(`Active/Total Nodes: ${active}/${len}; Seek more nodes...`);
         let i = 0;
         for (const source of Network.node._start) {
           console.log(fid, 'trying', source);
           try {
             let data = source.startsWith('http')
-              ? await readWeb(source) : await fsp.readFile(source);
+              ? await readWeb(source) : await fsp.readFile(source, 'utf8');
             if (data && typeof data === 'string') {
               data = data.match(/(^|(?<=\n))[\w.]+/g);
-              if (data.length) {
+              if (data && data.length) {
                 data = data.filter(item => isIPv4(item));
                 if (data.length) {
                   data = data.filter(ip => !Network.node._list.has(ip));
@@ -237,8 +237,8 @@ const Network = {
     },
     update: async (node, ip) => {
       const internalCall = Boolean(typeof ip === 'undefined');
-      const via = internalCall ? 'internal' : 'Network.node.scan()';
-      const fid = `Network.update.node(via ${via}):`;
+      const via = internalCall ? 'internal' : 'scan()';
+      const fid = `Network.update.node(${via}):`;
       const updateOffset = Date.now() - Network.node._intervalUpdate;
       if (internalCall) {
         // extract data from, and update, Network node (overwrites properties)
@@ -250,7 +250,7 @@ const Network = {
           node.peers.forEach(peer => {
             // check for new non-private nodes in peerlist
             if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
-            console.log(fid, ip, 'peerlist shows unscanned peer,', peer);
+            console.debug(fid, peer, 'via', ip, 'peerlist');
             const peerNode = new Mochimo.Node({ peer });
             Network.node.update(peerNode).catch(console.trace);
           });

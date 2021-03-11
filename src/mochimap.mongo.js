@@ -29,8 +29,8 @@
  */
 
 /* global BigInt */
-const DEBUG = process.env.PRODUCTION ? () => {} : console.debug;
-const ERROR = process.env.PRODUCTION ? console.error : console.trace;
+const DEBUG = process.env.DEBUG ? console.debug : () => {};
+const TRACE = process.env.TRACE ? console.error : console.trace;
 
 const { MongoClient } = require('mongodb');
 
@@ -120,14 +120,14 @@ const Mongo = {
           await client.close();
           DEBUG(fid, 'client connection closed successfully.');
         } catch (error) {
-          ERROR(fid, 'failed to close client connection;', error);
+          TRACE(fid, 'failed to close client connection;', error);
         }
       } else DEBUG(fid, 'client not connected, ignoring...');
     } else DEBUG(fid, 'no client detected, ignoring...');
   },
   get: {
     _client: async (connect = true) => {
-      const mURL = 'mongodb://localhost.com:27017/mochimap';
+      const mURL = process.env.MONGOURL;
       const fid = 'Mongo.get._client():';
       if (Mongo._connecting) {
         DEBUG(fid, 'client connection in progress, wait...');
@@ -141,7 +141,7 @@ const Mongo = {
           DEBUG(fid, 'client connected succesfully.');
         } catch (error) {
           Mongo._client = null;
-          ERROR(fid, 'client connection failed, removed;', error);
+          TRACE(fid, 'client connection failed, removed;', error);
         } finally { Mongo._connecting = false; }
       }
       if (Mongo._client === null && connect) {
@@ -151,7 +151,7 @@ const Mongo = {
           Mongo._client = await MongoClient.connect(mURL);
           DEBUG(fid, 'new client connection created successfully.');
         } catch (error) {
-          ERROR(fid, 'new client connection failed;', error);
+          TRACE(fid, 'new client connection failed;', error);
         } finally { Mongo._connecting = false; }
       }
       return Mongo._client;
@@ -165,7 +165,7 @@ const Mongo = {
         try {
           return client.db().collection(coName);
         } catch (error) {
-          ERROR(fid, 'failed to return collection;', error);
+          TRACE(fid, 'failed to return collection;', error);
         }
       }
       return null;
@@ -181,7 +181,7 @@ const Mongo = {
           DEBUG(fid, 'return cursor...');
           return collection.find(query, options);
         } catch (error) {
-          ERROR(fid, 'failed to return cursor;', error);
+          TRACE(fid, 'failed to return cursor;', error);
         }
       }
       return null;
@@ -195,7 +195,7 @@ const Mongo = {
           DEBUG(fid, 'return cursor...');
           return collection.findOne(query, options);
         } catch (error) {
-          ERROR(fid, 'failed to return cursor;', error);
+          TRACE(fid, 'failed to return cursor;', error);
         }
       }
       return null;
