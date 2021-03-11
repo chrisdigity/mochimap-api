@@ -60,7 +60,7 @@ const Network = {
       const fid = 'Network.block.check():';
       if (typeof ip === 'object') {
         bhash = ip.cblockhash;
-        bnum = ip.bnum;
+        bnum = ip.cblock;
         ip = ip.ip;
       }
       if (bnum === 0n) return; // disregard B.O.D. checks
@@ -246,17 +246,6 @@ const Network = {
         node = node.toJSON();
         // define reference to old node data
         const oldNode = Network.node._list.get(ip);
-        if (Array.isArray(node.peers)) {
-          node.peers.forEach(peer => {
-            // check for new non-private nodes in peerlist
-            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
-            console.debug(fid, peer, 'via', ip, 'peerlist');
-            const peerNode = new Mochimo.Node({ peer });
-            Network.node.update(peerNode).catch(console.trace);
-          });
-        }
-        // initiate asynchronous block check on nodes returning a blockhash
-        if (node.cblockhash) Network.block.check(node).catch(console.trace);
         if (oldNode) {
           // determine differences between latest node data and broadcast
           const updates = objectDifference(oldNode, node);
@@ -266,6 +255,17 @@ const Network = {
           }
         } else Server.broadcast('networkUpdates', 'network', node);
         Network.node._list.set(ip, Object.assign(oldNode || {}, node)); // update
+        // check for new non-private nodes in peerlist
+        if (Array.isArray(node.peers)) {
+          node.peers.forEach(peer => {
+            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
+            console.debug(fid, peer, 'via', ip, 'peerlist');
+            const peerNode = new Mochimo.Node({ ip: peer });
+            Network.node.update(peerNode).catch(console.trace);
+          });
+        }
+        // initiate asynchronous block check on nodes returning a blockhash
+        if (node.cblockhash) Network.block.check(node).catch(console.trace);
       } else if (node.lastTouch < updateOffset) {
         // update lastTouch and request peerlist
         node.lastTouch = Date.now();
