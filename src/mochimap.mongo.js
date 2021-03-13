@@ -251,30 +251,34 @@ const Mongo = {
       const fid = 'Mongo.process.blockUpdate():';
       const bhash = block.bhash;
       const bnum = block.bnum;
+      const txDocuments = [];
       DEBUG(fid, 'minify block data...');
       const blockDocument = block.toJSON(true);
       blockDocument._id = Mongo._id.block(bnum, bhash);
-      blockDocument.txids = [];
-      DEBUG(fid, 'extract transaction data and embed unique _id\'s...');
-      const txDocuments = [];
-      block.transactions.forEach(txe => {
-        const txid = txe.txid;
-        blockDocument.txids.push(txid);
-        txe = txe.toJSON(true);
-        txe._id = Mongo._id.transaction(txid, bnum, bhash);
-        txDocuments.push(txe);
-      });
+      if (blockDocument.type === 'normal') {
+        blockDocument.txids = [];
+        DEBUG(fid, 'extract transaction data and embed unique _id\'s...');
+        block.transactions.forEach(txe => {
+          const txid = txe.txid;
+          blockDocument.txids.push(txid);
+          txe = txe.toJSON(true);
+          txe._id = Mongo._id.transaction(txid, bnum, bhash);
+          txDocuments.push(txe);
+        });
+      }
       DEBUG(fid, 'insert block document...');
       const bInsert = await Mongo._insert('block', blockDocument);
       if (bInsert < 1) {
         throw new Error(
           `${fid} insert error, inserted ${bInsert}/1 block documents`);
       }
-      DEBUG(fid, 'insert transaction documents...');
-      const txInsert = await Mongo._insert('transaction', txDocuments);
-      if (txInsert < 1) {
-        throw new Error(`${fid} insert error, ` +
-          `inserted ${txInsert}/${txDocuments.length} transaction documents`);
+      if (txDocuments.length) {
+        DEBUG(fid, 'insert transaction documents...');
+        const txInsert = await Mongo._insert('transaction', txDocuments);
+        if (txInsert < 1) {
+          throw new Error(`${fid} insert error, ` +
+            `inserted ${txInsert}/${txDocuments.length} transaction documents`);
+        }
       }
     }
   },
