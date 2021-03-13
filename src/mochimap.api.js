@@ -94,7 +94,7 @@ const Network = {
             const phash = block.phash;
             const pbnum = block.bnum - 1n;
             Network.block.check(ip, pbnum, phash).catch(console.trace);
-            Network.block.visualize(block).catch(console.trace);
+            Network.block.visualizer(block).catch(console.trace);
           }
         }
       }
