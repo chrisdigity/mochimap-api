@@ -37,6 +37,19 @@ const { MongoClient } = require('mongodb');
 const asUint64String = (bigint) => {
   return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
 };
+const ellipsis = (str, max) => {
+  str = `${str}`;
+  if (str.length > max) return str.slice(0, max) + '...';
+  else return str;
+};
+const ellipsisJoin = (array, delimiter, max) => {
+  const end = array.length - 1;
+  return array.reduce((str, next, i) => {
+    str += ellipsis(next, max);
+    if (i < end) str += delimiter;
+    return str;
+  }, '');
+};
 
 const Mongo = {
   _client: null, // for caching client
@@ -51,7 +64,7 @@ const Mongo = {
   }),
   _id: {
     block: (bnum, bhash) => {
-      const fid = `Mongo._id.block(${bnum}, ${bhash}):`;
+      const fid = `Mongo._id.block(${bnum}, ${ellipsis(bhash, 8)}):`;
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
         DEBUG(fid, 'convert bnum to 64-bit hexadecimal string');
         bnum = asUint64String(bnum);
@@ -66,7 +79,8 @@ const Mongo = {
       return [bnum, bhash].join('-');
     },
     transaction: (txid, bnum, bhash) => {
-      const fid = `Mongo._id.transaction(${txid}, ${bnum}, ${bhash}):`;
+      const fid = `Mongo._id.transaction(${ellipsis(txid, 8)}, ` +
+        `${bnum}, ${ellipsis(bhash, 8)}):`;
       if (typeof txid === 'string') {
         DEBUG(fid, 'force 64 character txid');
         txid = txid.slice(0, 64).padStart(64, '0');
@@ -157,7 +171,7 @@ const Mongo = {
       return Mongo._client;
     },
     _collection: async (coName) => {
-      const fid = `Mongo.get._collection('${coName}'):`;
+      const fid = `Mongo.get._collection(${coName}):`;
       DEBUG(fid, 'get client...');
       const client = await Mongo.get._client();
       if (client) {
@@ -213,7 +227,8 @@ const Mongo = {
   },
   has: {
     _document: async (coName, ...args) => {
-      const fid = `Mongo.has._document(${coName}, ${args.toString()}):`;
+      const fid =
+        `Mongo.has._document(${coName}, ${ellipsisJoin(args, ', ', 8)}):`;
       DEBUG(fid, 'get collection...');
       const collection = await Mongo.get._collection(coName);
       if (collection) {
