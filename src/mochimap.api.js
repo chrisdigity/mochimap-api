@@ -88,12 +88,13 @@ const Network = {
           } else if (block.type === Mochimo.Block.INVALID) {
             console.error(fid, `Downloaded ${bnum}/${bhash.slice(0, 8)}~ from`,
               ip, 'got invalid block type');
-          } else { // initiate asynchronous "checkback" and block update
+          } else { // initiate block update
+            await Network.block.update(block);
+            // initiate asynchonous "checkback" and block visualization
             const phash = block.phash;
             const pbnum = block.bnum - 1n;
             Network.block.check(ip, pbnum, phash).catch(console.trace);
-            Network.block.update(block).then(Network.block.visualize)
-              .catch(console.trace);
+            Network.block.visualize(block).catch(console.trace);
           }
         }
       }
@@ -106,7 +107,7 @@ const Network = {
       // store raw block on local disk (no overwrite, excl. neogenesis blocks)
       const bhash = block.bhash;
       const bnum = block.bnum;
-      if (bnum & 0xff) {
+      if (bnum & 0xffn) {
         try {
           const fname = Mongo._id.block(bnum, bhash).replace('-', '.') + '.bc';
           const fpath = path.join(BCDIR, fname);
