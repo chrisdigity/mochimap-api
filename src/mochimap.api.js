@@ -207,7 +207,7 @@ const Network = {
             if (data && typeof data === 'string') {
               data = data.match(/(^|(?<=\n))[\w.]+/g);
               if (data && data.length) {
-                data = data.filter(item => isIPv4(item));
+                data = data.filter(ip => isIPv4(ip) && !isPrivateIPv4(ip));
                 if (data.length) {
                   data = data.filter(ip => !Network.node._list.has(ip));
                   if (data.length) {
@@ -259,7 +259,7 @@ const Network = {
         if (Array.isArray(node.peers)) {
           node.peers.forEach(peer => {
             if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
-            console.debug(fid, peer, 'via', ip, 'peerlist');
+            console.log(fid, 'added', peer, 'via', ip, 'peerlist');
             const peerNode = new Mochimo.Node({ ip: peer });
             Network.node.update(peerNode).catch(console.trace);
           });
