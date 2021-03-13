@@ -100,7 +100,7 @@ const Mongo = {
     }
   },
   _insert: async (coName, docs) => {
-    const fid = `Mongo._insert(${coName}, ${docs.length} document/s)`;
+    const fid = `Mongo._insert(${coName}, ${docs.length || 1} document/s)`;
     DEBUG(fid, 'get collection...');
     const collection = await Mongo.get._collection(coName);
     if (collection) {
