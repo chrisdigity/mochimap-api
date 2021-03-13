@@ -96,7 +96,7 @@ const Mongo = {
         DEBUG(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
-      return [bnum, bhash].join('-');
+      return [txid, bnum, bhash].join('-');
     }
   },
   _insert: async (coName, docs) => {
