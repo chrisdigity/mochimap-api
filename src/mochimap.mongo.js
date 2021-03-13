@@ -235,7 +235,9 @@ const Mongo = {
         DEBUG(fid, 'determine _id for query...');
         const query = { _id: Mongo._id[coName](...args) };
         DEBUG(fid, 'count documents...');
-        return await collection.countDocuments(query, { limit: 1 });
+        const count = await collection.countDocuments(query, { limit: 1 });
+        DEBUG(fid, 'found', count, 'documents...');
+        return count;
       }
       return null;
     },
