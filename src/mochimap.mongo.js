@@ -29,26 +29,22 @@
  */
 
 /* global BigInt */
-const DEBUG = process.env.DEBUG ? console.debug : () => {};
+/* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
+BigInt.prototype.toBSON = function () { return this.toString(); };
 const TRACE = process.env.TRACE ? console.error : console.trace;
+const DEBUG = process.env.DEBUG ? console.debug : () => {};
 
 const { MongoClient } = require('mongodb');
 
 const asUint64String = (bigint) => {
   return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
 };
-const ellipsis = (str, max) => {
-  str = `${str}`;
-  if (str.length > max) return str.slice(0, max) + '...';
-  else return str;
+const trim = (str, max) => {
+  str = `${str}`; return str.length > max ? str.slice(0, max) + '...' : str;
 };
-const ellipsisJoin = (array, delimiter, max) => {
+const trimJoin = (array, max, d) => {
   const end = array.length - 1;
-  return array.reduce((str, next, i) => {
-    str += ellipsis(next, max);
-    if (i < end) str += delimiter;
-    return str;
-  }, '');
+  return array.reduce((a, c, i) => a + trim(c, max) + (i < end ? d : ''), '');
 };
 
 const Mongo = {
@@ -64,7 +60,7 @@ const Mongo = {
   }),
   _id: {
     block: (bnum, bhash) => {
-      const fid = `Mongo._id.block(${bnum}, ${ellipsis(bhash, 8)}):`;
+      const fid = `Mongo._id.block(${bnum}, ${trim(bhash, 8)}):`;
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
         DEBUG(fid, 'convert bnum to 64-bit hexadecimal string');
         bnum = asUint64String(bnum);
@@ -79,8 +75,8 @@ const Mongo = {
       return [bnum, bhash].join('-');
     },
     transaction: (txid, bnum, bhash) => {
-      const fid = `Mongo._id.transaction(${ellipsis(txid, 8)}, ` +
-        `${bnum}, ${ellipsis(bhash, 8)}):`;
+      const fid = `Mongo._id.transaction(${trim(txid, 8)}, ` +
+        `${bnum}, ${trim(bhash, 8)}):`;
       if (typeof txid === 'string') {
         DEBUG(fid, 'force 64 character txid');
         txid = txid.slice(0, 64).padStart(64, '0');
@@ -228,7 +224,7 @@ const Mongo = {
   has: {
     _document: async (coName, ...args) => {
       const fid =
-        `Mongo.has._document(${coName}, ${ellipsisJoin(args, ', ', 8)}):`;
+        `Mongo.has._document(${coName}, ${trimJoin(args, 8, ', ')}):`;
       DEBUG(fid, 'get collection...');
       const collection = await Mongo.get._collection(coName);
       if (collection) {
