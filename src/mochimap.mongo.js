@@ -157,8 +157,8 @@ const Mongo = {
     }
   },
   has: {
-    block: (...args) => Mongo.has._oneCount('block', ...args),
-    transaction: (...args) => Mongo.has._oneCount('transaction', ...args)
+    block: (...args) => Mongo._oneCount('block', ...args),
+    transaction: (...args) => Mongo._oneCount('transaction', ...args)
   },
   process: {
     blockUpdate: async (block) => {
@@ -198,9 +198,7 @@ const Mongo = {
   },
   update: {
     blockById: (update, ...args) =>
-      Mongo._update('block', update, Mongo._id.block(...args)),
-    transactionById: (update, ...args) =>
-      Mongo._update('transaction', update, Mongo._id.transaction(...args))
+      Mongo._update('block', update, Mongo._id.block(...args))
   }
 };
 
