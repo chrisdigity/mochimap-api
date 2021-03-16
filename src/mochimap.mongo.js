@@ -42,12 +42,16 @@ const { MongoClient } = require('mongodb');
 const MongoClientURI = process.env.MONGO_URI;
 const MongoClientOptions = { useUnifiedTopology: true };
 const Mongo = {
+  _cache: null,
+  _client: () => new MongoClient(MongoClientURI, MongoClientOptions),
   _connect: async (cName, fid) => {
     fid = fid || fidFormat('Mongo._connect', cName);
-    DEBUG(fid, 'create client...');
-    const client = new MongoClient(MongoClientURI, MongoClientOptions);
-    DEBUG(fid, 'connect database...');
-    await client.connect();
+    DEBUG(fid, Mongo._cache ? 'use cached client...' : 'create client...');
+    const client = Mongo._cache = Mongo._cache || Mongo._client();
+    if (!Mongo._cache.isConnected) {
+      DEBUG(fid, 'connect database...');
+      await client.connect();
+    }
     DEBUG(fid, 'fetch collection...');
     return { client, collection: client.db().collection(cName) };
   },
