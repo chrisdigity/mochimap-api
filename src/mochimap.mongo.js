@@ -42,10 +42,12 @@ const { MongoClient } = require('mongodb');
 const MongoClientURI = process.env.MONGO_URI;
 const MongoClientOptions = { useUnifiedTopology: true };
 const Mongo = {
-  _connect: (cName, fid) => {
+  _connect: async (cName, fid) => {
     fid = fid || fidFormat('Mongo._connect', cName);
     DEBUG(fid, 'create client...');
     const client = new MongoClient(MongoClientURI, MongoClientOptions);
+    DEBUG(fid, 'connect database...');
+    await client.connect();
     DEBUG(fid, 'fetch collection...');
     return { client, collection: client.db().collection(cName) };
   },
@@ -96,7 +98,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._insert', cName, docs);
     let conn;
     try {
-      conn = Mongo._connect(cName, fid);
+      conn = await Mongo._connect(cName, fid);
       DEBUG(fid, 'insert document/s...');
       const cmd = Array.isArray(docs)
         ? await conn.collection.insertMany(docs)
@@ -109,7 +111,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._many', cName, query, options);
     let conn;
     try {
-      conn = Mongo._connect(cName, fid);
+      conn = await Mongo._connect(cName, fid);
       DEBUG(fid, 'return cursor...');
       return conn.collection.find(query, options);
     } finally { await Mongo._disconnect(conn, fid); }
@@ -118,7 +120,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._one', cName, query, options);
     let conn;
     try {
-      conn = Mongo._connect(cName, fid);
+      conn = await Mongo._connect(cName, fid);
       DEBUG(fid, 'return document...');
       return conn.collection.findOne(query, options);
     } finally { await Mongo._disconnect(conn, fid); }
@@ -127,7 +129,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._oneCount', cName, ...args);
     let conn;
     try {
-      conn = Mongo._connect(cName, fid);
+      conn = await Mongo._connect(cName, fid);
       DEBUG(fid, 'determine _id for query...');
       const query = Mongo._id[cName](...args);
       DEBUG(fid, 'count documents...');
@@ -140,7 +142,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._update', cName, update, query);
     let conn;
     try {
-      conn = Mongo._connect(cName, fid);
+      conn = await Mongo._connect(cName, fid);
       DEBUG(fid, 'update document/s...');
       const cmd = Array.isArray(update)
         ? await conn.collection.updateMany(query, update)
