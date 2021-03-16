@@ -16,53 +16,51 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  **
- * Manages a single client connection through the Node.js MongoDB driver.
+ * A MongoDB wrapper, for MochiMap, to perform restrictive commands based on
+ * https://mongodb.github.io/node-mongodb-native/3.3/reference/unified-topology/
+ *
  * Implements get, has, process and update functions for searching, checking,
  * processing and updating database entries for MochiMap data types, where the
  * _id (unique ID) of the associated data is handled automatically via the use
  * of appropriate data identifiers (txid, bnum, bhash).
+ *
  * Notes:
  *  - underscore (_) prefix denotes a function designed for internal use
- *  - most functions will resolve null on client connection or collection
- *    failure and report to stderr as necessary
+ *  - most functions will resolve undefined if no error was thrown on failure
  *
  */
 
 /* global BigInt */
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
 BigInt.prototype.toBSON = function () { return this.toString(); };
-const TRACE = process.env.TRACE ? console.error : console.trace;
-const DEBUG = process.env.DEBUG ? console.debug : () => {};
 
+/* Debugging constants - comment after debugging */
+const DEBUG = console.debug;
+
+const { asUint64String, fidFormat } = require('./mochimap.util');
 const { MongoClient } = require('mongodb');
-
-const asUint64String = (bigint) => {
-  return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
-};
-const trim = (str, max) => {
-  str = `${str}`; return str.length > max ? str.slice(0, max) + '...' : str;
-};
-const trimJoin = (array, max, d) => {
-  const end = array.length - 1;
-  return array.reduce((a, c, i) => a + trim(c, max) + (i < end ? d : ''), '');
-};
-
+const MongoClientURI = process.env.MONGO_URI;
+const MongoClientOptions = { useUnifiedTopology: true };
 const Mongo = {
-  _client: null, // for caching client
-  _clientURI: process.env.MONGO_URI,
-  _connecting: false, // for identifying client connection in progress
-  _connectingWait: (poll) => new Promise((resolve) => {
-    const checkConnecting = () => {
-      if (Mongo._connecting) return setTimeout(checkConnecting, poll);
-      resolve();
-    };
-    checkConnecting();
-  }),
+  _connect: (cName, fid) => {
+    fid = fid || fidFormat('Mongo._connect', cName);
+    DEBUG(fid, 'create client...');
+    const client = new MongoClient(MongoClientURI, MongoClientOptions);
+    DEBUG(fid, 'fetch collection...');
+    return { client, collection: client.db().collection(cName) };
+  },
+  _disconnect: async (conn, fid) => {
+    fid = fid || fidFormat('Mongo._disconnect');
+    if (conn && conn.client) {
+      DEBUG(fid, 'disconnect client...');
+      await conn.client.close();
+    }
+  },
   _id: {
     block: (bnum, bhash) => {
-      const fid = `Mongo._id.block(${bnum}, ${trim(bhash, 8)}):`;
+      const fid = fidFormat('Mongo._id.block', bnum, bhash);
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
-        DEBUG(fid, 'convert bnum to 64-bit hexadecimal string');
+        DEBUG(fid, 'force 64-bit hex bnum');
         bnum = asUint64String(bnum);
       } else if (typeof bnum === 'string') {
         DEBUG(fid, 'force 16 character bnum');
@@ -72,11 +70,10 @@ const Mongo = {
         DEBUG(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
-      return [bnum, bhash].join('-');
+      return { _id: [bnum, bhash].join('-') };
     },
     transaction: (txid, bnum, bhash) => {
-      const fid = `Mongo._id.transaction(${trim(txid, 8)}, ` +
-        `${bnum}, ${trim(bhash, 8)}):`;
+      const fid = fidFormat('Mongo._id.transaction', txid, bnum, bhash);
       if (typeof txid === 'string') {
         DEBUG(fid, 'force 64 character txid');
         txid = txid.slice(0, 64).padStart(64, '0');
@@ -92,155 +89,76 @@ const Mongo = {
         DEBUG(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
-      return [txid, bnum, bhash].join('-');
+      return { _id: [txid, bnum, bhash].join('-') };
     }
   },
-  _insert: async (coName, docs) => {
-    const fid = `Mongo._insert(${coName}, ${docs.length || 1} document/s)`;
-    DEBUG(fid, 'get collection...');
-    const collection = await Mongo.get._collection(coName);
-    if (collection) {
-      DEBUG(fid, 'collection found, inserting...');
-      const cmd = Array.isArray(docs) ? await collection.insertMany(docs)
-        : await collection.insertOne(docs);
-      DEBUG(fid, cmd.result.n, 'document/s inserted successfully!');
+  _insert: async (cName, docs) => {
+    const fid = fidFormat('Mongo._insert', cName, docs);
+    let conn;
+    try {
+      conn = Mongo._connect(cName, fid);
+      DEBUG(fid, 'insert document/s...');
+      const cmd = Array.isArray(docs)
+        ? await conn.collection.insertMany(docs)
+        : await conn.collection.insertOne(docs);
+      DEBUG(fid, cmd.result.n, 'doc/s inserted!');
       return cmd.result.n;
-    }
-    return null;
+    } finally { await Mongo._disconnect(conn, fid); }
   },
-  _update: async (coName, query, docs) => {
-    const fid = `Mongo._update(${coName}, ${query}, ${docs.length} document/s)`;
-    DEBUG(fid, 'get collection...');
-    const collection = await Mongo.get._collection(coName);
-    if (collection) {
-      DEBUG(fid, 'collection found, updating...');
-      const cmd = Array.isArray(docs) ? await collection.updateMany(query, docs)
-        : await collection.updateOne(query, docs);
-      DEBUG(fid, cmd.result.n, 'document/s updated successfully!');
-      return cmd.result.n;
-    }
-    return null;
+  _many: async (cName, query, options = {}) => {
+    const fid = fidFormat('Mongo._many', cName, query, options);
+    let conn;
+    try {
+      conn = Mongo._connect(cName, fid);
+      DEBUG(fid, 'return cursor...');
+      return conn.collection.find(query, options);
+    } finally { await Mongo._disconnect(conn, fid); }
   },
-  close: async () => {
-    const fid = 'Mongo.close():';
-    const client = await Mongo.get._client(false);
-    if (client) {
-      if (client.isConnected) {
-        DEBUG(fid, 'client connected, closing...');
-        try {
-          await client.close();
-          DEBUG(fid, 'client connection closed successfully.');
-        } catch (error) {
-          TRACE(fid, 'failed to close client connection;', error);
-        }
-      } else DEBUG(fid, 'client not connected, ignoring...');
-    } else DEBUG(fid, 'no client detected, ignoring...');
+  _one: async (cName, query, options = {}) => {
+    const fid = fidFormat('Mongo._one', cName, query, options);
+    let conn;
+    try {
+      conn = Mongo._connect(cName, fid);
+      DEBUG(fid, 'return document...');
+      return conn.collection.findOne(query, options);
+    } finally { await Mongo._disconnect(conn, fid); }
+  },
+  _oneCount: async (cName, ...args) => {
+    const fid = fidFormat('Mongo._oneCount', cName, ...args);
+    let conn;
+    try {
+      conn = Mongo._connect(cName, fid);
+      DEBUG(fid, 'determine _id for query...');
+      const query = Mongo._id[cName](...args);
+      DEBUG(fid, 'count documents...');
+      const count = await conn.collection.countDocuments(query, { limit: 1 });
+      DEBUG(fid, 'found', count, 'documents...');
+      return count;
+    } finally { await Mongo._disconnect(conn, fid); }
+  },
+  _update: async (cName, update, query) => {
+    const fid = fidFormat('Mongo._update', cName, update, query);
+    let conn;
+    try {
+      conn = Mongo._connect(cName, fid);
+      DEBUG(fid, 'update document/s...');
+      const cmd = Array.isArray(update)
+        ? await conn.collection.updateMany(query, update)
+        : await conn.collection.updateOne(query, update);
+      DEBUG(fid, cmd.result.n, 'doc/s updated!');
+    } finally { await Mongo._disconnect(conn, fid); }
   },
   get: {
-    _client: async (connect = true) => {
-      const fid = `Mongo.get._client(${Mongo._clientURI}):`;
-      if (Mongo._connecting) {
-        DEBUG(fid, 'client connection in progress, wait...');
-        await Mongo._connectingWait(50);
-      }
-      if (Mongo._client && !Mongo._client.isConnected && connect) {
-        DEBUG(fid, 'client not connected, connecting...');
-        Mongo._connecting = true;
-        try {
-          await Mongo._client.connect(Mongo._clientURI);
-          DEBUG(fid, 'client connected succesfully.');
-        } catch (error) {
-          Mongo._client = null;
-          TRACE(fid, 'client connection failed, removed;', error);
-        } finally { Mongo._connecting = false; }
-      }
-      if (Mongo._client === null && connect) {
-        DEBUG(fid, 'client not found, create new client connection...');
-        Mongo._connecting = true;
-        try {
-          Mongo._client = await MongoClient.connect(Mongo._clientURI);
-          DEBUG(fid, 'new client connection created successfully.');
-        } catch (error) {
-          TRACE(fid, 'new client connection failed;', error);
-        } finally { Mongo._connecting = false; }
-      }
-      return Mongo._client;
-    },
-    _collection: async (coName) => {
-      const fid = `Mongo.get._collection(${coName}):`;
-      DEBUG(fid, 'get client...');
-      const client = await Mongo.get._client();
-      if (client) {
-        DEBUG(fid, 'return collection...');
-        try {
-          return client.db().collection(coName);
-        } catch (error) {
-          TRACE(fid, 'failed to return collection;', error);
-        }
-      }
-      return null;
-    },
-    _cursor: async (coName, query, options = {}) => {
-      const fid = `Mongo.get._cursor(${query}, ${options}):`;
-      DEBUG(fid, 'force descending sort on _id');
-      Object.assign(options, { sort: { _id: -1 } });
-      DEBUG(fid, 'get collection...');
-      const collection = await Mongo.get._collection(coName);
-      if (collection) {
-        try {
-          DEBUG(fid, 'return cursor...');
-          return collection.find(query, options);
-        } catch (error) {
-          TRACE(fid, 'failed to return cursor;', error);
-        }
-      }
-      return null;
-    },
-    _one: async (coName, query, options = {}) => {
-      const fid = `Mongo.get._one(${query}, ${options}):`;
-      DEBUG(fid, 'get collection...');
-      const collection = await Mongo.get._collection(coName);
-      if (collection) {
-        try {
-          DEBUG(fid, 'return cursor...');
-          return collection.findOne(query, options);
-        } catch (error) {
-          TRACE(fid, 'failed to return cursor;', error);
-        }
-      }
-      return null;
-    },
-    blocks: (query, options) =>
-      Mongo.get._cursor('block', query, options),
-    blockById: (bnum, bhash) =>
-      Mongo.get._one('block', { _id: Mongo._id.block(bnum, bhash) }),
-    transactions: (query, options) =>
-      Mongo.get._cursor('transaction', query, options),
-    transactionById: (txid, bnum, bhash) => {
-      const query = { _id: Mongo._id.transaction(txid, bnum, bhash) };
-      return Mongo.get._one('block', query);
+    blocks: (...args) => Mongo._many('block', ...args),
+    blockById: (...args) => Mongo._one('block', Mongo._id.block(...args)),
+    transactions: (...args) => Mongo._many('transaction', ...args),
+    transactionById: (...args) => {
+      return Mongo._one('transaction', Mongo._id.transaction(...args));
     }
   },
   has: {
-    _document: async (coName, ...args) => {
-      const fid =
-        `Mongo.has._document(${coName}, ${trimJoin(args, 8, ', ')}):`;
-      DEBUG(fid, 'get collection...');
-      const collection = await Mongo.get._collection(coName);
-      if (collection) {
-        DEBUG(fid, 'determine _id for query...');
-        const query = { _id: Mongo._id[coName](...args) };
-        DEBUG(fid, 'count documents...');
-        const count = await collection.countDocuments(query, { limit: 1 });
-        DEBUG(fid, 'found', count, 'documents...');
-        return count;
-      }
-      return null;
-    },
-    block: (bnum, bhash) =>
-      Mongo.has._document('block', bnum, bhash),
-    transaction: (txid, bnum, bhash) =>
-      Mongo.has._document('transaction', txid, bnum, bhash)
+    block: (...args) => Mongo.has._oneCount('block', ...args),
+    transaction: (...args) => Mongo.has._oneCount('transaction', ...args)
   },
   process: {
     blockUpdate: async (block) => {
@@ -279,11 +197,10 @@ const Mongo = {
     }
   },
   update: {
-    block: (query, docs) => Mongo._update('block', query, docs),
-    blockById: (bnum, bhash, docs) => {
-      const query = { _id: Mongo._id.block(bnum, bhash) };
-      return Mongo._update('block', query, docs);
-    }
+    blockById: (update, ...args) =>
+      Mongo._update('block', update, Mongo._id.block(...args)),
+    transactionById: (update, ...args) =>
+      Mongo._update('transaction', update, Mongo._id.transaction(...args))
   }
 };
 

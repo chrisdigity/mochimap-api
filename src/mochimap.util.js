@@ -20,14 +20,18 @@
 /* global BigInt */
 const https = require('https');
 
-function objectIsEmpty (obj) {
-  for (var prop in obj) {
+const asUint64String = (bigint) => {
+  return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
+};
+
+const objectIsEmpty = (obj) => {
+  for (const prop in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
   }
   return true;
-}
+};
 
-function objectDifference (objA, objB, depth = 0) {
+const objectDifference = (objA, objB, depth = 0) => {
   if (typeof objA !== 'object' || typeof objB !== 'object') {
     throw new TypeError('comparison parameters MUST BE objects');
   } else if (typeof depth !== 'number') {
@@ -44,7 +48,16 @@ function objectDifference (objA, objB, depth = 0) {
       }
       return { ...objC, [key]: value };
     }, {});
-}
+};
+
+const fidFormat = (fid, ...args) => {
+  const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
+  const tJoin = (array, max, d) => {
+    const end = array.length - 1;
+    return array.reduce((a, c, i) => a + t(c, max) + (i < end ? d : ''), '');
+  };
+  return [fid, '(', tJoin(args, 8, ', '), '):'].join('');
+};
 
 const invalidHexString = (hexStr, name) => {
   if (typeof hexStr !== 'string') {
@@ -210,11 +223,13 @@ const visualizeHaiku = async (haiku, shadow) => {
 };
 
 module.exports = {
-  objectIsEmpty,
-  objectDifference,
+  asUint64String,
   checkRequest,
   compareWeight,
+  fidFormat,
   isPrivateIPv4,
+  objectDifference,
+  objectIsEmpty,
   readWeb,
   visualizeHaiku
 };
