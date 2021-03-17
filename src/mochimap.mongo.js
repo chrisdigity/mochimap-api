@@ -25,8 +25,7 @@
  * of appropriate data identifiers (txid, bnum, bhash).
  *
  * Notes:
- *  - underscore (_) prefix denotes a function designed for internal use
- *  - most functions will resolve undefined if no error was thrown on failure
+ *  - the underscore (_) prefix denotes internal uage (primarily)
  *
  */
 
@@ -34,46 +33,64 @@
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
 BigInt.prototype.toBSON = function () { return this.toString(); };
 
-/* Debugging constants - comment after debugging */
-const DEBUG = console.debug;
-
 const { asUint64String, fidFormat } = require('./mochimap.util');
 const { MongoClient } = require('mongodb');
-const MongoClientURI = process.env.MONGO_URI;
 const MongoClientOptions = { useUnifiedTopology: true };
+const MongoClientURI = process.env.MONGO_URI;
 const Mongo = {
-  _cache: null,
-  _client: () => new MongoClient(MongoClientURI, MongoClientOptions),
-  _connect: async (cName, fid) => {
-    fid = fid || fidFormat('Mongo._connect', cName);
-    DEBUG(fid, Mongo._cache ? 'use cached client...' : 'create client...');
-    const client = Mongo._cache = Mongo._cache || Mongo._client();
-    if (!Mongo._cache.isConnected) {
-      DEBUG(fid, 'connect database...');
-      await client.connect();
+  _client: null,
+  _clientConnecting: false, // for identifying client connection in progress
+  _clientWait: (poll = 0) => new Promise((resolve) => {
+    const checkConnecting = () => {
+      if (Mongo._clientConnecting) setTimeout(checkConnecting, poll);
+      else resolve();
+    };
+    checkConnecting();
+  }),
+  _connect: async (cName) => {
+    const fid = fidFormat('Mongo._connect', cName);
+    if (Mongo._clientConnecting) {
+      console.debug(fid, 'client connection in progress, wait...');
+      await Mongo._clientWait(50);
     }
-    DEBUG(fid, 'fetch collection...');
+    if (Mongo._client === null) {
+      console.debug(fid, 'create new client...');
+      Mongo._client = new MongoClient(MongoClientURI, MongoClientOptions);
+    } else console.debug(fid, 'using cached client...');
+    if (!Mongo._client.isConnected()) {
+      console.debug(fid, 'connecting to database...');
+      Mongo._clientConnecting = true;
+      try {
+        await Mongo._client.connect();
+        console.debug(fid, 'client connected succesfully.');
+      } catch (error) {
+        Mongo._client = null;
+        console.trace(fid, 'client connection failed;', error);
+      } finally { Mongo._connecting = false; }
+    }
+    console.debug(fid, 'fetch collection...');
+    const client = Mongo._client;
     return { client, collection: client.db().collection(cName) };
   },
-  _disconnect: async (conn, fid) => {
-    fid = fid || fidFormat('Mongo._disconnect');
-    if (conn && conn.client) {
-      DEBUG(fid, 'disconnect client...');
-      await conn.client.close();
+  _disconnect: async () => {
+    const fid = fidFormat('Mongo._disconnect');
+    if (Mongo._client && Mongo._client.isConnected()) {
+      console.debug(fid, 'disconnecting client...');
+      await Mongo._client.close();
     }
   },
   _id: {
     block: (bnum, bhash) => {
       const fid = fidFormat('Mongo._id.block', bnum, bhash);
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
-        DEBUG(fid, 'force 64-bit hex bnum');
+        console.debug(fid, 'force 64-bit hex bnum');
         bnum = asUint64String(bnum);
       } else if (typeof bnum === 'string') {
-        DEBUG(fid, 'force 16 character bnum');
+        console.debug(fid, 'force 16 character bnum');
         bnum = bnum.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bnum type`);
       if (typeof bhash === 'string') {
-        DEBUG(fid, 'force 16 character bhash');
+        console.debug(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
       return { _id: [bnum, bhash].join('-') };
@@ -81,18 +98,18 @@ const Mongo = {
     transaction: (txid, bnum, bhash) => {
       const fid = fidFormat('Mongo._id.transaction', txid, bnum, bhash);
       if (typeof txid === 'string') {
-        DEBUG(fid, 'force 64 character txid');
+        console.debug(fid, 'force 64 character txid');
         txid = txid.slice(0, 64).padStart(64, '0');
       } else throw new Error(`${fid} invalid bhash type`);
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
-        DEBUG(fid, 'convert bnum to 64-bit hexadecimal string');
+        console.debug(fid, 'convert bnum to 64-bit hexadecimal string');
         bnum = asUint64String(bnum);
       } else if (typeof bnum === 'string') {
-        DEBUG(fid, 'force 16 character bnum');
+        console.debug(fid, 'force 16 character bnum');
         bnum = bnum.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bnum type`);
       if (typeof bhash === 'string') {
-        DEBUG(fid, 'force 16 character bhash');
+        console.debug(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
       return { _id: [txid, bnum, bhash].join('-') };
@@ -100,59 +117,44 @@ const Mongo = {
   },
   _insert: async (cName, docs) => {
     const fid = fidFormat('Mongo._insert', cName, docs);
-    let conn;
-    try {
-      conn = await Mongo._connect(cName, fid);
-      DEBUG(fid, 'insert document/s...');
-      const cmd = Array.isArray(docs)
-        ? await conn.collection.insertMany(docs)
-        : await conn.collection.insertOne(docs);
-      DEBUG(fid, cmd.result.n, 'doc/s inserted!');
-      return cmd.result.n;
-    } finally { await Mongo._disconnect(conn, fid); }
+    const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'insert document/s...');
+    const cmd = Array.isArray(docs)
+      ? await conn.collection.insertMany(docs)
+      : await conn.collection.insertOne(docs);
+    console.debug(fid, cmd.result.n, 'doc/s inserted!');
+    return cmd.result.n;
   },
   _many: async (cName, query, options = {}) => {
     const fid = fidFormat('Mongo._many', cName, query, options);
-    let conn;
-    try {
-      conn = await Mongo._connect(cName, fid);
-      DEBUG(fid, 'return cursor...');
-      return conn.collection.find(query, options);
-    } finally { await Mongo._disconnect(conn, fid); }
+    const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'return cursor...');
+    return conn.collection.find(query, options);
   },
   _one: async (cName, query, options = {}) => {
     const fid = fidFormat('Mongo._one', cName, query, options);
-    let conn;
-    try {
-      conn = await Mongo._connect(cName, fid);
-      DEBUG(fid, 'return document...');
-      return conn.collection.findOne(query, options);
-    } finally { await Mongo._disconnect(conn, fid); }
+    const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'return document...');
+    return conn.collection.findOne(query, options);
   },
   _oneCount: async (cName, ...args) => {
     const fid = fidFormat('Mongo._oneCount', cName, ...args);
-    let conn;
-    try {
-      conn = await Mongo._connect(cName, fid);
-      DEBUG(fid, 'determine _id for query...');
-      const query = Mongo._id[cName](...args);
-      DEBUG(fid, 'count documents...');
-      const count = await conn.collection.countDocuments(query, { limit: 1 });
-      DEBUG(fid, 'found', count, 'documents...');
-      return count;
-    } finally { await Mongo._disconnect(conn, fid); }
+    const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'determine _id for query...');
+    const query = Mongo._id[cName](...args);
+    console.debug(fid, 'count documents...');
+    const count = await conn.collection.countDocuments(query, { limit: 1 });
+    console.debug(fid, 'found', count, 'documents...');
+    return count;
   },
   _update: async (cName, update, query) => {
     const fid = fidFormat('Mongo._update', cName, update, query);
-    let conn;
-    try {
-      conn = await Mongo._connect(cName, fid);
-      DEBUG(fid, 'update document/s...');
-      const cmd = Array.isArray(update)
-        ? await conn.collection.updateMany(query, update)
-        : await conn.collection.updateOne(query, update);
-      DEBUG(fid, cmd.result.n, 'doc/s updated!');
-    } finally { await Mongo._disconnect(conn, fid); }
+    const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'update document/s...');
+    const cmd = Array.isArray(update)
+      ? await conn.collection.updateMany(query, update)
+      : await conn.collection.updateOne(query, update);
+    console.debug(fid, cmd.result.n, 'doc/s updated!');
   },
   get: {
     blocks: (...args) => Mongo._many('block', ...args),
@@ -172,12 +174,12 @@ const Mongo = {
       const bhash = block.bhash;
       const bnum = block.bnum;
       const txDocuments = [];
-      DEBUG(fid, 'minify block data...');
+      console.debug(fid, 'minify block data...');
       const blockDocument = block.toJSON(true);
       blockDocument._id = Mongo._id.block(bnum, bhash);
       if (blockDocument.type === 'normal') {
         blockDocument.txids = [];
-        DEBUG(fid, 'extract transaction data and embed unique _id\'s...');
+        console.debug(fid, 'extract tx data and embed unique _id\'s...');
         block.transactions.forEach(txe => {
           const txid = txe.txid;
           blockDocument.txids.push(txid);
@@ -186,14 +188,14 @@ const Mongo = {
           txDocuments.push(txe);
         });
       }
-      DEBUG(fid, 'insert block document...');
+      console.debug(fid, 'insert block document...');
       const bInsert = await Mongo._insert('block', blockDocument);
       if (bInsert < 1) {
         throw new Error(
           `${fid} insert error, inserted ${bInsert}/1 block documents`);
       }
       if (txDocuments.length) {
-        DEBUG(fid, 'insert transaction documents...');
+        console.debug(fid, 'insert transaction documents...');
         const txInsert = await Mongo._insert('transaction', txDocuments);
         if (txInsert < 1) {
           throw new Error(`${fid} insert error, ` +
