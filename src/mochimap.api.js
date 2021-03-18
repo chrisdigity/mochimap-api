@@ -108,8 +108,8 @@ const Network = {
       const bnum = block.bnum;
       if (bnum & 0xffn) {
         try {
-          const fname = Mongo._id.block(bnum, bhash).replace('-', '.') + '.bc';
-          const fpath = path.join(BCDIR, fname);
+          const id = Mongo._id.block(bnum, bhash)._id;
+          const fpath = path.join(BCDIR, id.replace('-', '.') + '.bc');
           await fsp.mkdir(BCDIR, { recursive: true });
           await fsp.writeFile(fpath, Buffer.from(block.buffer), { flag: 'wx' });
         } catch (error) {
