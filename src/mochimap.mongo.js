@@ -125,14 +125,14 @@ const Mongo = {
     console.debug(fid, cmd.result.n, 'doc/s inserted!');
     return cmd.result.n;
   },
-  _many: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo._many', cName, query, options);
+  _manyFind: async (cName, query, options = {}) => {
+    const fid = fidFormat('Mongo._manyFind', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
     console.debug(fid, 'return cursor...');
     return conn.collection.find(query, options);
   },
-  _one: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo._one', cName, query, options);
+  _oneFind: async (cName, query, options = {}) => {
+    const fid = fidFormat('Mongo._oneFind', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
     console.debug(fid, 'return document...');
     return conn.collection.findOne(query, options);
@@ -159,12 +159,12 @@ const Mongo = {
     console.debug(fid, cmd.result.n, 'doc/s updated!');
   },
   get: {
-    blocks: (...args) => Mongo._many('block', ...args),
+    blocks: (...args) => Mongo._manyFind('block', ...args),
     blockById: (...args) =>
-      Mongo._one('block', { _id: Mongo._id.block(...args) }),
-    transactions: (...args) => Mongo._many('transaction', ...args),
+      Mongo._oneFind('block', { _id: Mongo._id.block(...args) }),
+    transactions: (...args) => Mongo._manyFind('transaction', ...args),
     transactionById: (...args) =>
-      Mongo._one('transaction', { _id: Mongo._id.transaction(...args) })
+      Mongo._oneFind('transaction', { _id: Mongo._id.transaction(...args) })
   },
   has: {
     block: (...args) => Mongo._oneCount('block', ...args),
