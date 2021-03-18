@@ -102,7 +102,7 @@ const Mongo = {
         txid = txid.slice(0, 64).padStart(64, '0');
       } else throw new Error(`${fid} invalid bhash type`);
       if (typeof bnum === 'number' || typeof bnum === 'bigint') {
-        console.debug(fid, 'convert bnum to 64-bit hexadecimal string');
+        console.debug(fid, 'convert bnum to 64-bit hex');
         bnum = asUint64String(bnum);
       } else if (typeof bnum === 'string') {
         console.debug(fid, 'force 16 character bnum');
