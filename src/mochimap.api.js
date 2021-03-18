@@ -56,9 +56,10 @@ const Network = {
   block: {
     _cache: new Set(), // TODO: switch to using _chain
     _chain: new Map(),
-    check: async (ip, bnum, bhash) => {
+    check: async (ip, bnum, bhash, noVisual) => {
       const fid = 'Network.block.check():';
       if (typeof ip === 'object') {
+        noVisual = ip.noVisual;
         bhash = ip.cblockhash;
         bnum = ip.cblock;
         ip = ip.ip;
@@ -89,16 +90,16 @@ const Network = {
             console.error(fid, `Downloaded ${bnum}/${bhash.slice(0, 8)}~ from`,
               ip, 'got invalid block type');
           } else { // initiate block update
-            await Network.block.update(block);
-            // initiate asynchonous "checkback" and block visualization
+            await Network.block.update(block, noVisual);
+            // asynchronous check for previous blocks
             const phash = block.phash;
             const pbnum = block.bnum - 1n;
-            Network.block.check(ip, pbnum, phash).catch(console.trace);
+            Network.block.check(ip, pbnum, phash, true).catch(console.trace);
           }
         }
       }
     },
-    update: async (block) => {
+    update: async (block, noVisual) => {
       const fid = 'Network.block.update():';
       // minify block and send to Server interface for asynchronous broadcast
       const blockJSON = block.toJSON(true);
@@ -116,10 +117,10 @@ const Network = {
           console.error(fid, `failed to write raw block to ${path};`, error);
         }
       }
-      // send block update to Mongo interface for processing
+      // send block update to Mongo interface for storage processing
       await Mongo.process.blockUpdate(block);
-      // send block data to visualizer for asynchronous haiku visualization
-      Network.block.visualizer(blockJSON).catch(console.trace);
+      // send block data to visualizer for haiku visualization
+      await Network.block.visualizer(blockJSON);
       // return block for promise chaining
       return block;
     },
