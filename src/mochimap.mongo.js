@@ -93,7 +93,7 @@ const Mongo = {
         console.debug(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
-      return { _id: [bnum, bhash].join('-') };
+      return [bnum, bhash].join('-');
     },
     transaction: (txid, bnum, bhash) => {
       const fid = fidFormat('Mongo._id.transaction', txid, bnum, bhash);
@@ -112,7 +112,7 @@ const Mongo = {
         console.debug(fid, 'force 16 character bhash');
         bhash = bhash.slice(0, 16).padStart(16, '0');
       } else throw new Error(`${fid} invalid bhash type`);
-      return { _id: [txid, bnum, bhash].join('-') };
+      return [txid, bnum, bhash].join('-');
     }
   },
   _insert: async (cName, docs) => {
@@ -141,7 +141,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._oneCount', cName, ...args);
     const conn = await Mongo._connect(cName, fid);
     console.debug(fid, 'determine _id for query...');
-    const query = Mongo._id[cName](...args);
+    const query = { _id: Mongo._id[cName](...args) };
     console.debug(fid, 'count documents...');
     const count = await conn.collection.countDocuments(query, { limit: 1 });
     console.debug(fid, 'found', count, 'documents...');
@@ -160,11 +160,11 @@ const Mongo = {
   },
   get: {
     blocks: (...args) => Mongo._many('block', ...args),
-    blockById: (...args) => Mongo._one('block', Mongo._id.block(...args)),
+    blockById: (...args) =>
+      Mongo._one('block', { _id: Mongo._id.block(...args) }),
     transactions: (...args) => Mongo._many('transaction', ...args),
-    transactionById: (...args) => {
-      return Mongo._one('transaction', Mongo._id.transaction(...args));
-    }
+    transactionById: (...args) =>
+      Mongo._one('transaction', { _id: Mongo._id.transaction(...args) })
   },
   has: {
     block: (...args) => Mongo._oneCount('block', ...args),
@@ -208,7 +208,7 @@ const Mongo = {
   },
   update: {
     blockById: (update, ...args) =>
-      Mongo._update('block', update, Mongo._id.block(...args))
+      Mongo._update('block', update, { _id: Mongo._id.block(...args) })
   }
 };
 
