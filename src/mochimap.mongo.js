@@ -62,11 +62,11 @@ const Mongo = {
       Mongo._clientConnecting = true;
       try {
         await Mongo._client.connect();
-        console.debug(fid, 'client connected succesfully.');
+        console.debug(fid, 'client connected succesfully');
       } catch (error) {
         Mongo._client = null;
         console.trace(fid, 'client connection failed;', error);
-      } finally { Mongo._connecting = false; }
+      } finally { Mongo._clientConnecting = false; }
     }
     console.debug(fid, 'fetch collection...');
     const client = Mongo._client;
