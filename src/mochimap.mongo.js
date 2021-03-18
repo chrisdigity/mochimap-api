@@ -150,6 +150,8 @@ const Mongo = {
   _update: async (cName, update, query) => {
     const fid = fidFormat('Mongo._update', cName, update, query);
     const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'add atomic operators...');
+    update = { $set: update };
     console.debug(fid, 'update document/s...');
     const cmd = Array.isArray(update)
       ? await conn.collection.updateMany(query, update)
