@@ -290,7 +290,7 @@ const Server = {
           for (const [key, value] of Object.entries(data)) {
             if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
               error = 'Invalid request parameter';
-              message = `Invalid hexadecimal characters in request ${key}`;
+              message = `Invalid hexadecimal characters in request <${key}>`;
               break;
             }
           }
@@ -299,7 +299,7 @@ const Server = {
           if (typeof requirement === 'undefined') req = 'GET';
           if (data !== req) {
             error = 'Invalid request method';
-            message = `expected ${req}, got ${data}`;
+            message = `expected '${req}', got '${data}'`;
           }
           break;
         case 'number':
@@ -307,7 +307,7 @@ const Server = {
           for (const [key, value] of Object.entries(data)) {
             if (isNaN(value)) {
               error = 'Invalid block number';
-              message = `${key} is not a number`;
+              message = `<${key}> is not a number`;
               break;
             }
           }
@@ -317,12 +317,13 @@ const Server = {
           if (typeof data !== 'object') data = { parameter: data };
           for (const [key, value] of Object.entries(data)) {
             if (typeof value === 'undefined') {
-              message = `missing ${key}`;
+              message = `missing <${key}>`;
               break;
             } else if (req) {
               if (!Array.isArray(req)) req = [req];
               if (!req.includes(value)) {
-                message = `Invalid ${key} value; expected ${req.join(' or ')}`;
+                message = `Invalid <${key}> value; ` +
+                  `expected '${req.join("' or '")}'`;
                 break;
               }
             }
@@ -413,7 +414,7 @@ const Server = {
       return Server._response(res, internalError, 500);
     }
     // assume invalid request path
-    const error = { error: 'Invalid request path', message: '' };
+    const error = { error: 'Invalid request path', message: 'check the url' };
     return Server._response(res, error, 400, pathname);
   },
   start: () => new Promise((resolve, reject) => {
