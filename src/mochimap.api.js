@@ -288,24 +288,27 @@ const Server = {
       type = [type];
     }
     type.forEach(cType => {
-      console.debug(fid, 'cType=', cType);
       switch (cType) {
         case 'defined':
-          if (typeof data === 'undefined') {
-            error = 'Invalid request parameter';
-            message = 'missing request parameter';
-          } else if (typeof data === 'object') {
-            console.debug(fid, 'data type= object');
+          console.debug(fid, 'check data is defined...');
+          if (typeof data === 'object') {
+            console.debug(fid, 'data is object');
             for (const [key, value] of Object.entries(data)) {
               if (typeof value === 'undefined') {
+                console.debug(fid, `data[${key}] is bad, `, typeof value);
                 error = 'Invalid request parameter';
                 message = `missing ${key} parameter`;
                 break;
-              }
+              } else console.debug(fid, `data[${key}] is ok,`, typeof value);
             }
-          }
+          } else if (typeof data === 'undefined') {
+            console.debug(fid, 'data is bad,', typeof data);
+            error = 'Invalid request parameter';
+            message = 'missing request parameter';
+          } else console.debug(fid, 'data is ok,', typeof data);
           break;
         case 'hex':
+          console.debug(fid, 'check data is hex...');
           if (typeof data === 'object') {
             console.debug(fid, 'data type= object');
             for (const [key, value] of Object.entries(data)) {
@@ -322,6 +325,7 @@ const Server = {
           }
           break;
         case 'method':
+          console.debug(fid, 'check method against requirement...');
           if (typeof requirement === 'undefined') requirement = 'GET';
           if (data !== requirement) {
             error = 'Invalid request method';
