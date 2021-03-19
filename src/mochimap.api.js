@@ -323,21 +323,31 @@ const Server = {
     }
     return false;
   },
-  _response: (res, json, statusCode, statusMessage) => {
+  _response: (res, json, statusCode, hint) => {
+    const hints = {
+      balance: '/balance/<addressType>/<address>',
+      block: '/block/<blockNumber>'
+    };
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
       'X-Robots-Tag': 'none',
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body)
     };
-    if (!statusMessage) {
-      switch (statusCode) {
-        case 200: statusMessage = 'OK'; break;
-        case 400: statusMessage = 'Bad Request'; break;
-        case 404: statusMessage = 'Not Found'; break;
-        case 500: statusMessage = 'Internal Server Error'; break;
-        default: statusMessage = '';
-      }
+    let statusMessage;
+    switch (statusCode) {
+      case 200: statusMessage = 'OK'; break;
+      case 400:
+        statusMessage = 'Bad Request';
+        if (hint) {
+          for (const [key, suggest] of Object.entries(hints)) {
+            if (hint.includes(key)) { json.hint = suggest; break; }
+          }
+        }
+        break;
+      case 404: statusMessage = 'Not Found'; break;
+      case 500: statusMessage = 'Internal Server Error'; break;
+      default: statusMessage = '';
     }
     res.writeHead(statusCode, statusMessage, headers);
     res.end(body);
@@ -350,33 +360,26 @@ const Server = {
   },
   request: async (req, res) => {
     const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
-    const syntax = {
-      balance: '/balance/<addressType>/<address>',
-      block: '/block/<blockNumber>'
-    };
     try {
-      let e = null;
+      let error = null;
       const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
       switch (path.shift()) {
         case 'balance': {
           const addressType = path.shift();
           const address = path.shift();
-          // check request
-          e = Server._check('method', req.method) ||
+          // check request parameters
+          error = Server._check('method', req.method) ||
             Server._check('valid', { addressType }, ['tag', 'wots']) ||
             Server._check(['valid', 'hex'], { address });
-          if (e) {
-            Object.assign(e, { hint: syntax.balance });
-            return Server._response(res, e, 400);
-          }
+          if (error) return Server._response(res, error, 400, 'balance');
           // call node for balance request
           const isTag = Boolean(addressType === 'tag');
-          const le = await Mochimo.getBalance(CUSTOMNODE, address, isTag) || {};
+          let le = await Mochimo.getBalance(CUSTOMNODE, address, isTag);
           // respond appropriately
           if (le) return Server._response(res, le, 200);
           const message = `${isTag ? 'Tag' : 'WOTS+'} not in ledger`;
-          e = { error: 'No results', message, address, balance: '0', tag: '' };
-          return Server._response(res, e, 404);
+          le = { error: 'No results', message, address, balance: '0', tag: '' };
+          return Server._response(res, le, 404);
         } /*
         case 'block': {
           if (Server._valid.method(req, res)) { // ensure request method is GET
@@ -387,23 +390,16 @@ const Server = {
       }
     } catch (error) {
       console.trace(error);
-      const internalErr = {
+      const internalError = {
         error: 'Internal server error',
         message: 'please alert Chrisdigity @ Mochimo Official Discord'
       };
-      return Server._response(res, internalErr, 500);
+      return Server._response(res, internalError, 500);
     }
-    // assume invalid request
-    const error = 'Invalid request path';
-    let message = '';
+    // assume invalid request path
+    const error = { error: 'Invalid request path', message: '' };
     // check possible intentions
-    for (const [key, suggestion] of Object.entries(syntax)) {
-      if (pathname.includes(key)) {
-        message = 'did you mean ' + suggestion;
-        break;
-      }
-    }
-    return Server._response(res, { error, message }, 400);
+    return Server._response(res, error, 400, pathname);
   },
   start: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
