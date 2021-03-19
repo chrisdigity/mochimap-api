@@ -31,6 +31,9 @@
 
 const { asUint64String, fidFormat } = require('./mochimap.util');
 const { MongoClient, Long } = require('mongodb');
+
+const toLong = (number) => Long.fromString(number.toString());
+
 const MongoClientOptions = { useUnifiedTopology: true };
 const MongoClientURI = process.env.MONGO_URI;
 const Mongo = {
@@ -159,7 +162,7 @@ const Mongo = {
     blockById: (...args) =>
       Mongo._oneFind('block', { _id: Mongo._id.block(...args) }),
     blockByNumber: (bnum) =>
-      Mongo._oneFind('block', { bnum: bnum.toString() }),
+      Mongo._oneFind('block', { bnum: Long.fromString(bnum.toString()) }),
     transactions: (...args) => Mongo._manyFind('transaction', ...args),
     transactionById: (...args) =>
       Mongo._oneFind('transaction', { _id: Mongo._id.transaction(...args) }),
@@ -179,10 +182,11 @@ const Mongo = {
       const blockDocument = block.toJSON(true);
       blockDocument._id = Mongo._id.block(bnum, bhash);
       // convert BigInt values to MongoDB->Long
-      blockDocument.bnum = Long.fromString(blockDocument.bnum.toString());
-      blockDocument.mreward = Long.fromString(blockDocument.mreward.toString());
-      blockDocument.mfee = Long.fromString(blockDocument.mfee.toString());
-      blockDocument.amount = Long.fromString(blockDocument.amount.toString());
+      blockDocument.bnum = toLong(blockDocument.bnum);
+      const bd = blockDocument; // reference to blockDocument
+      if (typeof bd.mreward !== 'undefined') bd.mreward = toLong(bd.mreward);
+      if (typeof bd.mfee !== 'undefined') bd.mfee = toLong(bd.mfee);
+      if (typeof bd.amount !== 'undefined') bd.amount = toLong(bd.amount);
       // handle transactions on normal blocks
       if (blockDocument.type === 'normal') {
         blockDocument.txids = [];
@@ -193,9 +197,9 @@ const Mongo = {
           txe = txe.toJSON(true);
           txe._id = Mongo._id.transaction(txid, bnum, bhash);
           // convert BigInt values to MongoDB->Long
-          txe.sendtotal = Long.fromString(txe.sendtotal.toString());
-          txe.changetotal = Long.fromString(txe.changetotal.toString());
-          txe.txfee = Long.fromString(txe.txfee.toString());
+          txe.sendtotal = toLong(txe.sendtotal);
+          txe.changetotal = toLong(txe.changetotal);
+          txe.txfee = toLong(txe.txfee);
           txDocuments.push(txe);
         });
       }
