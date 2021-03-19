@@ -302,6 +302,12 @@ const Server = {
             message = `expected ${req}, got ${data}`;
           }
           break;
+        case 'number':
+          if (isNaN(data)) {
+            error = 'Invalid block number';
+            message = `${data} is not a number`;
+          }
+          break;
         case 'valid':
           error = 'Invalid request parameter';
           if (typeof data !== 'object') data = { parameter: data };
@@ -388,7 +394,7 @@ const Server = {
             Server._check(['valid', 'number'], { blockNumber });
           if (error) return Server._response(res, error, 400, 'block');
           // call node for balance request
-          let block = await Mongo.get.blockByNumber(blockNumber);
+          let block = await Mongo.get.blockByNumber(BigInt(blockNumber));
           if (block) return Server._response(res, block, 200);
           block = { error: 'No results', message: 'could not find block' };
           return Server._response(res, block, 404);
