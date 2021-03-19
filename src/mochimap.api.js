@@ -303,9 +303,13 @@ const Server = {
           }
           break;
         case 'number':
-          if (isNaN(data)) {
-            error = 'Invalid block number';
-            message = `${data} is not a number`;
+          if (typeof data !== 'object') data = { parameter: data };
+          for (const [key, value] of Object.entries(data)) {
+            if (isNaN(value)) {
+              error = 'Invalid block number';
+              message = `${key} is not a number`;
+              break;
+            }
           }
           break;
         case 'valid':
