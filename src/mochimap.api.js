@@ -279,6 +279,51 @@ const Network = {
 const Server = {
   _api: null,
   _apiConnections: new Set(),
+  _check: (type, data, requirement) => {
+    let error, message;
+    if (!Array.isArray(type)) type = [type];
+    type.forEach(cType => {
+      switch (cType) {
+        case 'defined':
+          if (typeof data === 'undefined') {
+            error = 'Invalid request parameter';
+            message = 'missing request parameter';
+          } else if (typeof data === 'object') {
+            for (const [key, value] of Object.entries(data)) {
+              if (typeof value === 'undefined') {
+                error = 'Invalid request parameter';
+                message = `missing ${key} parameter`;
+                break;
+              }
+            }
+          }
+          break;
+        case 'hex':
+          if (typeof data === 'object') {
+            for (const [key, value] of Object.entries(data)) {
+              if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
+                error = 'Invalid request parameter';
+                message = `Invalid hexadecimal characters in ${key}`;
+                break;
+              }
+            }
+          } else if (data.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
+            error = 'Invalid request parameter';
+            message = 'Invalid hexadecimal characters in request parameter';
+          }
+          break;
+        case 'method':
+          if (typeof requirement === 'undefined') requirement = 'GET';
+          if (data !== requirement) {
+            error = 'Invalid request method';
+            message = `expected ${requirement}, got ${data}`;
+          }
+          break;
+      }
+      if (error) return { error, message };
+    });
+    return false;
+  },
   _response: (res, json, statusCode, statusMessage) => {
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
@@ -298,25 +343,6 @@ const Server = {
     res.end(body);
     return null;
   },
-  _valid: {
-    hex: (req, res, data) => {
-      for (const [name, str] of Object.entries(data)) {
-        if (str.replace(/[0-9A-Fa-f]/g, '')) { // checks for non-hex characters
-          const error = `Invalid hexadecimal characters in ${name}`;
-          return Server._response(res, { error }, 400);
-        }
-      }
-      return true;
-    },
-    method: (req, res, method = 'GET') => {
-      if (req.method !== method) {
-        const error =
-          `Invalid request method: expected ${method}, got ${req.method}`;
-        return Server._response(res, { error }, 400);
-      }
-      return true;
-    }
-  },
   broadcast: (type, event, data) => { /* noop until websockets */ },
   connect: (res, socket, head) => {
     Server._apiConnections.add(socket); // track connections
@@ -326,19 +352,26 @@ const Server = {
     // derive request path
     const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
     const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
-
-    switch (path.shift()) {
-      case 'balance': {
-        try {
-          if (Server._valid.method(req, res)) { // ensure request method is GET
+    const internalErr = {
+      error: 'Internal server error',
+      message: 'please alert Chrisdigity @ Mochimo Official Discord'
+    };
+    let err;
+    try {
+      switch (path.shift()) {
+        case 'balance': {
+          err = Server._check('method', req.method);
+          if (err) return Server._response(res, err, 400);
+          else { // request method is GET
             let isTag = true;
             let address = path.shift();
             if (address === 'wots') {
               address = path.shift();
               isTag = false;
             } // else if (address === '<next address type>') ...
-            if (Server._valid.hex(req, res, { address })) { // check parameters
-              // query ledger via node
+            err = Server._check(['defined', 'hex'], address);
+            if (err) return Server._response(res, err, 400);
+            else { // parameters ok
               const lentry = Mochimo.getBalance(CUSTOMNODE, address, isTag);
               if (lentry === null) {
                 const error = 'Address could not be found in ledger';
@@ -346,19 +379,19 @@ const Server = {
               } else return Server._response(res, lentry, 200);
             }
           }
-        } catch (error) { return Server._response(res, undefined, 500); }
-        break;
-      } /*
-      case 'block': {
-        if (Server._valid.method(req, res)) { // ensure request method is GET
-          const bnum = 0;
-        }
-        break;
-      } */
-    }
+          // break;
+        } /*
+        case 'block': {
+          if (Server._valid.method(req, res)) { // ensure request method is GET
+            const bnum = 0;
+          }
+          break;
+        } */
+      }
+    } catch (error) { return Server._response(res, internalErr, 500); }
     // assume invalid request
-    const error = 'Invalid request path';
-    Server._response(res, { error }, 400);
+    err = { error: 'Invalid request path', message: '' };
+    Server._response(res, err, 400);
   },
   start: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
