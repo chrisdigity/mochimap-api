@@ -372,11 +372,17 @@ const Server = {
             err = Server._check(['defined', 'hex'], { address });
             if (err) return Server._response(res, err, 400);
             else { // parameters ok
-              const lentry = Mochimo.getBalance(CUSTOMNODE, address, isTag);
-              if (lentry === null) {
-                const error = 'Address could not be found in ledger';
-                return Server._response(res, { error }, 404);
-              } else return Server._response(res, lentry, 200);
+              const le = await Mochimo.getBalance(CUSTOMNODE, address, isTag);
+              if (le === null) {
+                const unknown = {
+                  error: 'No results',
+                  message: `${isTag ? 'Tag' : 'WOTS+'} not in ledger`,
+                  address,
+                  balance: '0',
+                  tag: ''
+                };
+                return Server._response(res, unknown, 404);
+              } else return Server._response(res, le, 200);
             }
           }
           // break;
