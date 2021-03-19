@@ -279,25 +279,11 @@ const Network = {
 const Server = {
   _api: null,
   _apiConnections: new Set(),
-  _check: (type, data, requirement) => {
+  _check: (type, data, req) => {
     let error, message;
     if (!Array.isArray(type)) type = [type];
     for (const cType of type) {
       switch (cType) {
-        case 'defined':
-          if (typeof data === 'object') {
-            for (const [key, value] of Object.entries(data)) {
-              if (typeof value === 'undefined') {
-                error = 'Invalid request parameter';
-                message = `missing ${key} parameter`;
-                break;
-              }
-            }
-          } else if (typeof data === 'undefined') {
-            error = 'Invalid request parameter';
-            message = 'missing request parameter';
-          }
-          break;
         case 'hex':
           if (typeof data === 'object') {
             for (const [key, value] of Object.entries(data)) {
@@ -313,20 +299,37 @@ const Server = {
           }
           break;
         case 'method':
-          if (typeof requirement === 'undefined') requirement = 'GET';
-          if (data !== requirement) {
+          if (typeof requirement === 'undefined') req = 'GET';
+          if (data !== req) {
             error = 'Invalid request method';
-            message = `expected ${requirement}, got ${data}`;
+            message = `expected ${req}, got ${data}`;
+          }
+          break;
+        case 'valid':
+          error = 'Invalid request parameter';
+          if (typeof data !== 'object') data = { parameter: data };
+          for (const [key, value] of Object.entries(data)) {
+            if (typeof value === 'undefined') {
+              message = `missing ${key}`;
+              break;
+            } else if (req) {
+              if (!Array.isArray(req)) req = [req];
+              if (!req.include(value)) {
+                message = `expected ${key}= ${req.join(' or ')}; got ${data}`;
+                break;
+              }
+            }
           }
           break;
       }
-      if (error) return { error, message };
+      if (error && message) return { error, message };
     }
     return false;
   },
   _response: (res, json, statusCode, statusMessage) => {
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
+      'X-Robots-Tag': 'none',
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body)
     };
@@ -349,43 +352,27 @@ const Server = {
     socket.on('end', () => Server._apiConnections.delete(socket));
   },
   request: async (req, res) => {
-    // derive request path
     const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
-    const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
-    const internalErr = {
-      error: 'Internal server error',
-      message: 'please alert Chrisdigity @ Mochimo Official Discord'
-    };
-    let err;
     try {
+      let e = null;
+      const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
       switch (path.shift()) {
         case 'balance': {
-          err = Server._check('method', req.method);
-          if (err) return Server._response(res, err, 400);
-          else { // request method is GET
-            let isTag = true;
-            let address = path.shift();
-            if (address === 'wots') {
-              address = path.shift();
-              isTag = false;
-            } // else if (address === '<next address type>') ...
-            err = Server._check(['defined', 'hex'], { address });
-            if (err) return Server._response(res, err, 400);
-            else { // parameters ok
-              const le = await Mochimo.getBalance(CUSTOMNODE, address, isTag);
-              if (le === null) {
-                const unknown = {
-                  error: 'No results',
-                  message: `${isTag ? 'Tag' : 'WOTS+'} not in ledger`,
-                  address,
-                  balance: '0',
-                  tag: ''
-                };
-                return Server._response(res, unknown, 404);
-              } else return Server._response(res, le, 200);
-            }
-          }
-          // break;
+          const addressType = path.shift();
+          const address = path.shift();
+          // check request
+          e = Server._check('method', req.method) ||
+            Server._check('valid', { addressType }, ['tag', 'wots']) ||
+            Server._check(['valid', 'hex'], { address });
+          if (e) return Server._response(res, e, 400);
+          // call node for balance request
+          const isTag = Boolean(addressType === 'tag');
+          const le = await Mochimo.getBalance(CUSTOMNODE, address, isTag) || {};
+          // respond appropriately
+          if (le) return Server._response(res, le, 200);
+          const message = `${isTag ? 'Tag' : 'WOTS+'} not in ledger`;
+          e = { error: 'No results', message, address, balance: '0', tag: '' };
+          return Server._response(res, e, 404);
         } /*
         case 'block': {
           if (Server._valid.method(req, res)) { // ensure request method is GET
@@ -396,11 +383,27 @@ const Server = {
       }
     } catch (error) {
       console.trace(error);
+      const internalErr = {
+        error: 'Internal server error',
+        message: 'please alert Chrisdigity @ Mochimo Official Discord'
+      };
       return Server._response(res, internalErr, 500);
     }
     // assume invalid request
-    err = { error: 'Invalid request path', message: '' };
-    Server._response(res, err, 400);
+    const error = 'Invalid request path';
+    let message = '';
+    const dym = { // "did you mean" suggestions
+      balance: '/balance/<tag||wots>/<address>',
+      block: '/block/<block number>'
+    };
+    // check possible intentions
+    for (const [key, suggestion] of Object.entries(dym)) {
+      if (pathname.includes(key)) {
+        message = 'did you mean ' + suggestion;
+        break;
+      }
+    }
+    return Server._response(res, { error, message }, 400);
   },
   start: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
