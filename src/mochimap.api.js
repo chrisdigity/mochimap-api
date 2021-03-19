@@ -280,15 +280,21 @@ const Server = {
   _api: null,
   _apiConnections: new Set(),
   _check: (type, data, requirement) => {
+    const fid = fidFormat('Server._check', type, data, requirement);
     let error, message;
-    if (!Array.isArray(type)) type = [type];
+    if (!Array.isArray(type)) {
+      console.debug(fid, 'move type parameter to array...');
+      type = [type];
+    }
     type.forEach(cType => {
+      console.debug(fid, 'cType=', cType);
       switch (cType) {
         case 'defined':
           if (typeof data === 'undefined') {
             error = 'Invalid request parameter';
             message = 'missing request parameter';
           } else if (typeof data === 'object') {
+            console.debug(fid, 'data type= object');
             for (const [key, value] of Object.entries(data)) {
               if (typeof value === 'undefined') {
                 error = 'Invalid request parameter';
@@ -300,7 +306,9 @@ const Server = {
           break;
         case 'hex':
           if (typeof data === 'object') {
+            console.debug(fid, 'data type= object');
             for (const [key, value] of Object.entries(data)) {
+              console.debug(fid, 'check data[', key, ']...');
               if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
                 error = 'Invalid request parameter';
                 message = `Invalid hexadecimal characters in ${key}`;
