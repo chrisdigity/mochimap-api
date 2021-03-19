@@ -333,28 +333,32 @@ const Server = {
     }
     return false;
   },
-  _hints: {
-    balance: '/balance/<addressType>/<address>',
-    block: '/block/<blockNumber>'
-  },
   _response: (res, json, statusCode, hint) => {
-    const body = JSON.stringify(json, null, 2) || '';
-    const headers = {
-      'X-Robots-Tag': 'none',
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body)
+    const hints = {
+      balance: '/balance/<addressType>/<address>',
+      block: '/block/<blockNumber>'
     };
     let statusMessage;
     switch (statusCode) {
       case 200: statusMessage = 'OK'; break;
       case 400:
         statusMessage = 'Bad Request';
-        if (hint && Server._hints[hint]) json.hint = Server._hints[hint];
+        if (hint) {
+          for (const [key, value] of Object.entries(hints)) {
+            if (hint.includes(key)) { json.hint = value; break; }
+          }
+        }
         break;
       case 404: statusMessage = 'Not Found'; break;
       case 500: statusMessage = 'Internal Server Error'; break;
       default: statusMessage = '';
     }
+    const body = JSON.stringify(json, null, 2) || '';
+    const headers = {
+      'X-Robots-Tag': 'none',
+      'Content-Type': 'application/json',
+      'Content-Length': Buffer.byteLength(body)
+    };
     res.writeHead(statusCode, statusMessage, headers);
     res.end(body);
     return null;
@@ -410,12 +414,7 @@ const Server = {
     }
     // assume invalid request path
     const error = { error: 'Invalid request path', message: '' };
-    // check possible intentions
-    let hint;
-    for (const [key, value] of Object.entries(Server._hints)) {
-      if (pathname.includes(key)) { hint = value; break; }
-    }
-    return Server._response(res, error, 400, hint);
+    return Server._response(res, error, 400, pathname);
   },
   start: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
