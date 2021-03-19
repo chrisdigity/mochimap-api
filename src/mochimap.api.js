@@ -404,7 +404,7 @@ const gracefulShutdown = (err, origin = 'unknown') => {
 };
 process.on('SIGINT', gracefulShutdown);
 process.on('SIGTERM', gracefulShutdown);
-process.on('uncaughtException', gracefulShutdown);
+process.on('uncaughtException', console.trace);
 
 /* startup */
 console.log('Begin startup...');
