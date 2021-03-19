@@ -314,7 +314,7 @@ const Server = {
               break;
             } else if (req) {
               if (!Array.isArray(req)) req = [req];
-              if (!req.include(value)) {
+              if (!req.includes(value)) {
                 message = `expected ${key}= ${req.join(' or ')}; got ${data}`;
                 break;
               }
