@@ -285,17 +285,14 @@ const Server = {
     for (const cType of type) {
       switch (cType) {
         case 'hex':
-          if (typeof data === 'object') {
-            for (const [key, value] of Object.entries(data)) {
-              if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
-                error = 'Invalid request parameter';
-                message = `Invalid hexadecimal characters in ${key}`;
-                break;
-              }
+          error = 'Invalid request parameter';
+          if (typeof data !== 'object') data = { parameter: data };
+          for (const [key, value] of Object.entries(data)) {
+            if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
+              error = 'Invalid request parameter';
+              message = `Invalid hexadecimal characters in request ${key}`;
+              break;
             }
-          } else if (data.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
-            error = 'Invalid request parameter';
-            message = 'Invalid hexadecimal characters in request parameter';
           }
           break;
         case 'method':
@@ -315,7 +312,7 @@ const Server = {
             } else if (req) {
               if (!Array.isArray(req)) req = [req];
               if (!req.includes(value)) {
-                message = `expected ${key}= ${req.join(' or ')}; got ${value}`;
+                message = `Invalid ${key} value; expected ${req.join(' or ')}`;
                 break;
               }
             }
@@ -353,6 +350,10 @@ const Server = {
   },
   request: async (req, res) => {
     const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
+    const syntax = {
+      balance: '/balance/<addressType>/<address>',
+      block: '/block/<blockNumber>'
+    };
     try {
       let e = null;
       const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
@@ -364,7 +365,10 @@ const Server = {
           e = Server._check('method', req.method) ||
             Server._check('valid', { addressType }, ['tag', 'wots']) ||
             Server._check(['valid', 'hex'], { address });
-          if (e) return Server._response(res, e, 400);
+          if (e) {
+            Object.assign(e, { hint: syntax.balance });
+            return Server._response(res, e, 400);
+          }
           // call node for balance request
           const isTag = Boolean(addressType === 'tag');
           const le = await Mochimo.getBalance(CUSTOMNODE, address, isTag) || {};
@@ -392,12 +396,8 @@ const Server = {
     // assume invalid request
     const error = 'Invalid request path';
     let message = '';
-    const dym = { // "did you mean" suggestions
-      balance: '/balance/<tag||wots>/<address>',
-      block: '/block/<block number>'
-    };
     // check possible intentions
-    for (const [key, suggestion] of Object.entries(dym)) {
+    for (const [key, suggestion] of Object.entries(syntax)) {
       if (pathname.includes(key)) {
         message = 'did you mean ' + suggestion;
         break;
