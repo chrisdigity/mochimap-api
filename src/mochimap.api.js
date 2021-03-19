@@ -34,6 +34,7 @@ const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
 const {
+  fidFormat,
   isPrivateIPv4,
   objectDifference,
   objectIsEmpty,
