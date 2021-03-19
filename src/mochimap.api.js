@@ -34,7 +34,6 @@ const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
 const {
-  fidFormat,
   isPrivateIPv4,
   objectDifference,
   objectIsEmpty,
@@ -281,38 +280,27 @@ const Server = {
   _api: null,
   _apiConnections: new Set(),
   _check: (type, data, requirement) => {
-    const fid = fidFormat('Server._check', type, data, requirement);
     let error, message;
-    if (!Array.isArray(type)) {
-      console.debug(fid, 'move type parameter to array...');
-      type = [type];
-    }
-    type.forEach(cType => {
+    if (!Array.isArray(type)) type = [type];
+    for (const cType of type) {
       switch (cType) {
         case 'defined':
-          console.debug(fid, 'check data is defined...');
           if (typeof data === 'object') {
-            console.debug(fid, 'data is object');
             for (const [key, value] of Object.entries(data)) {
               if (typeof value === 'undefined') {
-                console.debug(fid, `data[${key}] is bad, `, typeof value);
                 error = 'Invalid request parameter';
                 message = `missing ${key} parameter`;
                 break;
-              } else console.debug(fid, `data[${key}] is ok,`, typeof value);
+              }
             }
           } else if (typeof data === 'undefined') {
-            console.debug(fid, 'data is bad,', typeof data);
             error = 'Invalid request parameter';
             message = 'missing request parameter';
-          } else console.debug(fid, 'data is ok,', typeof data);
+          }
           break;
         case 'hex':
-          console.debug(fid, 'check data is hex...');
           if (typeof data === 'object') {
-            console.debug(fid, 'data type= object');
             for (const [key, value] of Object.entries(data)) {
-              console.debug(fid, 'check data[', key, ']...');
               if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
                 error = 'Invalid request parameter';
                 message = `Invalid hexadecimal characters in ${key}`;
@@ -325,7 +313,6 @@ const Server = {
           }
           break;
         case 'method':
-          console.debug(fid, 'check method against requirement...');
           if (typeof requirement === 'undefined') requirement = 'GET';
           if (data !== requirement) {
             error = 'Invalid request method';
@@ -334,7 +321,7 @@ const Server = {
           break;
       }
       if (error) return { error, message };
-    });
+    }
     return false;
   },
   _response: (res, json, statusCode, statusMessage) => {
