@@ -369,7 +369,7 @@ const Server = {
               address = path.shift();
               isTag = false;
             } // else if (address === '<next address type>') ...
-            err = Server._check(['defined', 'hex'], address);
+            err = Server._check(['defined', 'hex'], { address });
             if (err) return Server._response(res, err, 400);
             else { // parameters ok
               const lentry = Mochimo.getBalance(CUSTOMNODE, address, isTag);
