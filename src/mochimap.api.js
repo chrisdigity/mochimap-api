@@ -380,13 +380,19 @@ const Server = {
           const message = `${isTag ? 'Tag' : 'WOTS+'} not in ledger`;
           le = { error: 'No results', message, address, balance: '0', tag: '' };
           return Server._response(res, le, 404);
-        } /*
+        }
         case 'block': {
-          if (Server._valid.method(req, res)) { // ensure request method is GET
-            const bnum = 0;
-          }
-          break;
-        } */
+          const blockNumber = path.shift();
+          // check request parameters
+          error = Server._check('method', req.method) ||
+            Server._check(['valid', 'number'], { blockNumber });
+          if (error) return Server._response(res, error, 400, 'block');
+          // call node for balance request
+          let block = await Mongo.get.blockByNumber(blockNumber);
+          if (block) return Server._response(res, block, 200);
+          block = { error: 'No results', message: 'could not find block' };
+          return Server._response(res, block, 404);
+        }
       }
     } catch (error) {
       console.trace(error);
