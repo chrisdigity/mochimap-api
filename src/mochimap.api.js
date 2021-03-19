@@ -120,7 +120,7 @@ const Network = {
       // send block update to Mongo interface for storage processing
       await Mongo.process.blockUpdate(block);
       // send block data to visualizer for haiku visualization
-      await Network.block.visualizer(blockJSON);
+      if (!noVisual) await Network.block.visualizer(blockJSON);
       // return block for promise chaining
       return block;
     },
