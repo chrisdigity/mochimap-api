@@ -279,7 +279,7 @@ const Network = {
 const Server = {
   _api: null,
   _response: (res, json, statusCode, statusMessage) => {
-    const body = JSON.stringify(json, null, 2);
+    const body = JSON.stringify(json, null, 2) || '';
     const headers = {
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body)
