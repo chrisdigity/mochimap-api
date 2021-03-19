@@ -29,12 +29,8 @@
  *
  */
 
-/* global BigInt */
-/* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
-BigInt.prototype.toBSON = function () { return this.toString(); };
-
 const { asUint64String, fidFormat } = require('./mochimap.util');
-const { MongoClient } = require('mongodb');
+const { MongoClient, Long } = require('mongodb');
 const MongoClientOptions = { useUnifiedTopology: true };
 const MongoClientURI = process.env.MONGO_URI;
 const Mongo = {
@@ -182,6 +178,12 @@ const Mongo = {
       console.debug(fid, 'minify block data...');
       const blockDocument = block.toJSON(true);
       blockDocument._id = Mongo._id.block(bnum, bhash);
+      // convert BigInt values to MongoDB->Long
+      blockDocument.bnum = Long.fromString(blockDocument.bnum.toString());
+      blockDocument.mreward = Long.fromString(blockDocument.mreward.toString());
+      blockDocument.mfee = Long.fromString(blockDocument.mfee.toString());
+      blockDocument.amount = Long.fromString(blockDocument.amount.toString());
+      // handle transactions on normal blocks
       if (blockDocument.type === 'normal') {
         blockDocument.txids = [];
         console.debug(fid, 'extract tx data and embed unique _id\'s...');
@@ -190,6 +192,10 @@ const Mongo = {
           blockDocument.txids.push(txid);
           txe = txe.toJSON(true);
           txe._id = Mongo._id.transaction(txid, bnum, bhash);
+          // convert BigInt values to MongoDB->Long
+          txe.sendtotal = Long.fromString(txe.sendtotal.toString());
+          txe.changetotal = Long.fromString(txe.changetotal.toString());
+          txe.txfee = Long.fromString(txe.txfee.toString());
           txDocuments.push(txe);
         });
       }
