@@ -166,7 +166,8 @@ const Mongo = {
       Mongo._oneFind('block', { bnum: bnum.toString() }),
     transactions: (...args) => Mongo._manyFind('transaction', ...args),
     transactionById: (...args) =>
-      Mongo._oneFind('transaction', { _id: Mongo._id.transaction(...args) })
+      Mongo._oneFind('transaction', { _id: Mongo._id.transaction(...args) }),
+    transactionByTxid: (txid) => Mongo._oneFind('transaction', { txid })
   },
   has: {
     block: (...args) => Mongo._oneCount('block', ...args),

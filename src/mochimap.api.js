@@ -337,7 +337,8 @@ const Server = {
   _response: (res, json, statusCode, hint) => {
     const hints = {
       balance: '/balance/<addressType>/<address>',
-      block: '/block/<blockNumber>'
+      block: '/block/<blockNumber>',
+      transaction: '/transaction/<txid>'
     };
     let statusMessage;
     switch (statusCode) {
@@ -403,6 +404,18 @@ const Server = {
           if (block) return Server._response(res, block, 200);
           block = { error: 'No results', message: 'could not find block' };
           return Server._response(res, block, 404);
+        }
+        case 'transaction': {
+          const txid = path.shift();
+          // check request parameters
+          error = Server._check('method', req.method) ||
+            Server._check(['valid', 'hex'], { txid });
+          if (error) return Server._response(res, error, 400, 'transaction');
+          // call node for balance request
+          let tx = await Mongo.get.transactionByTxid(txid);
+          if (tx) return Server._response(res, tx, 200);
+          tx = { error: 'No results', message: 'could not find transaction' };
+          return Server._response(res, tx, 404);
         }
       }
     } catch (error) {
