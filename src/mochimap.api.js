@@ -278,6 +278,7 @@ const Network = {
 }; // end const Network...
 const Server = {
   _api: null,
+  _apiConnections: new Set(),
   _response: (res, json, statusCode, statusMessage) => {
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
@@ -317,6 +318,10 @@ const Server = {
     }
   },
   broadcast: (type, event, data) => { /* noop until websockets */ },
+  connect: (res, socket, head) => {
+    Server._apiConnections.add(socket); // track connections
+    socket.on('end', () => Server._apiConnections.delete(socket));
+  },
   request: async (req, res) => {
     // derive request path
     const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
@@ -365,6 +370,7 @@ const Server = {
         cert: fs.readFileSync('/etc/ssl/certs/mochimap.com.pem')
       }) : http.createServer(); // insecure development server
     // set http server events
+    Server._api.on('connect', Server.connect);
     Server._api.on('request', Server.request);
     Server._api.on('error', reject);
     Server._api.on('listening', () => {
@@ -389,6 +395,8 @@ const gracefulShutdown = (err, origin = 'unknown') => {
       console.log('Server closed...\n');
       process.exit(Number(err) || 1);
     });
+    // disconnect existing connections
+    Server._apiConnections.forEach(socket => socket.destroy());
   } else {
     console.log('Nothing to finish...\n');
     process.exit(Number(err) || 1);
