@@ -127,12 +127,16 @@ const Mongo = {
   _manyFind: async (cName, query, options = {}) => {
     const fid = fidFormat('Mongo._manyFind', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'suggest unnatural (reverse) sort...');
+    options = Object.assign({ sort: { $natural: -1 } }, options);
     console.debug(fid, 'return cursor...');
     return conn.collection.find(query, options);
   },
   _oneFind: async (cName, query, options = {}) => {
     const fid = fidFormat('Mongo._oneFind', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
+    console.debug(fid, 'suggest unnatural (reverse) sort...');
+    options = Object.assign({ sort: { $natural: -1 } }, options);
     console.debug(fid, 'return document...');
     return conn.collection.findOne(query, options);
   },
