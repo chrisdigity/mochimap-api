@@ -388,7 +388,10 @@ const Server = {
           break;
         } */
       }
-    } catch (error) { return Server._response(res, internalErr, 500); }
+    } catch (error) {
+      console.trace(error);
+      return Server._response(res, internalErr, 500);
+    }
     // assume invalid request
     err = { error: 'Invalid request path', message: '' };
     Server._response(res, err, 400);
