@@ -77,8 +77,8 @@ const Mongo = {
   find: async (cName, query, options = {}) => {
     const fid = fidFormat('Mongo.find', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
-    console.debug(fid, 'suggest unnatural (reverse) sort...');
-    options = Object.assign({ sort: { $natural: -1 } }, options);
+    console.debug(fid, 'force unnatural sort (descending)...');
+    Object.assign(options, { sort: { $natural: -1 } });
     const cursor = await conn.collection.find(query, options);
     console.debug(fid, cursor.hasNext() ? 'return cursor...' : 'no results...');
     return cursor;
