@@ -50,7 +50,7 @@ const Responder = {
     const isTag = Boolean(addressType === 'tag');
     const le = await Mochimo.getBalance(process.env.CUSTOMNODE, address, isTag);
     // send successfull query or 404
-    return this._respond(res, le ? 200 : 404, le ||
+    return Responder._respond(res, le ? 200 : 404, le ||
       { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
   },
   block: async (res, blockNumber) => {
@@ -59,20 +59,20 @@ const Responder = {
     // perform block query
     const block = await Mongo.findOne('block', { bnum });
     // send successfull query or 404
-    return this._respond(res, block ? 200 : 404, block ||
+    return Responder._respond(res, block ? 200 : 404, block ||
       { message: `${blockNumber} could not be found...` });
   },
   search: (cName, search) => {},
-  searchBlock: (...args) => this.search('block', ...args),
-  searchTransaction: (...args) => this.search('transaction', ...args),
+  searchBlock: (...args) => Responder.search('block', ...args),
+  searchTransaction: (...args) => Responder.search('transaction', ...args),
   transaction: async (res, txid) => {
     // perform transaction query
     const transaction = await Mongo.findOne('transaction', { txid });
     // send successfull query or 404
-    return this._respond(res, transaction ? 200 : 404, transaction ||
+    return Responder._respond(res, transaction ? 200 : 404, transaction ||
       { message: `${txid} could not be found...` });
   },
-  unknown: (res, code = 404, json = {}) => this._respond(res, code, json)
+  unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json)
 };
 
 module.exports = Responder;
