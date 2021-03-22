@@ -190,7 +190,7 @@ const Network = {
         // send haiku to Server interface for asynchronous broadcast
         Server.broadcast('haikuUpdates', 'haiku', visual);
         // send haiku to Mongo interface for asynchronous database update
-        const _id = Mongo.util.id.block(bnum, bhash);
+        const _id = Mongo.util.id.block(BigInt(bnum), bhash);
         await Mongo.update('block', visual, { _id });
       } else console.warn(`cannot visualize bnum ${bnum} at this time...`);
     }
