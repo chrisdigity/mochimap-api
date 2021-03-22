@@ -16,14 +16,9 @@
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
  **
- * A MongoDB wrapper, for MochiMap, to perform restrictive commands based on
- * https://mongodb.github.io/node-mongodb-native/3.3/reference/unified-topology/
- *
- * Implements get, has, process and update functions for searching, checking,
- * processing and updating database entries for MochiMap data types, where the
- * _id (unique ID) of the associated data is handled automatically via the use
- * of appropriate data identifiers (txid, bnum, bhash).
- *
+ * A MongoDB wrapper, for MochiMap, to simplify access and manage a cached
+ * connection to the database and it's data. Also provides utilities for unique
+ * id (_id) management and conversion to MongoDB's Long data type.
  * Notes:
  *  - the underscore (_) prefix denotes internal uage (primarily)
  *
