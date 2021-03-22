@@ -122,11 +122,11 @@ const Mongo = {
           console.debug(fid, 'force 64-bit hex bnum');
           bnum = asUint64String(bnum);
         } else if (typeof bnum === 'string') {
-          console.debug(fid, 'force 16 character bnum');
+          console.debug(fid, 'force 16 char bnum');
           bnum = bnum.slice(0, 16).padStart(16, '0');
         } else throw new Error(`${fid} invalid bnum type`);
         if (typeof bhash === 'string') {
-          console.debug(fid, 'force 16 character bhash');
+          console.debug(fid, 'force 16 char bhash');
           bhash = bhash.slice(0, 16).padStart(16, '0');
         } else throw new Error(`${fid} invalid bhash type`);
         return [bnum, bhash].join('-');
@@ -134,7 +134,7 @@ const Mongo = {
       transaction: (txid, bnum, bhash, fid) => {
         fid = fid || fidFormat('Mongo.util.id.transaction', txid, bnum, bhash);
         if (typeof txid === 'string') {
-          console.debug(fid, 'force 64 character txid');
+          console.debug(fid, 'force 64 char txid');
           txid = txid.slice(0, 64).padStart(64, '0');
         } else throw new Error(`${fid} invalid bhash type`);
         return [txid, Mongo.util.id.block(bnum, bhash, fid)].join('-');
