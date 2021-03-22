@@ -46,33 +46,51 @@ const Responder = {
     res.end(body);
   },
   balance: async (res, addressType, address) => {
-    // perform balance request
-    const isTag = Boolean(addressType === 'tag');
-    const le = await Mochimo.getBalance(process.env.CUSTOMNODE, address, isTag);
-    // send successfull query or 404
-    return Responder._respond(res, le ? 200 : 404, le ||
-      { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
+    try {
+      // perform balance request
+      const isTag = Boolean(addressType === 'tag');
+      const le = await Mochimo.getBalance(process.env.CUSTOMNODE, address, isTag);
+      // send successfull query or 404
+      return Responder._respond(res, le ? 200 : 404, le ||
+        { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
   },
   block: async (res, blockNumber) => {
-    // convert blockNumber parameter to Long number type
-    const bnum = Mongo.util.long(blockNumber);
-    // perform block query
-    const block = await Mongo.findOne('block', { bnum });
-    // send successfull query or 404
-    return Responder._respond(res, block ? 200 : 404, block ||
-      { message: `${blockNumber} could not be found...` });
+    try {
+      // convert blockNumber parameter to Long number type
+      const bnum = Mongo.util.long(blockNumber);
+      // perform block query
+      const block = await Mongo.findOne('block', { bnum });
+      // send successfull query or 404
+      return Responder._respond(res, block ? 200 : 404, block ||
+        { message: `${blockNumber} could not be found...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
   },
-  search: (cName, search) => {},
+  search: (cName, res, ...args) => {
+    try {} catch (error) { Responder.unknownInternal(res, error); }
+  },
   searchBlock: (...args) => Responder.search('block', ...args),
   searchTransaction: (...args) => Responder.search('transaction', ...args),
   transaction: async (res, txid) => {
-    // perform transaction query
-    const transaction = await Mongo.findOne('transaction', { txid });
-    // send successfull query or 404
-    return Responder._respond(res, transaction ? 200 : 404, transaction ||
-      { message: `${txid} could not be found...` });
+    try {
+      // perform transaction query
+      const transaction = await Mongo.findOne('transaction', { txid });
+      // send successfull query or 404
+      return Responder._respond(res, transaction ? 200 : 404, transaction ||
+        { message: `${txid} could not be found...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
   },
-  unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json)
+  unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json),
+  unknownInternal: (res, error) => {
+    // log error and send alert response
+    console.trace(error);
+    const date = new Date();
+    Responder.unknown(res, 500, {
+      message: 'please consider opening a issue detailing this error @ ' +
+        'https://github.com/chrisdigity/mochimap.com/issues',
+      timestamp: date.toISOString()
+    });
+  }
 };
 
 module.exports = Responder;

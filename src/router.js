@@ -102,16 +102,7 @@ const Router = async (req, res) => {
     if (intent.detected) message += `did you mean ${intent.hint}?`;
     else message += 'check path and try again...';
     Responder.unknown(res, 400, { message });
-  } catch (error) {
-    // log error and send alert response
-    console.trace(error);
-    const date = new Date();
-    Responder.unknown(res, 500, {
-      message: 'please consider opening a issue detailing this error @ ' +
-        'https://github.com/chrisdigity/mochimap.com/issues',
-      timestamp: date.toISOString()
-    });
-  }
+  } catch (error) { Responder.unknownInternal(res, error); }
 };
 
 module.exports = Router;
