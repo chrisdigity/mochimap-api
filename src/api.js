@@ -23,8 +23,6 @@ require('dotenv').config();
 /* global BigInt */
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
 BigInt.prototype.toJSON = function () { return this.toString(); };
-const LowerCase = (str) => str.toLowerCase();
-const NotEmpty = (val) => val;
 
 // const crypto = require('crypto');
 const { isIPv4 } = require('net');
@@ -39,9 +37,10 @@ const {
   objectIsEmpty,
   readWeb,
   visualizeHaiku
-} = require('./mochimap.util');
-const Mongo = require('./mochimap.mongo');
+} = require('./util');
+const Mongo = require('./mongo');
 const Mochimo = require('mochimo');
+const Router = require('./router');
 
 /* pre-core */
 // const GENESIS_HASH =
@@ -49,8 +48,6 @@ const Mochimo = require('mochimo');
 const SET_LIMIT = 0xfff;
 const DATADIR = path.join('.', 'data');
 const BCDIR = path.join(DATADIR, 'bc');
-const BASEURL = 'https://api.mochimap.com/';
-const CUSTOMNODE = process.env.CUSTOM_NODE;
 
 const Network = {
   block: {
@@ -77,7 +74,7 @@ const Network = {
           Network.block._cache.delete(Network.block._cache.values().next().value);
         }
         // check database has received block update
-        const hasBlock = await Mongo.has.block(bnum, bhash);
+        const hasBlock = await Mongo.has('block', bnum, bhash);
         if (!hasBlock) {
           // download/verify block is as advertised
           const block = await Mochimo.getBlock(ip, bnum);
@@ -109,7 +106,7 @@ const Network = {
       const bnum = block.bnum;
       if (bnum & 0xffn) {
         try {
-          const id = Mongo._id.block(bnum, bhash);
+          const id = Mongo.util.id.block(bnum, bhash);
           const fpath = path.join(BCDIR, id.replace('-', '.') + '.bc');
           await fsp.mkdir(BCDIR, { recursive: true });
           await fsp.writeFile(fpath, Buffer.from(block.buffer), { flag: 'wx' });
@@ -117,41 +114,84 @@ const Network = {
           console.error(fid, `failed to write raw block to ${path};`, error);
         }
       }
-      // send block update to Mongo interface for storage processing
-      await Mongo.process.blockUpdate(block);
+      // process block update
+      const txDocuments = [];
+      console.debug(fid, 'minify block data...');
+      blockJSON._id = Mongo.util.id.block(bnum, bhash);
+      // convert BigInt values to MongoDB->Long
+      blockJSON.bnum = Mongo.util.long(blockJSON.bnum);
+      if (typeof blockJSON.mreward !== 'undefined') {
+        blockJSON.mreward = Mongo.util.long(blockJSON.mreward);
+      }
+      if (typeof blockJSON.mfee !== 'undefined') {
+        blockJSON.mfee = Mongo.util.long(blockJSON.mfee);
+      }
+      if (typeof blockJSON.amount !== 'undefined') {
+        blockJSON.amount = Mongo.util.long(blockJSON.amount);
+      }
+      // handle transactions on normal blocks
+      if (blockJSON.type === Mochimo.Block.NORMAL) {
+        blockJSON.txids = [];
+        console.debug(fid, 'extract tx data and embed unique _id\'s...');
+        block.transactions.forEach(txe => {
+          const txid = txe.txid;
+          blockJSON.txids.push(txid);
+          txe = txe.toJSON(true);
+          txe._id = Mongo.util.id.transaction(txid, bnum, bhash);
+          // convert BigInt values to MongoDB->Long
+          txe.sendtotal = Mongo.util.long(txe.sendtotal);
+          txe.changetotal = Mongo.util.long(txe.changetotal);
+          txe.txfee = Mongo.util.long(txe.txfee);
+          txDocuments.push(txe);
+        });
+      }
+      console.debug(fid, 'insert block document...');
+      const bInsert = await Mongo.insert('block', blockJSON);
+      if (bInsert < 1) {
+        throw new Error(
+          `${fid} insert error, inserted ${bInsert}/1 block documents`);
+      }
+      if (txDocuments.length) {
+        console.debug(fid, 'insert transaction documents...');
+        const txInsert = await Mongo.insert('transaction', txDocuments);
+        if (txInsert < txDocuments.length) {
+          throw new Error(`${fid} insert error, ` +
+            `inserted ${txInsert}/${txDocuments.length} transaction documents`);
+        }
+      }
       // send block data to visualizer for haiku visualization
       if (!noVisual) await Network.block.visualizer(blockJSON);
       // return block for promise chaining
       return block;
     },
-    visualizer: async (hBlock) => {
-      const bhash = hBlock.bhash;
-      const bnum = hBlock.bnum;
+    visualizer: async (block) => {
+      const bhash = block.bhash;
+      const bnum = block.bnum;
       // find appropriate block to use for haiku visualization
       let checkback = 0;
       let shadow = 0;
-      while (hBlock.type !== 'normal' || checkback > 0) {
+      while (block.type !== Mochimo.Block.NORMAL || checkback > 0) {
         shadow |= checkback;
-        if (hBlock.type === 'normal') checkback--; // decrease checkback
+        if (block.type === Mochimo.Block.NORMAL) checkback--; // decrease checkback
         else {
           shadow |= ++checkback; // increase checkback and trigger shadow haiku
-          // check for previous block data
-          const pbnum = BigInt(hBlock.bnum) - 1n;
           // get previous block data (if available) and start over
-          hBlock = await Mongo.get.blockById(pbnum, hBlock.bhash);
-          if (hBlock) continue;
+          const _id = Mongo.util.id.block(BigInt(block.bnum) - 1n, block.bhash);
+          block = await Mongo.findOne('block', { _id });
+          if (block) continue;
           break;
         }
       }
       // visualize Haiku from appropriate block data
-      if (hBlock) {
+      if (block) {
         shadow = Boolean(shadow);
-        const haiku = Mochimo.Trigg.expand(hBlock.nonce, shadow);
+        const haiku = Mochimo.Trigg.expand(block.nonce, shadow);
         const visual = await visualizeHaiku(haiku, shadow);
         // send haiku to Server interface for asynchronous broadcast
         Server.broadcast('haikuUpdates', 'haiku', visual);
         // send haiku to Mongo interface for asynchronous database update
-        await Mongo.update.blockById(visual, bnum, bhash);
+        const _id = Mongo.util.id.block(bnum, bhash);
+        await Mongo.update('block', visual, { _id });
       } else console.warn(`cannot visualize bnum ${bnum} at this time...`);
     }
   },
@@ -279,157 +319,7 @@ const Network = {
 const Server = {
   _api: null,
   _apiConnections: new Set(),
-  _check: (type, data, req) => {
-    let error, message;
-    if (!Array.isArray(type)) type = [type];
-    for (const cType of type) {
-      switch (cType) {
-        case 'hex':
-          error = 'Invalid request parameter';
-          if (typeof data !== 'object') data = { parameter: data };
-          for (const [key, value] of Object.entries(data)) {
-            if (value.replace(/[0-9A-Fa-f]/g, '')) { // checks non-hex chars
-              error = 'Invalid request parameter';
-              message = `Invalid hexadecimal characters in request <${key}>`;
-              break;
-            }
-          }
-          break;
-        case 'method':
-          if (typeof requirement === 'undefined') req = 'GET';
-          if (data !== req) {
-            error = 'Invalid request method';
-            message = `expected '${req}', got '${data}'`;
-          }
-          break;
-        case 'number':
-          if (typeof data !== 'object') data = { parameter: data };
-          for (const [key, value] of Object.entries(data)) {
-            if (isNaN(value)) {
-              error = 'Invalid block number';
-              message = `<${key}> is not a number`;
-              break;
-            }
-          }
-          break;
-        case 'valid':
-          error = 'Invalid request parameter';
-          if (typeof data !== 'object') data = { parameter: data };
-          for (const [key, value] of Object.entries(data)) {
-            if (typeof value === 'undefined') {
-              message = `missing <${key}>`;
-              break;
-            } else if (req) {
-              if (!Array.isArray(req)) req = [req];
-              if (!req.includes(value)) {
-                message = `Invalid <${key}> value; ` +
-                  `expected '${req.join("' or '")}'`;
-                break;
-              }
-            }
-          }
-          break;
-      }
-      if (error && message) return { error, message };
-    }
-    return false;
-  },
-  _response: (res, json, statusCode, hint) => {
-    const hints = {
-      balance: '/balance/<addressType>/<address>',
-      block: '/block/<blockNumber>',
-      transaction: '/transaction/<txid>'
-    };
-    let statusMessage;
-    switch (statusCode) {
-      case 200: statusMessage = 'OK'; break;
-      case 400:
-        statusMessage = 'Bad Request';
-        if (hint) {
-          for (const [key, value] of Object.entries(hints)) {
-            if (hint.includes(key)) { json.hint = value; break; }
-          }
-        }
-        break;
-      case 404: statusMessage = 'Not Found'; break;
-      case 500: statusMessage = 'Internal Server Error'; break;
-      default: statusMessage = '';
-    }
-    const body = JSON.stringify(json, null, 2) || '';
-    const headers = {
-      'X-Robots-Tag': 'none',
-      'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body)
-    };
-    res.writeHead(statusCode, statusMessage, headers);
-    res.end(body);
-    return null;
-  },
   broadcast: (type, event, data) => { /* noop until websockets */ },
-  connect: (res, socket, head) => {
-    Server._apiConnections.add(socket); // track connections
-    socket.on('end', () => Server._apiConnections.delete(socket));
-  },
-  request: async (req, res) => {
-    const { pathname /* , searchParams */ } = new URL(req.url, BASEURL);
-    try {
-      let error = null;
-      const path = pathname.split('/').filter(NotEmpty).map(LowerCase);
-      switch (path.shift()) {
-        case 'balance': {
-          const addressType = path.shift();
-          const address = path.shift();
-          // check request parameters
-          error = Server._check('method', req.method) ||
-            Server._check('valid', { addressType }, ['tag', 'wots']) ||
-            Server._check(['valid', 'hex'], { address });
-          if (error) return Server._response(res, error, 400, 'balance');
-          // call node for balance request
-          const isTag = Boolean(addressType === 'tag');
-          let le = await Mochimo.getBalance(CUSTOMNODE, address, isTag);
-          // respond appropriately
-          if (le) return Server._response(res, le, 200);
-          const message = `${isTag ? 'Tag' : 'WOTS+'} not in ledger`;
-          le = { error: 'No results', message, address, balance: '0', tag: '' };
-          return Server._response(res, le, 404);
-        }
-        case 'block': {
-          const blockNumber = path.shift();
-          // check request parameters
-          error = Server._check('method', req.method) ||
-            Server._check(['valid', 'number'], { blockNumber });
-          if (error) return Server._response(res, error, 400, 'block');
-          // call node for balance request
-          let block = await Mongo.get.blockByNumber(BigInt(blockNumber));
-          if (block) return Server._response(res, block, 200);
-          block = { error: 'No results', message: 'could not find block' };
-          return Server._response(res, block, 404);
-        }
-        case 'transaction': {
-          const txid = path.shift();
-          // check request parameters
-          error = Server._check('method', req.method) ||
-            Server._check(['valid', 'hex'], { txid });
-          if (error) return Server._response(res, error, 400, 'transaction');
-          // call node for balance request
-          let tx = await Mongo.get.transactionByTxid(txid);
-          if (tx) return Server._response(res, tx, 200);
-          tx = { error: 'No results', message: 'could not find transaction' };
-          return Server._response(res, tx, 404);
-        }
-      }
-    } catch (error) {
-      console.trace(error);
-      const internalError = {
-        error: 'Internal server error',
-        message: 'please alert Chrisdigity @ Mochimo Official Discord'
-      };
-      return Server._response(res, internalError, 500);
-    }
-    // assume invalid request path
-    const error = { error: 'Invalid request path', message: 'check the url' };
-    return Server._response(res, error, 400, pathname);
-  },
   start: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
     console.log(fid, 'creating new http/s server...');
@@ -440,9 +330,12 @@ const Server = {
         cert: fs.readFileSync('/etc/ssl/certs/mochimap.com.pem')
       }) : http.createServer(); // insecure development server
     // set http server events
-    Server._api.on('connect', Server.connect);
-    Server._api.on('request', Server.request);
+    Server._api.on('request', Router);
     Server._api.on('error', reject);
+    Server._api.on('connect', (res, socket/* , head */) => {
+      Server._apiConnections.add(socket); // track connections
+      socket.on('end', () => Server._apiConnections.delete(socket));
+    });
     Server._api.on('listening', () => {
       const { address, port } = Server._api.address();
       console.log(fid, `${address}:${port} ready`);
