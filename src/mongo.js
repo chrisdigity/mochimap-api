@@ -24,6 +24,12 @@
  *
  */
 
+// monkey-patch RegExp serialization
+/* eslint no-extend-native: ["error", { "exceptions": ["RegExp"] }] */
+Object.defineProperty(RegExp.prototype, 'toJSON', {
+  value: RegExp.prototype.toString
+});
+
 const { asUint64String, fidFormat } = require('./util');
 const { MongoClient, Long } = require('mongodb');
 
