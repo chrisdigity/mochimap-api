@@ -75,19 +75,21 @@ const Mongo = {
     return cmd.result.n;
   },
   find: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo.find', cName, query, options);
+    const fid = fidFormat('Mongo.find', cName, JSON.stringify(query),
+      JSON.stringify(options));
     const conn = await Mongo._connect(cName, fid);
-    console.debug(fid, 'force unnatural sort (descending)...');
+    console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { $natural: -1 } });
     const cursor = await conn.collection.find(query, options);
-    console.debug(fid, cursor.hasNext() ? 'return cursor...' : 'no results...');
+    console.debug(fid, await cursor.hasNext() ? 'return cursor...' : 'no results...');
     return cursor;
   },
   findOne: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo._oneFind', cName, query, options);
+    const fid = fidFormat('Mongo._oneFind', cName, JSON.stringify(query),
+      JSON.stringify(options));
     const conn = await Mongo._connect(cName, fid);
-    console.debug(fid, 'suggest unnatural (reverse) sort...');
-    options = Object.assign({ sort: { $natural: -1 } }, options);
+    console.debug(fid, 'force unnatural sort (desc)...');
+    Object.assign(options, { sort: { $natural: -1 } });
     console.debug(fid, 'find document...');
     const doc = await conn.collection.findOne(query, options);
     console.debug(fid, doc ? 'return document...' : 'no result...');
@@ -99,7 +101,8 @@ const Mongo = {
     console.debug(fid, 'determine _id for query...');
     const query = { _id: Mongo.util.id[cName](...args) };
     console.debug(fid, 'count documents...');
-    const count = await conn.collection.countDocuments(query, { limit: 1 });
+    const options = { limit: 1, sort: { $natural: -1 } };
+    const count = await conn.collection.countDocuments(query, options);
     console.debug(fid, 'found', count, 'documents...');
     return count;
   },
