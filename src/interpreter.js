@@ -41,6 +41,22 @@ const Parse = {
     lt: (val) => ({ $lt: val }),
     lte: (val) => ({ $lte: val }),
     ne: (val) => ({ $ne: val })
+  },
+  special: {
+    wots: (val) => ({
+      $or: [
+        { srcaddr: val },
+        { dstaddr: val },
+        { chgaddr: val }
+      ]
+    }),
+    tag: (val) => ({
+      $or: [
+        { srctag: val },
+        { dsttag: val },
+        { chgtag: val }
+      ]
+    })
   }
 };
 
@@ -51,7 +67,9 @@ const Interpreter = {
     if (typeof query === 'string' && query) {
       if (query.startsWith('?')) query = query.slice(1);
       const parameters = query.split('&');
-      for (const param of parameters) {
+      const $and = [];
+      // parse search parameters
+      for (let param of parameters) {
         let [keymod, value] = param.split('=');
         const [key, mod] = keymod.split(':');
         // parse known key and modifier queries
@@ -63,9 +81,14 @@ const Interpreter = {
           if (value > 1) results.options.skip = results.options.limit * value;
           continue;
         }
-        // finally, add query
-        results.query[key] = value;
+        // expand special parameters and/or add to $and
+        param = {}; // reused...
+        if (Parse.special[key]) param = Parse.special[key];
+        else param[key] = value;
+        $and.push(param);
       }
+      // finally, assign parameters to query
+      if ($and.length) Object.assign(results.query, $and);
     }
     // return final object
     return results;
