@@ -17,8 +17,33 @@
  *
  */
 
-const NumberKeys = ['size', 'bnum', 'time0', 'stime', 'difficulty', 'mreward',
-  'mfee', 'amount', 'tcount', 'lcount', 'sendtotal', 'changetotal', 'txfee'];
+const Parse = {
+  _int: (val) => isNaN(val) ? val : parseInt(val),
+  key: {
+    size: this._int,
+    bnum: this._int,
+    time0: this._int,
+    stime: this._int,
+    difficulty: this._int,
+    mreward: this._int,
+    mfee: this._int,
+    amount: this._int,
+    tcount: this._int,
+    lcount: this._int,
+    sendtotal: this._int,
+    changetotal: this._int,
+    txfee: this._int
+  },
+  mod: {
+    contains: (val) => ({ $regex: new RegExp(`.*${val}.*`) }),
+    exists: (val) => ({ $exists: val === 'false' ? false : Boolean(val) }),
+    gt: (val) => ({ $gt: val }),
+    gte: (val) => ({ $gte: val }),
+    lt: (val) => ({ $lt: val }),
+    lte: (val) => ({ $lte: val }),
+    ne: (val) => ({ $ne: val })
+  }
+};
 
 const Interpreter = {
   search: (query) => {
@@ -30,19 +55,17 @@ const Interpreter = {
       for (const param of parameters) {
         let [keymod, value] = param.split('=');
         const [key, mod] = keymod.split(':');
-        // parse known number values
-        if (NumberKeys.includes(key) && !isNaN(value)) value = parseInt(value);
-        // check for valid options
+        // parse known key and modifier queries
+        if (Parse.key[key]) value = Parse.key[key](value);
+        if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
+        // parse known key options
         if (key === 'page' && !isNaN(value)) {
           value = parseInt(value);
           if (value > 1) results.options.skip = results.options.limit * value;
           continue;
         }
-        // otherwise, parse query
-        if (mod) {
-          results.query[key] = {};
-          results.query[key][`$${mod}`] = value;
-        } else results.query[key] = value;
+        // finally, add query
+        results.query[key] = value;
       }
     }
     // return final object
