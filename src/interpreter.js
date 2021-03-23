@@ -18,21 +18,20 @@
  */
 
 const Parse = {
-  _int: (val) => isNaN(val) ? val : parseInt(val),
   key: {
-    size: this._int,
-    bnum: this._int,
-    time0: this._int,
-    stime: this._int,
-    difficulty: this._int,
-    mreward: this._int,
-    mfee: this._int,
-    amount: this._int,
-    tcount: this._int,
-    lcount: this._int,
-    sendtotal: this._int,
-    changetotal: this._int,
-    txfee: this._int
+    size: (val) => isNaN(val) ? val : parseInt(val),
+    bnum: (val) => isNaN(val) ? val : parseInt(val),
+    time0: (val) => isNaN(val) ? val : parseInt(val),
+    stime: (val) => isNaN(val) ? val : parseInt(val),
+    difficulty: (val) => isNaN(val) ? val : parseInt(val),
+    mreward: (val) => isNaN(val) ? val : parseInt(val),
+    mfee: (val) => isNaN(val) ? val : parseInt(val),
+    amount: (val) => isNaN(val) ? val : parseInt(val),
+    tcount: (val) => isNaN(val) ? val : parseInt(val),
+    lcount: (val) => isNaN(val) ? val : parseInt(val),
+    sendtotal: (val) => isNaN(val) ? val : parseInt(val),
+    changetotal: (val) => isNaN(val) ? val : parseInt(val),
+    txfee: (val) => isNaN(val) ? val : parseInt(val)
   },
   mod: {
     contains: (val) => ({ $regex: new RegExp(`.*${val}.*`) }),
