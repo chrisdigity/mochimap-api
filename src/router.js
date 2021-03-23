@@ -64,7 +64,8 @@ const Router = async (req, res) => {
   try {
     const { pathname, search } = new URL(req.url, BaseURL);
     const intent = { hint: '', detected: 0 };
-    let routeMatch, params;
+    const params = [];
+    let routeMatch;
     // find matching route from Routes
     for (const route of Routes) {
       if (route.method !== req.method) continue;
@@ -73,7 +74,7 @@ const Router = async (req, res) => {
         if (pathMatch) {
           // route matched, break loop
           routeMatch = route;
-          params = pathMatch.slice(1);
+          params.push(...pathMatch.slice(1));
           break;
         }
       } else if (route.path === pathname) {
