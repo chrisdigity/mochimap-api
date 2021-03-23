@@ -34,7 +34,9 @@ const Parse = {
     txfee: (val) => isNaN(val) ? val : parseInt(val)
   },
   mod: {
-    contains: (val) => ({ $regex: new RegExp(`.*${val}.*`) }),
+    begins: (val) => ({ $regex: new RegExp(`^${val}`) }),
+    contains: (val) => ({ $regex: new RegExp(`${val}`) }),
+    ends: (val) => ({ $regex: new RegExp(`${val}$`) }),
     exists: (val) => ({ $exists: val === 'false' ? false : Boolean(val) }),
     gt: (val) => ({ $gt: val }),
     gte: (val) => ({ $gte: val }),
@@ -83,12 +85,12 @@ const Interpreter = {
         }
         // expand special parameters and/or add to $and
         param = {}; // reused...
-        if (Parse.special[key]) param = Parse.special[key];
+        if (Parse.special[key]) param = Parse.special[key](value);
         else param[key] = value;
         $and.push(param);
       }
       // finally, assign parameters to query
-      if ($and.length) Object.assign(results.query, { query: { $and } });
+      if ($and.length) Object.assign(results.query, { $and });
     }
     // return final object
     return results;
