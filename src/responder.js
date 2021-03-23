@@ -77,7 +77,7 @@ const Responder = {
       Object.assign(search, Interpreter.search(args[0]));
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
-      const results = cursor.toArray();
+      const results = await cursor.toArray();
       // send succesfull query or 404
       Responder._respond(res, results.length ? 200 : 404, results.length
         ? results : { message: `no results found for ${args[0]}` });
