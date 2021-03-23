@@ -31,7 +31,7 @@ const Interpreter = {
         let [keymod, value] = param.split('=');
         const [key, mod] = keymod.split(':');
         // parse known number values
-        if (NumberKeys.includes(key) && !isNaN) value = parseInt(value);
+        if (NumberKeys.includes(key) && !isNaN(value)) value = parseInt(value);
         // check for valid options
         if (key === 'page' && !isNaN(value)) {
           value = parseInt(value);
