@@ -79,8 +79,8 @@ const Responder = {
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
       const dbquery = {
-        count: await cursor.count(),
-        ms: null,
+        duration: null,
+        found: await cursor.count(),
         pages: null,
         results: await cursor.toArray()
       };
