@@ -79,11 +79,12 @@ const Responder = {
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
       const dbquery = {
-        stats: { found: await cursor.count(), time: null },
+        count: await cursor.count(),
+        ms: null,
         results: await cursor.toArray()
       };
-      // update time stat
-      dbquery.stats.time = Date.now() - start;
+      // update query time stat
+      dbquery.ms = Date.now() - start;
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
       else Responder._respond(res, 404, dbquery, 'No results');
