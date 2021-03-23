@@ -17,27 +17,36 @@
  *
  */
 
+const NumberKeys = ['size', 'bnum', 'time0', 'stime', 'difficulty', 'mreward',
+  'mfee', 'amount', 'tcount', 'lcount', 'sendtotal', 'changetotal', 'txfee'];
+
 const Interpreter = {
   search: (query) => {
-    const results = { query: {}, options: { limit: 32 } };
+    const results = { query: {}, options: { limit: 8 } };
     // remove any preceding '?'
-    if (query.startsWith('?')) query = query.slice(1);
-    const parameters = query.split('&');
-    for (const param of parameters) {
-      let [keymod, value] = param.split('=');
-      const [key, mod] = keymod.split(':');
-      // check for valid options
-      if (key === 'page' && !isNaN(value)) {
-        value = parseInt(value);
-        if (value > 1) results.options.skip = results.options.limit * value;
-        continue;
+    if (typeof query === 'string' && query) {
+      if (query.startsWith('?')) query = query.slice(1);
+      const parameters = query.split('&');
+      for (const param of parameters) {
+        let [keymod, value] = param.split('=');
+        const [key, mod] = keymod.split(':');
+        // parse known number values
+        if (NumberKeys.includes(key) && !isNaN) value = parseInt(value);
+        // check for valid options
+        if (key === 'page' && !isNaN(value)) {
+          value = parseInt(value);
+          if (value > 1) results.options.skip = results.options.limit * value;
+          continue;
+        }
+        // otherwise, parse query
+        if (mod) {
+          results.query[key] = {};
+          results.query[key][`$${mod}`] = value;
+        } else results.query[key] = value;
       }
-      // otherwise, parse query
-      if (mod) {
-        results[key] = {};
-        results[key][`$${mod}`] = value;
-      } else results.query[key] = value;
     }
+    // return final object
+    return results;
   }
 };
 
