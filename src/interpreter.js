@@ -79,7 +79,7 @@ const Interpreter = {
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
         // parse known key options
         if (key === 'page' && !isNaN(value)) {
-          value = parseInt(value);
+          value = parseInt(value) - 1;
           if (value > 1) results.options.skip = results.options.limit * value;
           continue;
         }
