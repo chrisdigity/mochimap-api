@@ -37,10 +37,11 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/block/search',
+    param: /^[?]?(?:[0-9a-z]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
     hint: '[BaseURL]/block/search?<param>=<paramValue>',
     hintCheck: /block|search/gi,
     handler: Responder.searchBlock,
-    enabled: false
+    enabled: true
   }, {
     method: 'GET',
     path: /^\/transaction\/([0-9a-f]+)$/i,
@@ -51,10 +52,11 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/transaction/search',
+    param: /^[?]?(?:[0-9a-z]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
     hint: '[BaseURL]/transaction/search?<param>=<paramValue>',
     hintCheck: /transaction|search/gi,
     handler: Responder.searchTransaction,
-    enabled: false
+    enabled: true
   }
 ];
 
@@ -88,10 +90,16 @@ const Router = async (req, res) => {
     }
     // check for matching route
     if (routeMatch) {
-      // check route is enabled
+      // ensure route is enabled
       if (routeMatch.enabled) {
-        // acquire additional parameters, if available
-        if (search) params.push(search);
+        if (search && routeMatch.param instanceof RegExp) {
+          // ensure search query is valid
+          if (!routeMatch.param.test(search)) {
+            return Responder.unknown(res, 400,
+              { message: 'invalid search parameters, check request...' });
+          } // add search query as parameter
+          params.push(search);
+        }
         return await routeMatch.handler(res, ...params);
       } // route is not enabled, respond with 409
       return Responder.unknown(res, 409,
@@ -100,7 +108,7 @@ const Router = async (req, res) => {
     // unkown request: suggest detected intent or check path
     let message = 'the request was not understood, ';
     if (intent.detected) message += `did you mean ${intent.hint}?`;
-    else message += 'check path and try again...';
+    else message += 'check request...';
     Responder.unknown(res, 400, { message });
   } catch (error) { Responder.unknownInternal(res, error); }
 };

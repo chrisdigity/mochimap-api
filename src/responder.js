@@ -19,6 +19,7 @@
 
 const Mochimo = require('mochimo');
 const Mongo = require('./mongo');
+const Interpreter = require('./interpreter');
 
 const Responder = {
   _respond: (res, statusCode, json, statusMessage = false) => {
@@ -33,7 +34,9 @@ const Responder = {
       }
     }
     // assign error and message properties if required
-    if (statusCode > 299 && !json.error) json.error = statusMessage;
+    if (statusCode > 299 && !json.error) {
+      json = Object.assign({ error: statusMessage }, json);
+    }
     // process response headers
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
@@ -66,8 +69,23 @@ const Responder = {
         { message: `${blockNumber} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  search: (cName, res, ...args) => {
-    try {} catch (error) { Responder.unknownInternal(res, error); }
+  search: async (cName, res, ...args) => {
+    let cursor;
+    try {
+      // set defaults and interpret requested search params as necessary
+      const search = { query: {}, options: {} };
+      Object.assign(search, Interpreter.search(args[0]));
+      // query database for results
+      cursor = await Mongo.find(cName, search.query, search.options);
+      const results = cursor.toArray();
+      // send succesfull query or 404
+      Responder._respond(res, results.length ? 200 : 404, results.length
+        ? results : { message: `no results found for ${args[0]}` });
+    } catch (error) { // send 500 on internal error
+      Responder.unknownInternal(res, error);
+    } finally { // cleanup cursor
+      if (cursor && !cursor.isClosed()) await cursor.close();
+    }
   },
   searchBlock: (...args) => Responder.search('block', ...args),
   searchTransaction: (...args) => Responder.search('transaction', ...args),
