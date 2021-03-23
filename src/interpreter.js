@@ -88,7 +88,7 @@ const Interpreter = {
         $and.push(param);
       }
       // finally, assign parameters to query
-      if ($and.length) Object.assign(results.query, $and);
+      if ($and.length) Object.assign(results.query, { query: $and });
     }
     // return final object
     return results;
