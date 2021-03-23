@@ -70,6 +70,7 @@ const Responder = {
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   search: async (cName, res, ...args) => {
+    const start = Date.now();
     let cursor;
     try {
       // set defaults and interpret requested search params as necessary
@@ -77,10 +78,15 @@ const Responder = {
       Object.assign(search, Interpreter.search(args[0]));
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
-      const results = await cursor.toArray();
+      const dbquery = {
+        stats: { found: await cursor.count(), time: null },
+        results: await cursor.toArray()
+      };
+      // update time stat
+      dbquery.stats.time = Date.now - start;
       // send succesfull query or 404
-      Responder._respond(res, results.length ? 200 : 404, results.length
-        ? results : { message: `no results found for ${args[0]}` });
+      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
+      else Responder._respond(res, 404, dbquery, 'No results');
     } catch (error) { // send 500 on internal error
       Responder.unknownInternal(res, error);
     } finally { // cleanup cursor
