@@ -80,7 +80,7 @@ const Interpreter = {
         // parse known key options
         if (key === 'page' && !isNaN(value)) {
           value = parseInt(value) - 1;
-          if (value > 1) results.options.skip = results.options.limit * value;
+          if (value) results.options.skip = results.options.limit * value;
           continue;
         }
         // expand special parameters and/or add to $and
