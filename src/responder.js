@@ -85,8 +85,8 @@ const Responder = {
         results: await cursor.toArray()
       };
       // update query pages and time stat
-      dbquery.pages = Math.ceil(dbquery.count / search.options.limit);
-      dbquery.ms = Date.now() - start;
+      dbquery.pages = Math.ceil(dbquery.found / search.options.limit);
+      dbquery.duration = Date.now() - start;
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
       else Responder._respond(res, 404, dbquery, 'No results');
