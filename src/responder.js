@@ -83,7 +83,7 @@ const Responder = {
         results: await cursor.toArray()
       };
       // update time stat
-      dbquery.stats.time = Date.now - start;
+      dbquery.stats.time = Date.now() - start;
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
       else Responder._respond(res, 404, dbquery, 'No results');
