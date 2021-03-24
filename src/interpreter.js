@@ -45,7 +45,7 @@ const Parse = {
     ne: (val) => ({ $ne: val })
   },
   special: {
-    wots: (val) => ({
+    address: (val) => ({
       $or: [
         { srcaddr: val },
         { dstaddr: val },
