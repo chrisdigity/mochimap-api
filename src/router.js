@@ -22,9 +22,9 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
-    path: /^\/balance\/(tag|wots)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/balance/<tag||wots>/<address>',
-    hintCheck: /balance/gi,
+    path: /^\/balance\/(tag|address)\/([0-9a-f]+)$/i,
+    hint: '[BaseURL]/balance/<"tag"||"address">/<address>',
+    hintCheck: /balance|tag|address/gi,
     handler: Responder.balance,
     enabled: true
   }, {
