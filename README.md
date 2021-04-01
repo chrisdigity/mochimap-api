@@ -12,9 +12,8 @@ Welcome to the home of MochiMap. MochiMap is a selfless service (*pats self on b
 
 ## The contents of this repository ~ ![GitHub language count](https://img.shields.io/github/languages/count/chrisdigity/mochimap.com?style=plastic) ![GitHub top language](https://img.shields.io/github/languages/top/chrisdigity/mochimap.com?style=plastic)
 This repository hosts:
- - the [MochiMap.com](https://www.mochimap.com/) frontend under [docs/](docs/) (hosted by Gtihub Pages)
- - the MochiMap API backend under [/](/) (hosted externally via Cloudflare)
-   - *excludes files containing security concerns*
+ - the [MochiMap.com](https://www.mochimap.com/) frontend hosted by GitHub Pages (see [docs/](docs/))
+ - the MochiMap API backend hosted externally via Cloudflare
 
 ## API Usage
 The MochiMap API interprets blockchain and transaction data from the Mochimo Cryptocurrency Network and stores it as Developer friendly JSON data. This data is publicly accessible via the MochiMap API endpoints listed below, allowing both direct queries and custom search patterns for querying data.
