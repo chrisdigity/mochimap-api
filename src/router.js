@@ -44,6 +44,20 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: /^\/network\/(?=\d+\.\d+\.\d+\.\d+$)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})$/i,
+    hint: '[BaseURL]/network/<IPv4>',
+    hintCheck: /network|node/gi,
+    handler: Responder.network,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: '/network/search',
+    hint: '[BaseURL]/network/search',
+    hintCheck: /network|node|search/gi,
+    handler: Responder.searchNetwork,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/transaction\/([0-9a-f]+)$/i,
     hint: '[BaseURL]/transaction/<txid>',
     hintCheck: /transaction/gi,
