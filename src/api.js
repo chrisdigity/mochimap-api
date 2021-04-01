@@ -24,17 +24,18 @@ require('dotenv').config();
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
 BigInt.prototype.toJSON = function () { return this.toString(); };
 
-// const crypto = require('crypto');
-const { isIPv4 } = require('net');
-const https = require('https');
-const http = require('http');
-const path = require('path');
 const fs = require('fs');
 const fsp = fs.promises;
+const path = require('path');
+const http = require('http');
+const https = require('https');
+// const crypto = require('crypto');
+const { isIPv4 } = require('net');
 const {
   isPrivateIPv4,
-  objectDifference,
-  objectIsEmpty,
+  ms,
+  // objectDifference,
+  // objectIsEmpty,
   readWeb,
   visualizeHaiku
 } = require('./util');
@@ -53,14 +54,15 @@ const Network = {
   block: {
     _cache: new Set(), // TODO: switch to using _chain
     _chain: new Map(),
-    check: async (ip, bnum, bhash, noVisual) => {
+    check: async (node, bnum, bhash, noVisual) => {
       const fid = 'Network.block.check():';
-      if (typeof ip === 'object') {
-        noVisual = ip.noVisual;
-        bhash = ip.cblockhash;
-        bnum = ip.cblock;
-        ip = ip.ip;
-      }
+      let ip;
+      if (typeof node === 'object') {
+        noVisual = node.noVisual;
+        bhash = node.cblockhash;
+        bnum = node.cblock;
+        ip = node.ip;
+      } else ip = node;
       if (bnum === 0n) return; // disregard B.O.D. checks
       if (!Network.block._cache.has(bhash)) {
         // download tfile entries and validate against _chain
@@ -197,23 +199,21 @@ const Network = {
   },
   node: {
     _idle: 0,
-    _intervalScan: 1000,
-    _intervalScanFailure: 60000,
-    _intervalUpdate: 20000,
     _list: new Map(),
     _start: [
       path.join(DATADIR, 'startnodes.lst'),
       'https://www.mochimap.com/startnodes.lst',
       'https://mochimo.org/startnodes.lst',
-      'https://www.mochimap.net/startnodes.lst'
+      'https://www.mochimap.net/startnodes.lst',
+      false // indicates failure
     ],
     _timer: null,
     consensus: () => {
       const chains = new Map();
       let consensus = null;
       Network.node._list.forEach(node => {
-        // ensure node meets requirements
-        if (!node.cblockhash) return;
+        // ensure node has cblockhash and VEOK status
+        if (!node.cblockhash || node.status) return;
         // increment consensus for chain
         if (chains.has(node.cblockhash)) {
           chains.set(node.cblockhash, chains.get(node.cblockhash) + 1);
@@ -227,65 +227,85 @@ const Network = {
     },
     scan: async () => {
       const fid = 'Network.node.scan():';
+      // setup scan parameters and scan all registered nodes, asynchronously
       const len = Network.node._list.size;
       let active = 0;
       Network.node._list.forEach((nodeJSON, ip) => {
         if (nodeJSON.status === Mochimo.VEOK) active++;
-        Network.node.update(nodeJSON, ip); // asynchronous update
+        Network.node.update(nodeJSON, ip).catch(console.trace);
       });
-      // complete network blackout failsafe and fresh start trigger
+      // fresh start or complete network blackout check
       if (!active && !Network.node._idle) Network.node._idle = Date.now();
       else if (active) Network.node._idle = 0;
       const idleTime = Network.node._idle ? Date.now() - Network.node._idle : 0;
       if (idleTime > Network.node._intervalUpdate || len === 0) {
         console.log(`Active/Total Nodes: ${active}/${len}; Seek more nodes...`);
-        let i = 0;
         for (const source of Network.node._start) {
-          console.log(fid, 'trying', source);
-          try {
+          if (!source) { // check source failure
+            Network.node._timer = setTimeout(Network.node.scan, ms.minute);
+            return console.error(fid, 'failure! Retry in 60 seconds...');
+          } else console.log(fid, 'trying', source);
+          try { // download and decipher data from source
             let data = source.startsWith('http')
               ? await readWeb(source) : await fsp.readFile(source, 'utf8');
-            if (data && typeof data === 'string') {
-              data = data.match(/(^|(?<=\n))[\w.]+/g);
-              if (data && data.length) {
-                data = data.filter(ip => isIPv4(ip) && !isPrivateIPv4(ip));
-                if (data.length) {
-                  data = data.filter(ip => !Network.node._list.has(ip));
-                  if (data.length) {
-                    data.forEach(ip => {
-                      const node = new Mochimo.Node({ ip }).toJSON();
-                      Network.node._list.set(ip, node); // add to _list
-                      Network.node.update(node, ip); // call node
-                    });
-                    console.log(fid, source, 'added', data.length, 'nodes');
-                    break;
-                  } else console.error(fid, source, 'yields no additional IPs');
-                } else console.error(fid, source, 'yields no valid IP data');
-              } else console.error(fid, source, 'yields no valid data');
-            } else console.error(fid, source, 'yields no string data');
+            if (typeof data !== 'string') throw new Error('no string data');
+            data = (data.match(/(^|(?<=\n))[\w.]+/g) || []);
+            data = data.filter(ip =>
+              isIPv4(ip) && !isPrivateIPv4(ip) && !Network.node._list.has(ip));
+            if (!data.length) throw new Error('no additional/valid IP data');
+            data.forEach(ip => {
+              const node = new Mochimo.Node({ ip }).toJSON();
+              Network.node._list.set(ip, node); // add to _list
+              Network.node.update(node, ip); // call node
+            });
+            console.log(fid, source, 'added', data.length, 'nodes');
+            break;
           } catch (error) { console.error(fid, source, 'failure;', error); }
-          i++;
-        }
-        if (i === Network.node._start.length) {
-          Network.node._timer =
-            setTimeout(Network.node.scan, Network.node._intervalScanFailure);
-          return console.error(fid, 'failure! Retry in',
-            (Network.node._intervalScanFailure / 1000), 'seconds...');
         }
       }
-      Network.node._timer =
-        setTimeout(Network.node.scan, Network.node._intervalScan);
+      Network.node._timer = setTimeout(Network.node.scan, ms.second);
     },
-    update: async (node, ip) => {
-      const internalCall = Boolean(typeof ip === 'undefined');
-      const via = internalCall ? 'internal' : 'scan()';
-      const fid = `Network.update.node(${via}):`;
-      const updateOffset = Date.now() - Network.node._intervalUpdate;
-      if (internalCall) {
-        // extract data from, and update, Network node (overwrites properties)
-        ip = node.ip;
-        node = node.toJSON();
-        // define reference to old node data
+    update: async (nodeJSON) => {
+      const internalCall = typeof nodeJSON.status === 'undefined';
+      const fid = `Network.update.node(${internalCall ? 'internal' : 'scan'}):`;
+      const ip = nodeJSON.ip; // dereference ip
+      const now = Date.now(); // get timestamp
+      const dropOffset = now - ms.day; // calc drop offset
+      const updateOffset = now - (ms.second * 20); // calc update offset
+      // assign JSON defaults
+      nodeJSON = Object.assign({ lastTouch: 0, lastVEOK: now }, nodeJSON);
+      // remove stale nodes after 1 day, otherwise check node update condition
+      if (typeof nodeJSON.lastVEOK === 'undefined') nodeJSON.lastVEOK = now;
+      if (nodeJSON.lastVEOK < dropOffset) return Network.node._list.delete(ip);
+      if (nodeJSON.lastTouch < updateOffset) {
+        nodeJSON.lastTouch = now; // update before peerlist request
+        // build options and perform peerlist request
+        const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
+        const node = (await Mochimo.Node.callserver(nodeOptions)).toJSON();
+        // initiate asynchronous block check on nodes returning a blockhash
+        if (node.cblockhash) Network.block.check(node).catch(console.trace);
+        // check for additional nodes in resulting peerlist
+        if (Array.isArray(node.peers)) {
+          node.peers.forEach(peer => {
+            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
+            console.log(fid, 'adding', peer, 'via', ip, 'peerlist');
+            // queue asynchronous scan of additional peers on peerlist
+            Network.node.update({ ip: peer }).catch(console.trace);
+          });
+        }
+        // check geolocation update condition
+        const geoOffset = now - ms.week; // calc geo offset
+        if (typeof nodeJSON.geo !== 'object') nodeJSON.geo = { updated: 0 };
+        if (nodeJSON.geo.updated < geoOffset) {
+          const geoSource =
+            `https://ipinfo.io/${ip}/json?token=${process.env.IPINFO}`;
+          const geo = await readWeb(geoSource);
+          if (typeof geo === 'object') {
+            if (!geo.error) Object.assign(node, { geo, updated: Date.now() });
+            else console.trace(geoSource, JSON.stringify(geo.error));
+          } else console.trace(geoSource, 'failed to return json data');
+        }
+        /* // check for realtime changes to map structure
         const oldNode = Network.node._list.get(ip);
         if (oldNode) {
           // determine differences between latest node data and broadcast
@@ -294,24 +314,11 @@ const Network = {
             updates.ip = ip; // ensure identification integrity
             Server.broadcast('networkUpdates', 'network', updates);
           }
-        } else Server.broadcast('networkUpdates', 'network', node);
-        Network.node._list.set(ip, Object.assign(oldNode || {}, node)); // update
-        // check for new non-private nodes in peerlist
-        if (Array.isArray(node.peers)) {
-          node.peers.forEach(peer => {
-            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
-            console.log(fid, 'added', peer, 'via', ip, 'peerlist');
-            const peerNode = new Mochimo.Node({ ip: peer });
-            Network.node.update(peerNode).catch(console.trace);
-          });
-        }
-        // initiate asynchronous block check on nodes returning a blockhash
-        if (node.cblockhash) Network.block.check(node).catch(console.trace);
-      } else if (node.lastTouch < updateOffset) {
-        // update lastTouch and request peerlist
-        node.lastTouch = Date.now();
-        Mochimo.Node.callserver({ ip, opcode: Mochimo.OP_GETIPL })
-          .then(Network.node.update).catch(console.trace);
+        } else Server.broadcast('networkUpdates', 'network', node); */
+        // assign latest data to original node reference and update database
+        const filter = { upsert: true };
+        const query = { _id: Mongo.util.id.network(ip) };
+        Mongo.update('network', Object.assign(nodeJSON, node), query, filter);
       }
     }
   }
@@ -371,5 +378,5 @@ process.on('uncaughtException', console.trace);
 
 /* startup */
 console.log('Begin startup...');
-// start api server and network scanning
+// start api server and begin network scanning
 Server.start().then(Network.node.scan).catch(gracefulShutdown);
