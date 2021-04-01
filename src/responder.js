@@ -17,6 +17,7 @@
  *
  */
 
+const { isPrivateIPv4 } = require('./util');
 const Mochimo = require('mochimo');
 const Mongo = require('./mongo');
 const Interpreter = require('./interpreter');
@@ -52,7 +53,7 @@ const Responder = {
     try {
       // perform balance request
       const isTag = Boolean(addressType === 'tag');
-      const le = await Mochimo.getBalance(process.env.CUSTOMNODE, address, isTag);
+      const le = await Mochimo.getBalance(process.env.NODE, address, isTag);
       // send successfull query or 404
       return Responder._respond(res, le ? 200 : 404, le ||
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
@@ -67,6 +68,21 @@ const Responder = {
       // send successfull query or 404
       return Responder._respond(res, block ? 200 : 404, block ||
         { message: `${blockNumber} could not be found...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  network: async (res, ip) => {
+    try {
+      // check IPv4 for private formats
+      if (isPrivateIPv4(ip)) {
+        const error = 'Invalid IPv4 address';
+        const message = 'private Iv4 addresses are not supported';
+        return Responder._respond(res, 400, { error, message });
+      }
+      // perform network query
+      const node = await Mongo.findOne('network', { ip });
+      // send successfull query or 404
+      return Responder._respond(res, node ? 200 : 404, node ||
+        { message: `${ip} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   search: async (cName, res, ...args) => {
@@ -97,6 +113,7 @@ const Responder = {
     }
   },
   searchBlock: (...args) => Responder.search('block', ...args),
+  searchNetwork: (...args) => Responder.search('network', ...args),
   searchTransaction: (...args) => Responder.search('transaction', ...args),
   transaction: async (res, txid) => {
     try {
