@@ -17,21 +17,27 @@
  *
  */
 
+const ParseInt = (val) => isNaN(val) ? val : parseInt(val);
 const Parse = {
   key: {
-    size: (val) => isNaN(val) ? val : parseInt(val),
-    bnum: (val) => isNaN(val) ? val : parseInt(val),
-    time0: (val) => isNaN(val) ? val : parseInt(val),
-    stime: (val) => isNaN(val) ? val : parseInt(val),
-    difficulty: (val) => isNaN(val) ? val : parseInt(val),
-    mreward: (val) => isNaN(val) ? val : parseInt(val),
-    mfee: (val) => isNaN(val) ? val : parseInt(val),
-    amount: (val) => isNaN(val) ? val : parseInt(val),
-    tcount: (val) => isNaN(val) ? val : parseInt(val),
-    lcount: (val) => isNaN(val) ? val : parseInt(val),
-    sendtotal: (val) => isNaN(val) ? val : parseInt(val),
-    changetotal: (val) => isNaN(val) ? val : parseInt(val),
-    txfee: (val) => isNaN(val) ? val : parseInt(val)
+    // block integer conversions
+    size: ParseInt,
+    bnum: ParseInt,
+    time0: ParseInt,
+    stime: ParseInt,
+    difficulty: ParseInt,
+    mreward: ParseInt,
+    mfee: ParseInt,
+    amount: ParseInt,
+    tcount: ParseInt,
+    lcount: ParseInt,
+    // network integer conversions
+    port: ParseInt,
+    status: ParseInt,
+    // transaction integer conversions
+    sendtotal: ParseInt,
+    changetotal: ParseInt,
+    txfee: ParseInt
   },
   mod: {
     begins: (val) => ({ $regex: new RegExp(`^${val}`) }),
@@ -46,18 +52,10 @@ const Parse = {
   },
   special: {
     address: (val) => ({
-      $or: [
-        { srcaddr: val },
-        { dstaddr: val },
-        { chgaddr: val }
-      ]
+      $or: [{ srcaddr: val }, { dstaddr: val }, { chgaddr: val }]
     }),
     tag: (val) => ({
-      $or: [
-        { srctag: val },
-        { dsttag: val },
-        { chgtag: val }
-      ]
+      $or: [{ srctag: val }, { dsttag: val }, { chgtag: val }]
     })
   }
 };
