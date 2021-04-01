@@ -19,22 +19,21 @@
  * A MongoDB wrapper, for MochiMap, to simplify access and manage a cached
  * connection to the database and it's data. Also provides utilities for unique
  * id (_id) management and conversion to MongoDB's Long data type.
- * Notes:
- *  - the underscore (_) prefix denotes internal uage (primarily)
+ * Note: the underscore (_) prefix denotes internal uage (primarily).
  *
  */
 
 // monkey-patch RegExp serialization
 /* eslint no-extend-native: ["error", { "exceptions": ["RegExp"] }] */
 Object.defineProperty(RegExp.prototype, 'toJSON', {
-  value: RegExp.prototype.toString
+  value: RegExp.prototype.toString // JSON.stringify RegExp for console.debug
 });
 
 const { asUint64String, fidFormat } = require('./util');
 const { MongoClient, Long } = require('mongodb');
 
 const MongoClientOptions = { useUnifiedTopology: true };
-const MongoClientURI = process.env.MONGO_URI;
+const MongoClientURI = process.env.MONGO;
 const Mongo = {
   _client: null,
   _clientConnecting: false, // for identifying client connection in progress
@@ -114,15 +113,15 @@ const Mongo = {
     console.debug(fid, 'found', count, 'documents...');
     return count;
   },
-  update: async (cName, update, query) => {
+  update: async (cName, update, query, options) => {
     const fid = fidFormat('Mongo.update', cName, update, query);
     const conn = await Mongo._connect(cName, fid);
     console.debug(fid, 'add atomic operators...');
     update = { $set: update };
     console.debug(fid, 'update documents...');
     const cmd = Array.isArray(update)
-      ? await conn.collection.updateMany(query, update)
-      : await conn.collection.updateOne(query, update);
+      ? await conn.collection.updateMany(query, update, options)
+      : await conn.collection.updateOne(query, update, options);
     console.debug(fid, cmd.result.n, 'documents updated!');
   },
   util: {
