@@ -192,42 +192,61 @@ const readWeb = (options, postData) => {
 };
 
 const visualizeHaiku = async (haiku, shadow) => {
+  const algo = (arr, key) => { // condensed heuristic algorithm
+    let pi, ps, is;
+    const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
+    for (let i = pi = ps = is = 0; i < arr.length; i++, is = 0) {
+      ts.forEach(r => { is += (arr[i][key].match(r) || []).length; });
+      if (is > ps) { ps = is; pi = i; }
+    } return { photo: arr[pi], ps };
+  };
   // heuristically determine best picture query for haiku
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
   const query = search.join('%20');
-  let pexels;
+  const data = { img: { haiku, shadow } };
+  let results;
   try { // request results from Pexels
-    pexels = await readWeb({
+    results = await readWeb({
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
-      headers: { Authorization: process.env.PEXELS_SECRET }
-    });
-    if (pexels.error) throw new Error(pexels.error);
-  } catch (error) { console.trace('Pexels request ERROR:', pexels, error); }
-  // check results exist
-  if (!pexels.error && pexels) {
-    let pi, ps, is;
-    const ts = haiku.match(/\b\w{3,}\b/g);
-    for (let i = pi = ps = is = 0; i < pexels.photos.length; i++, is = 0) {
-      ts.forEach(t => {
-        is += (pexels.photos[i].url.match(new RegExp(t, 'g')) || []).length;
-      });
-      if (is > ps) { ps = is; pi = i; }
-    }
-    const photo = pexels.photos[pi];
-    const data = { img: {} };
-    data.img.author = photo.photographer || 'Unknown';
-    data.img.authorurl = photo.photographer_url || 'pexels.com';
-    data.img.desc = photo.url.match(/\w+(?=-)/g).join(' ');
-    data.img.haiku = haiku;
-    data.img.shadow = shadow;
-    data.img.src = photo.src.original;
-    data.img.srcid = 'Pexels';
-    data.img.srcurl = photo.url;
-    // return stringified JSON
-    return data;
-  }
-  throw new Error('failed to visualize Haiku');
+      headers: { Authorization: process.env.PEXELS }
+    }); // apply algorithm or throw error
+    if (results.photos && results.photos.length) {
+      const sol = algo(results.photos, 'url');
+      if (!data.sol || data.sol.ps > sol.ps) {
+        data.sol = sol; // derive pexels photo data
+        data.img.author = sol.photo.photographer || 'Unknown';
+        data.img.authorurl = sol.photo.photographer_url || 'pexels.com';
+        data.img.desc = sol.photo.url.match(/\w+(?=-)/g).join(' ');
+        data.img.src = sol.photo.src.large;
+        data.img.srcid = 'Pexels';
+        data.img.srcurl = sol.photo.url;
+      }
+    } else throw new Error(results.error || 'no "photos" in results');
+  } catch (error) { console.trace('Pexels request ERROR:', error); }
+  try { // request results from Unsplash
+    results = await readWeb({
+      hostname: 'api.unsplash.com',
+      path: `/search/photos?query=${query}&per_page=30`,
+      headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
+    }); // apply algorithm or throw error
+    if (results.photos && results.photos.length) {
+      const sol = algo(results.results, 'description');
+      if (!data.sol || data.sol.ps > sol.ps) {
+        data.sol = sol; // derive pexels photo data
+        data.img.author = sol.photo.user.name || 'Unknown';
+        data.img.authorurl = sol.photo.user.links.html || 'unsplash.com';
+        data.img.desc = sol.photo.description;
+        data.img.src = sol.photo.urls.regular;
+        data.img.srcid = 'Unsplash';
+        data.img.srcurl = sol.photo.links.html;
+      }
+    } else throw new Error(results.errors || 'no "photos" in results');
+  } catch (error) { console.trace('Unsplash request ERROR:', error); }
+  // throw error on no solution
+  if (!data.sol) throw new Error('failed to visualize Haiku');
+  delete data.sol;
+  return data;
 };
 
 module.exports = {
