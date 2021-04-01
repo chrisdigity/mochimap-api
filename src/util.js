@@ -165,6 +165,14 @@ const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
+const ms = {
+  second: 1000,
+  minute: 60000,
+  hour: 3600000,
+  day: 86400000,
+  week: 604800000
+};
+
 const readWeb = (options, postData) => {
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
@@ -228,6 +236,7 @@ module.exports = {
   compareWeight,
   fidFormat,
   isPrivateIPv4,
+  ms,
   objectDifference,
   objectIsEmpty,
   readWeb,
