@@ -141,6 +141,17 @@ const Mongo = {
         } else throw new Error(`${fid} invalid bhash type`);
         return [bnum, bhash].join('-');
       },
+      network: (ip, category, fid) => {
+        fid = fid || fidFormat('Mongo.util.id.network', ip, category);
+        const agg = [];
+        if (typeof ip === 'string') agg.push(...ip.split('.'));
+        else throw new Error(`${fid} invalid ip type`);
+        if (typeof category !== 'undefined') { // optional
+          if (typeof category === 'string') agg.push(category);
+          else throw new Error(`${fid} invalid category type`);
+        }
+        return agg.join('-');
+      },
       transaction: (txid, bnum, bhash, fid) => {
         fid = fid || fidFormat('Mongo.util.id.transaction', txid, bnum, bhash);
         if (typeof txid === 'string') {
