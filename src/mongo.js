@@ -85,7 +85,7 @@ const Mongo = {
     const fid = fidFormat('Mongo.find', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
-    Object.assign(options, { sort: { $natural: -1 } });
+    Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
     // console.debug(fid, 'options applied;', JSON.stringify(options));
     const cursor = await conn.collection.find(query, options);
@@ -96,7 +96,7 @@ const Mongo = {
     const fid = fidFormat('Mongo._oneFind', cName, query, options);
     const conn = await Mongo._connect(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
-    Object.assign(options, { sort: { $natural: -1 } });
+    Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
     // console.debug(fid, 'options applied;', JSON.stringify(options));
     // console.debug(fid, 'find document...');
@@ -110,7 +110,7 @@ const Mongo = {
     // console.debug(fid, 'determine _id for query...');
     const query = { _id: Mongo.util.id[cName](...args) };
     // console.debug(fid, 'count documents...');
-    const options = { limit: 1, sort: { $natural: -1 } };
+    const options = { limit: 1, sort: { _id: -1 } };
     const count = await conn.collection.countDocuments(query, options);
     // console.debug(fid, 'found', count, 'documents...');
     return count;
