@@ -293,7 +293,7 @@ const Network = {
     },
     update: async (nodeJSON) => {
       const internalCall = typeof nodeJSON.status === 'undefined';
-      const fid = `Network.update.node(${internalCall ? 'internal' : 'scan'}):`;
+      const fid = `Network.node.update(${internalCall ? 'internal' : 'scan'}):`;
       const ip = nodeJSON.ip; // dereference ip
       const now = Date.now(); // get timestamp
       const dropOffset = now - ms.day; // calc drop offset
