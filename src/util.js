@@ -230,7 +230,7 @@ const visualizeHaiku = async (haiku, shadow) => {
       path: `/search/photos?query=${query}&per_page=30`,
       headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
     }); // apply algorithm or throw error
-    if (results.photos && results.photos.length) {
+    if (results.results && results.results.length) {
       const sol = algo(results.results, 'description');
       if (!data.sol || data.sol.ps > sol.ps) {
         data.sol = sol; // derive pexels photo data
@@ -241,7 +241,7 @@ const visualizeHaiku = async (haiku, shadow) => {
         data.img.srcid = 'Unsplash';
         data.img.srcurl = sol.photo.links.html;
       }
-    } else throw new Error(results.errors || 'no "photos" in results');
+    } else throw new Error(results.errors || 'no "results" in results');
   } catch (error) { console.trace('Unsplash request ERROR:', error); }
   // throw error on no solution
   if (!data.sol) throw new Error('failed to visualize Haiku');
