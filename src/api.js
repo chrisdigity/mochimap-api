@@ -331,7 +331,7 @@ const Network = {
           for (const peer of node.peers) {
             if (isPrivateIPv4(peer) || Network.node._list.has(peer)) continue;
             // queue asynchronous add and scan of additional peers on peerlist
-            Network.node.add(fid, peer, ip);
+            Network.node.add(fid, peer, ip).catch(console.trace);
           }
         }
         // check geolocation update condition
@@ -356,10 +356,12 @@ const Network = {
             Server.broadcast('networkUpdates', 'network', updates);
           }
         } else Server.broadcast('networkUpdates', 'network', node); */
-        // assign node data to network list and update database
+        // assign node data to network list
+        Object.assign(nodeJSON, node);
+        // filter BigInt values from node for Mongo compatibility
         const filter = { upsert: true };
         const query = { _id: Mongo.util.id.network(ip) };
-        Mongo.update('network', Object.assign(nodeJSON, node), query, filter);
+        Mongo.update('network', Mongo.util.filterBigInt(node), query, filter);
       }
     }
   }
