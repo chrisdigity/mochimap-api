@@ -248,6 +248,12 @@ const Network = {
       false // indicates failure
     ],
     _timer: null,
+    add: async (fid, ip, source) => {
+      console.log(fid, 'adding', ip, 'via', source);
+      const node = new Mochimo.Node({ ip }).toJSON();
+      Network.node._list.set(ip, node); // add to _list
+      await Network.node.update(node, ip); // update node
+    },
     consensus: () => {
       const chains = new Map();
       let consensus = null;
@@ -293,13 +299,9 @@ const Network = {
             data = data.filter(ip =>
               isIPv4(ip) && !isPrivateIPv4(ip) && !Network.node._list.has(ip));
             if (!data.length) throw new Error('no additional/valid IP data');
-            data.forEach(ip => {
-              const node = new Mochimo.Node({ ip }).toJSON();
-              Network.node._list.set(ip, node); // add to _list
-              Network.node.update(node, ip); // call node
-            });
-            console.log(fid, source, 'added', data.length, 'nodes');
-            break;
+            // add valid nodes to network node list
+            for (const ip of data) await Network.node.add(fid, ip, source);
+            break; // end loop
           } catch (error) { console.error(fid, source, 'failure;', error); }
         }
       }
@@ -323,17 +325,14 @@ const Network = {
         const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
         const node = (await Mochimo.Node.callserver(nodeOptions)).toJSON();
         // initiate asynchronous block check on nodes returning a blockhash
-        if (node.cblockhash) {
-          Network.block.check(node).catch(console.trace);
-        }
+        if (node.cblockhash) Network.block.check(node).catch(console.trace);
         // check for additional nodes in resulting peerlist
         if (Array.isArray(node.peers)) {
-          node.peers.forEach(peer => {
-            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) return;
-            console.log(fid, 'adding', peer, 'via', ip, 'peerlist');
-            // queue asynchronous scan of additional peers on peerlist
-            Network.node.update({ ip: peer }).catch(console.trace);
-          });
+          for (const peer of node.peers) {
+            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) continue;
+            // queue asynchronous add and scan of additional peers on peerlist
+            Network.node.add(fid, peer, ip);
+          }
         }
         // check geolocation update condition
         const geoOffset = now - ms.week; // calc geo offset
@@ -357,7 +356,7 @@ const Network = {
             Server.broadcast('networkUpdates', 'network', updates);
           }
         } else Server.broadcast('networkUpdates', 'network', node); */
-        // assign latest data to original node reference and update database
+        // assign node data to network list and update database
         const filter = { upsert: true };
         const query = { _id: Mongo.util.id.network(ip) };
         Mongo.update('network', Object.assign(nodeJSON, node), query, filter);
