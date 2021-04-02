@@ -63,6 +63,7 @@ const Parse = {
 const Interpreter = {
   search: (query, paged) => {
     const results = { query: {}, options: {} };
+    if (paged) results.options.limit = 8;
     // remove any preceding '?'
     if (typeof query === 'string' && query) {
       if (query.startsWith('?')) query = query.slice(1);
@@ -78,7 +79,6 @@ const Interpreter = {
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
           value = parseInt(value) - 1;
-          if (!results.options.limit) results.options.limit = 8;
           if (value) results.options.skip = results.options.limit * value;
           continue;
         }
