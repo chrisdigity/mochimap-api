@@ -53,7 +53,7 @@ const Responder = {
     try {
       // perform balance request
       const isTag = Boolean(addressType === 'tag');
-      const le = await Mochimo.getBalance(process.env.NODE, address, isTag);
+      const le = await Mochimo.getBalance(process.env.FULLNODE, address, isTag);
       // send successfull query or 404
       return Responder._respond(res, le ? 200 : 404, le ||
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
