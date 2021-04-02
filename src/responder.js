@@ -85,23 +85,20 @@ const Responder = {
         { message: `${ip} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  search: async (cName, res, ...args) => {
+  search: async (cName, paged, res, ...args) => {
     const start = Date.now();
     let cursor;
     try {
       // set defaults and interpret requested search params as necessary
       const search = { query: {}, options: {} };
-      Object.assign(search, Interpreter.search(args[0]));
+      Object.assign(search, Interpreter.search(args[0], paged));
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
-      const dbquery = {
-        duration: null,
-        found: await cursor.count(),
-        pages: null,
-        results: await cursor.toArray()
-      };
-      // update query pages and time stat
-      dbquery.pages = Math.ceil(dbquery.found / search.options.limit);
+      const dbquery = { duration: null, found: await cursor.count() };
+      if (search.options.limit) { // update number of pages in results
+        dbquery.pages = Math.ceil(dbquery.found / search.options.limit);
+      } // apply cursor array to results and update duration stat
+      dbquery.results = await cursor.toArray();
       dbquery.duration = Date.now() - start;
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
@@ -112,9 +109,9 @@ const Responder = {
       if (cursor && !cursor.isClosed()) await cursor.close();
     }
   },
-  searchBlock: (...args) => Responder.search('block', ...args),
-  searchNetwork: (...args) => Responder.search('network', ...args),
-  searchTransaction: (...args) => Responder.search('transaction', ...args),
+  searchBlock: (...args) => Responder.search('block', 1, ...args),
+  searchNetwork: (...args) => Responder.search('network', 0, ...args),
+  searchTransaction: (...args) => Responder.search('transaction', 1, ...args),
   transaction: async (res, txid) => {
     try {
       // perform transaction query

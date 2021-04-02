@@ -61,8 +61,8 @@ const Parse = {
 };
 
 const Interpreter = {
-  search: (query) => {
-    const results = { query: {}, options: { limit: 8 } };
+  search: (query, paged) => {
+    const results = { query: {}, options: {} };
     // remove any preceding '?'
     if (typeof query === 'string' && query) {
       if (query.startsWith('?')) query = query.slice(1);
@@ -76,8 +76,9 @@ const Interpreter = {
         if (Parse.key[key]) value = Parse.key[key](value);
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
         // parse known key options
-        if (key === 'page' && !isNaN(value)) {
+        if (paged && key === 'page' && !isNaN(value)) {
           value = parseInt(value) - 1;
+          if (!results.options.limit) results.options.limit = 8;
           if (value) results.options.skip = results.options.limit * value;
           continue;
         }
