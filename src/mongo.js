@@ -23,11 +23,7 @@
  *
  */
 
-// monkey-patch RegExp serialization
-/* eslint no-extend-native: ["error", { "exceptions": ["RegExp"] }] *//*
-Object.defineProperty(RegExp.prototype, 'toJSON', {
-  value: RegExp.prototype.toString // JSON.stringify RegExp for console.debug
-}); */
+/* global BigInt */
 
 const { asUint64String, fidFormat } = require('./util');
 const { MongoClient, Long } = require('mongodb');
@@ -165,5 +161,14 @@ const Mongo = {
     long: (number) => Long.fromString(number.toString())
   }
 };
+
+// monkey-patch RegExp / BigInt serialization
+/* eslint no-extend-native: ["error", { "exceptions": ["RegExp", "BigInt"] }] */
+/* Object.defineProperty(RegExp.prototype, 'toJSON', {
+  value: RegExp.prototype.toString // JSON.stringify RegExp for console.debug
+}); */
+Object.defineProperty(BigInt.prototype, 'toBSON', {
+  value: function () { return Mongo.util.long(this); }
+});
 
 module.exports = Mongo;
