@@ -161,34 +161,21 @@ const Network = {
       const txDocuments = [];
       console.debug(fid, 'minify block data...');
       blockJSON._id = Mongo.util.id.block(bnum, bhash);
-      // convert BigInt values to MongoDB->Long
-      blockJSON.bnum = Mongo.util.long(blockJSON.bnum);
-      if (typeof blockJSON.mreward !== 'undefined') {
-        blockJSON.mreward = Mongo.util.long(blockJSON.mreward);
-      }
-      if (typeof blockJSON.mfee !== 'undefined') {
-        blockJSON.mfee = Mongo.util.long(blockJSON.mfee);
-      }
-      if (typeof blockJSON.amount !== 'undefined') {
-        blockJSON.amount = Mongo.util.long(blockJSON.amount);
-      }
       // handle transactions on normal blocks
       if (blockJSON.type === Mochimo.Block.NORMAL) {
         blockJSON.txids = [];
         console.debug(fid, 'extract tx data and embed unique _id\'s...');
         block.transactions.forEach(txe => {
-          const txid = txe.txid;
-          blockJSON.txids.push(txid);
-          txe = txe.toJSON(true);
-          txe._id = Mongo.util.id.transaction(txid, bnum, bhash);
-          // convert BigInt values to MongoDB->Long
-          txe.sendtotal = Mongo.util.long(txe.sendtotal);
-          txe.changetotal = Mongo.util.long(txe.changetotal);
-          txe.txfee = Mongo.util.long(txe.txfee);
-          txDocuments.push(txe);
+          blockJSON.txids.push(txe.txid);
+          // minify txe and add bhash / bnum
+          txe = Object.assign(txe.toJSON(true), { bhash, bnum });
+          // add _id, filter BigInt values and add to docs
+          txe._id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
+          txDocuments.push(Mongo.util.filterBigInt(txe));
         });
       }
       console.debug(fid, 'insert block document...');
+      Mongo.util.filterBigInt(blockJSON);
       const bInsert = await Mongo.insert('block', blockJSON);
       if (bInsert < 1) {
         throw new Error(

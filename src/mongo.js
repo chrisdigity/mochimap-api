@@ -173,13 +173,13 @@ const Mongo = {
         }
         return agg.join('-');
       },
-      transaction: (txid, bnum, bhash, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.transaction', txid, bnum, bhash);
+      transaction: (bnum, bhash, txid, fid) => {
+        fid = fid || fidFormat('Mongo.util.id.transaction', bnum, bhash, txid);
         if (typeof txid === 'string') {
           // console.debug(fid, 'force 64 char txid');
           txid = txid.slice(0, 64).padStart(64, '0');
         } else throw new Error(`${fid} invalid bhash type`);
-        return [txid, Mongo.util.id.block(bnum, bhash, fid)].join('-');
+        return [Mongo.util.id.block(bnum, bhash, fid), txid].join('-');
       }
     },
     long: (number) => Long.fromString(number.toString())
