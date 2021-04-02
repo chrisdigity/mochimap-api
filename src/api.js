@@ -73,7 +73,8 @@ const Network = {
         // ... dumb for now ...
         Network.block._cache.add(bhash);
         if (Network.block._cache.size > SET_LIMIT) {
-          Network.block._cache.delete(Network.block._cache.values().next().value);
+          Network.block._cache.delete(
+            Network.block._cache.values().next().value);
         }
         // check database has received block update
         const hasBlock = await Mongo.has('block', bnum, bhash);
@@ -87,6 +88,7 @@ const Network = {
             const pbnum = block.bnum - 1n;
             await Network.block.check(ip, pbnum, phash, true);
           } catch (error) { // trace errors
+            Network.block._cache.add(bhash);
             console.trace(fid, error);
           } finally { // check integrity of stored blockchain
             if (!noExtended) await Network.block.integrity(bnum, bhash);
