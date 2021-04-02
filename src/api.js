@@ -134,7 +134,7 @@ const Network = {
         } // check for block again, TODO: send email report alerting failure
         if (!block) return console.trace(fid, 'blockchain integrity failure!');
         // update bnum and bhash
-        bnum = block.bnum - 1n;
+        bnum -= 1n;
         bhash = block.phash;
       }
       console.log(fid, 'integrity verified!');
