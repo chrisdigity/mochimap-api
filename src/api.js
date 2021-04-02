@@ -159,12 +159,10 @@ const Network = {
       }
       // process block update
       const txDocuments = [];
-      console.debug(fid, 'minify block data...');
       blockJSON._id = Mongo.util.id.block(bnum, bhash);
       // handle transactions on normal blocks
       if (blockJSON.type === Mochimo.Block.NORMAL) {
         blockJSON.txids = [];
-        console.debug(fid, 'extract tx data and embed unique _id\'s...');
         block.transactions.forEach(txe => {
           blockJSON.txids.push(txe.txid);
           // minify txe and add bhash / bnum
@@ -174,7 +172,6 @@ const Network = {
           txDocuments.push(Mongo.util.filterBigInt(txe));
         });
       }
-      console.debug(fid, 'insert block document...');
       Mongo.util.filterBigInt(blockJSON);
       const bInsert = await Mongo.insert('block', blockJSON);
       if (bInsert < 1) {
@@ -182,7 +179,6 @@ const Network = {
           `${fid} insert error, inserted ${bInsert}/1 block documents`);
       }
       if (txDocuments.length) {
-        console.debug(fid, 'insert transaction documents...');
         const txInsert = await Mongo.insert('transaction', txDocuments);
         if (txInsert < txDocuments.length) {
           throw new Error(`${fid} insert error, ` +
