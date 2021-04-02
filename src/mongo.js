@@ -129,7 +129,7 @@ const Mongo = {
   },
   util: {
     filterBigInt: (obj) => {
-      for (const key of obj.keys()) {
+      for (const key of Object.keys(obj)) {
         if (typeof obj[key] === 'object') Mongo.util.filterBigInt(obj[key]);
         else if (typeof obj[key] === 'bigint') {
           obj[key] = Mongo.util.long(obj[key]);
@@ -138,7 +138,7 @@ const Mongo = {
       return obj;
     },
     filterLong: (obj) => {
-      for (const key of obj.keys()) {
+      for (const key of Object.keys(obj)) {
         if (typeof obj[key] === 'object') Mongo.util.filterLong(obj[key]);
         else if (obj[key] instanceof Long) {
           obj[key] = BigInt(obj[key].toString());
