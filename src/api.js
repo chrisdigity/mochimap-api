@@ -54,11 +54,11 @@ const Network = {
   block: {
     _cache: new Set(), // TODO: switch to using _chain
     _chain: new Map(),
-    check: async (node, bnum, bhash, noVisual) => {
+    check: async (node, bnum, bhash, noExtended) => {
       const fid = 'Network.block.check():';
       let ip;
       if (typeof node === 'object') {
-        noVisual = node.noVisual;
+        noExtended = node.noExtended;
         bhash = node.cblockhash;
         bnum = node.cblock;
         ip = node.ip;
@@ -78,25 +78,65 @@ const Network = {
         // check database has received block update
         const hasBlock = await Mongo.has('block', bnum, bhash);
         if (!hasBlock) {
-          // download/verify block is as advertised
-          const block = await Mochimo.getBlock(ip, bnum);
-          if (block.bnum !== bnum) {
-            console.error(fid, `Downloaded ${bnum} from ${ip}, got ${bnum}`);
-          } else if (block.bhash !== bhash) {
-            console.error(fid, `Downloaded ${bnum}/${bhash.slice(0, 8)}~ from`,
-              ip, `got ${block.bnum}/${block.bhash.slice(0, 8)}~`);
-          } else if (block.type === Mochimo.Block.INVALID) {
-            console.error(fid, `Downloaded ${bnum}/${bhash.slice(0, 8)}~ from`,
-              ip, 'got invalid block type');
-          } else { // initiate block update
-            await Network.block.update(block, noVisual);
+          try { // download/verify block is as advertised
+            const block = await Network.block.download(ip, bnum, bhash);
+            // initiate block update
+            await Network.block.update(block, noExtended);
             // asynchronous check for previous blocks
             const phash = block.phash;
             const pbnum = block.bnum - 1n;
-            Network.block.check(ip, pbnum, phash, true).catch(console.trace);
+            await Network.block.check(ip, pbnum, phash, true);
+          } catch (error) { // trace errors
+            console.trace(fid, error);
+          } finally { // check integrity of stored blockchain
+            if (!noExtended) await Network.block.integrity(bnum, bhash);
           }
         }
       }
+    },
+    download: async (ip, bnum, bhash) => {
+      const fid = 'Network.block.download():';
+      const block = await Mochimo.getBlock(ip, bnum);
+      if (block.bnum !== bnum) {
+        throw new Error(`${fid} Downloaded ${bnum} from ${ip}, got ${bnum}`);
+      } else if (block.bhash !== bhash) {
+        throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
+          `${ip} got ${block.bnum}/${block.bhash.slice(0, 8)}~`);
+      } else if (block.type === Mochimo.Block.INVALID) {
+        throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
+          ip + 'got invalid block type');
+      }
+      return block;
+    },
+    integrity: async (bnum, bhash) => { // TODO: move this to Network.chain...
+      const fid = 'Network.block.integrity():';
+      if (bnum & 0xf) return; // only allow integrity check every 0x10 blocks
+      let backscan = Math.max((~(bnum - 1)) & bnum, 0x100); // 1 aeon scan limit
+      console.log(fid, backscan, 'block backscan initiated...');
+      while (backscan--) {
+        let block;
+        try { // check database for block
+          const _id = Mongo.util.id.block(bnum, bhash);
+          block = await Mongo.findOne('block', { _id });
+        } catch (error) { console.trace(fid, error); }
+        if (!block) { // query all nodes for block if not found
+          for (const node of Network.node._list.values()) {
+            if (node.status) return; // ignore nodes with issues
+            try { // download block from next node
+              block = await Network.block.download(node.ip, bnum, bhash);
+              await Network.block.update(block); // process block update
+              break; // block check/update successful
+            } catch (error) { // download failed, report and try next node
+              console.error(fid, error);
+            }
+          }
+        } // check for block again, TODO: send email report alerting failure
+        if (!block) return console.trace(fid, 'blockchain integrity failure!');
+        // update bnum and bhash
+        bnum = block.bnum - 1n;
+        bhash = block.phash;
+      }
+      console.log(fid, 'integrity verified!');
     },
     update: async (block, noVisual) => {
       const fid = 'Network.block.update():';
@@ -283,7 +323,9 @@ const Network = {
         const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
         const node = (await Mochimo.Node.callserver(nodeOptions)).toJSON();
         // initiate asynchronous block check on nodes returning a blockhash
-        if (node.cblockhash) Network.block.check(node).catch(console.trace);
+        if (node.cblockhash) {
+          Network.block.check(node).catch(console.trace);
+        }
         // check for additional nodes in resulting peerlist
         if (Array.isArray(node.peers)) {
           node.peers.forEach(peer => {
