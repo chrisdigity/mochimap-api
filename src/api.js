@@ -314,11 +314,10 @@ const Network = {
       const now = Date.now(); // get timestamp
       const dropOffset = now - ms.day; // calc drop offset
       const updateOffset = now - (ms.second * 20); // calc update offset
-      // assign JSON defaults
-      nodeJSON = Object.assign({ lastTouch: 0, lastVEOK: now }, nodeJSON);
       // remove stale nodes after 1 day, otherwise check node update condition
-      if (typeof nodeJSON.lastVEOK === 'undefined') nodeJSON.lastVEOK = now;
-      if (nodeJSON.lastVEOK < dropOffset) return Network.node._list.delete(ip);
+      if (typeof nodeJSON.lastOk === 'undefined') nodeJSON.lastOk = now;
+      if (nodeJSON.lastOk < dropOffset) return Network.node._list.delete(ip);
+      if (typeof nodeJSON.lastTouch === 'undefined') nodeJSON.lastTouch = 0;
       if (nodeJSON.lastTouch < updateOffset) {
         nodeJSON.lastTouch = now; // update before peerlist request
         // build options and perform peerlist request
@@ -336,14 +335,16 @@ const Network = {
         }
         // check geolocation update condition
         const geoOffset = now - ms.week; // calc geo offset
-        if (typeof nodeJSON.geo !== 'object') nodeJSON.geo = { updated: 0 };
-        if (nodeJSON.geo.updated < geoOffset) {
+        if (typeof nodeJSON.geotime === 'undefined') nodeJSON.geotime = 0;
+        if (nodeJSON.geotime < geoOffset) {
           const geoSource =
             `https://ipinfo.io/${ip}/json?token=${process.env.IPINFO}`;
           const geo = await readWeb(geoSource);
           if (typeof geo === 'object') {
-            if (!geo.error) Object.assign(node, { geo, updated: Date.now() });
-            else console.trace(geoSource, JSON.stringify(geo.error));
+            if (!geo.error) {
+              node.geoloc = geo.loc || null;
+              node.geotime = Date.now();
+            } else console.trace(geoSource, JSON.stringify(geo.error));
           } else console.trace(geoSource, 'failed to return json data');
         }
         /* // check for realtime changes to map structure
