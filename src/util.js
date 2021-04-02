@@ -192,11 +192,12 @@ const readWeb = (options, postData) => {
 };
 
 const visualizeHaiku = async (haiku, shadow) => {
-  const algo = (arr, key) => { // condensed heuristic algorithm
-    let pi, ps, is;
+  const algo = (arr, ...comp) => { // condensed heuristic algorithm
+    let pi, ps, is, str;
     const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
-    for (let i = pi = ps = is = 0; i < arr.length; i++, is = 0) {
-      ts.forEach(r => { is += (arr[i][key].match(r) || []).length; });
+    for (let i = pi = ps = is = 0; i < arr.length; i++, is = 0, str = '') {
+      for (const app of comp) str += ' ' + arr[i][app];
+      for (const reg of ts) is += (str.match(reg) || []).length;
       if (is > ps) { ps = is; pi = i; }
     } return { photo: arr[pi], ps };
   };
@@ -231,7 +232,7 @@ const visualizeHaiku = async (haiku, shadow) => {
       headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
     }); // apply algorithm or throw error
     if (results.results && results.results.length) {
-      const sol = algo(results.results, 'description');
+      const sol = algo(results.results, 'description', 'alt_description');
       if (!data.sol || data.sol.ps > sol.ps) {
         data.sol = sol; // derive pexels photo data
         data.img.author = sol.photo.user.name || 'Unknown';
