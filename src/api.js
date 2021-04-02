@@ -110,8 +110,9 @@ const Network = {
     },
     integrity: async (bnum, bhash) => { // TODO: move this to Network.chain...
       const fid = 'Network.block.integrity():';
-      if (bnum & 0xf) return; // only allow integrity check every 0x10 blocks
-      let backscan = Math.max((~(bnum - 1)) & bnum, 0x100); // 1 aeon scan limit
+      if (bnum & 0xfn) return; // only allow integrity check every 0x10 blocks
+      let backscan = (~(bnum - 1)) & bnum; // determine backscan depth
+      if (backscan > 0xffn) backscan = 0x100n; // apply 1 aeon backscan limit
       console.log(fid, backscan, 'block backscan initiated...');
       while (backscan--) {
         let block;
