@@ -222,6 +222,7 @@ const visualizeHaiku = async (haiku, shadow) => {
         data.img.src = sol.photo.src.large;
         data.img.srcid = 'Pexels';
         data.img.srcurl = sol.photo.url;
+        data.img.thumb = sol.photo.src.tiny;
       }
     } else throw new Error(results.error || 'no "photos" in results');
   } catch (error) { console.trace('Pexels request ERROR:', error); }
@@ -241,6 +242,7 @@ const visualizeHaiku = async (haiku, shadow) => {
         data.img.src = sol.photo.urls.regular;
         data.img.srcid = 'Unsplash';
         data.img.srcurl = sol.photo.links.html;
+        data.img.thumb = sol.photo.urls.thumb;
       }
     } else throw new Error(results.errors || 'no "results" in results');
   } catch (error) { console.trace('Unsplash request ERROR:', error); }
