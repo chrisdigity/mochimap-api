@@ -43,7 +43,8 @@ const Responder = {
     const headers = {
       'X-Robots-Tag': 'none',
       'Content-Type': 'application/json',
-      'Content-Length': Buffer.byteLength(body)
+      'Content-Length': Buffer.byteLength(body),
+      'Access-Control-Allow-Origin': '*'
     };
     // send response
     res.writeHead(statusCode, statusMessage, headers);
