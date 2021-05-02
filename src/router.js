@@ -37,7 +37,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/block/search',
-    param: /^[?]?(?:[0-9a-z]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
     hint: '[BaseURL]/block/search?<param>=<paramValue>',
     hintCheck: /block|search/gi,
     handler: Responder.searchBlock,
@@ -52,7 +52,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/network/search',
-    param: /^[?]?(?:[0-9a-z]+(?::[a-z]+)*[=]+[0-9a-z.]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z.]+(?:$|&))+$/i,
     hint: '[BaseURL]/network/search?<param>=<paramValue>',
     hintCheck: /network|node|search/gi,
     handler: Responder.searchNetwork,
@@ -67,7 +67,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/transaction/search',
-    param: /^[?]?(?:[0-9a-z]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z]+(?:$|&))+$/i,
     hint: '[BaseURL]/transaction/search?<param>=<paramValue>',
     hintCheck: /transaction|search/gi,
     handler: Responder.searchTransaction,
