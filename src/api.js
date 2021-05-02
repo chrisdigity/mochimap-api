@@ -146,8 +146,7 @@ const Network = {
       const blockJSON = block.toJSON(true);
       Server.broadcast('blockUpdates', 'block', blockJSON);
       // store raw block on local disk (no overwrite, excl. neogenesis blocks)
-      const bhash = block.bhash;
-      const bnum = block.bnum;
+      const { bhash, bnum, stime } = block;
       if (bnum & 0xffn) {
         try {
           const id = Mongo.util.id.block(bnum, bhash);
@@ -163,11 +162,9 @@ const Network = {
       blockJSON._id = Mongo.util.id.block(bnum, bhash);
       // handle transactions on normal blocks
       if (blockJSON.type === Mochimo.Block.NORMAL) {
-        blockJSON.txids = [];
         block.transactions.forEach(txe => {
-          blockJSON.txids.push(txe.txid);
           // minify txe and add bhash / bnum
-          txe = Object.assign(txe.toJSON(true), { bhash, bnum });
+          txe = Object.assign(txe.toJSON(true), { bhash, bnum, stime });
           // add _id, filter BigInt values and add to docs
           txe._id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
           txDocuments.push(Mongo.util.filterBigInt(txe));
