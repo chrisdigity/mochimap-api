@@ -100,13 +100,19 @@ const Network = {
       const fid = 'Network.block.download():';
       const block = await Mochimo.getBlock(ip, bnum);
       if (block.bnum !== bnum) {
+        // drop blocks where the advertised block number does not match received
         throw new Error(`${fid} Downloaded ${bnum} from ${ip}, got ${bnum}`);
       } else if (block.bhash !== bhash) {
+        // drop blocks where the advertised block hash does not match received
         throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
           `${ip} got ${block.bnum}/${block.bhash.slice(0, 8)}~`);
       } else if (block.type === Mochimo.Block.INVALID) {
+        // drop blocks where the Block.type cannot be determined
         throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
           ip + 'got invalid block type');
+      } else if (!block.verifyBlockHash()) {
+        // drop blocks where the block hash does not match calculated result
+        throw new Error(`${fid} sha256 block hash mismatch`);
       }
       return block;
     },
