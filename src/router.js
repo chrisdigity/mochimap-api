@@ -44,6 +44,13 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: /^\/history\/(tag|address)\/([0-9a-f]+)$/i,
+    hint: '[BaseURL]/history/<"tag"||"address">/<address>',
+    hintCheck: /history|tag|address/gi,
+    handler: Responder.history,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/network\/(?=\d+\.\d+\.\d+\.\d+$)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})$/i,
     hint: '[BaseURL]/network/<IPv4>',
     hintCheck: /network|node/gi,

@@ -138,50 +138,90 @@ const Network = {
         bnum -= 1n;
         bhash = block.phash;
       }
-      console.log(fid, 'integrity verified!');
+      if (backscan > 0xffn) console.log(fid, 'integrity verified!');
     },
     update: async (block, noVisual) => {
       const fid = 'Network.block.update():';
-      // minify block and send to Server interface for asynchronous broadcast
-      const blockJSON = block.toJSON(true);
+      // expose bnum, bhash and stime from block data
+      const { bnum, bhash, stime } = block;
+      // prepend _id to minified block JSON
+      const _bid = Mongo.util.id.block(bnum, bhash);
+      const blockJSON = Object.assign({ _id: _bid }, block.toJSON(true));
+      // send block JSON to Server interface for asynchronous broadcast
       Server.broadcast('blockUpdates', 'block', blockJSON);
-      // store raw block on local disk (no overwrite, excl. neogenesis blocks)
-      const { bhash, bnum, stime } = block;
-      if (bnum & 0xffn) {
-        try {
-          const id = Mongo.util.id.block(bnum, bhash);
-          const fpath = path.join(BCDIR, id.replace('-', '.') + '.bc');
-          await fsp.mkdir(BCDIR, { recursive: true });
-          await fsp.writeFile(fpath, Buffer.from(block.buffer), { flag: 'wx' });
-        } catch (error) {
-          console.error(fid, `failed to write raw block to ${path};`, error);
-        }
+      // store raw block on disk, async (no overwrite, excl. neogenesis blocks)
+      if (bnum & 0xffn) { // neogenesis blocks are generated, no need to store
+        const fname = blockJSON._id.replace('-', '.') + '.bc';
+        const fpath = path.join(BCDIR, fname);
+        const failure = `failed to write raw block to ${path};`;
+        fsp.mkdir(BCDIR, { recursive: true })
+          .then(() => fsp.writeFile(fpath, block, { flag: 'wx' }))
+          .catch(error => console.error(fid, failure, error));
       }
-      // process block update
-      const txDocuments = [];
-      blockJSON._id = Mongo.util.id.block(bnum, bhash);
+      // filter BigInt from blockJSON and insert in database
+      Mongo.util.filterBigInt(blockJSON);
+      if (await Mongo.insert('block', blockJSON) < 1) {
+        throw new Error(`${fid} insert error, block document insert failed`);
+      }
       // handle transactions on normal blocks
       if (blockJSON.type === Mochimo.Block.NORMAL) {
-        block.transactions.forEach(txe => {
-          // minify txe and add bhash / bnum
-          txe = Object.assign(txe.toJSON(true), { bhash, bnum, stime });
-          // add _id, filter BigInt values and add to docs
-          txe._id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
-          txDocuments.push(Mongo.util.filterBigInt(txe));
+        // push mining reward to historyJSON
+        const _hid = Mongo.util.id.history(bnum, bhash, undefined, 'mreward');
+        const history = { timestamp: stime, bnum, bhash };
+        const historyJSON = [Object.assign({ _id: _hid }, history)];
+        historyJSON[0].to = blockJSON.maddr;
+        historyJSON[0].amount = blockJSON.mreward;
+        // obtain and format transactions in txJSON
+        const txJSON = block.transactions.map(txe => {
+          let _id;
+          // push simple transaction history to historyJSON~
+          // when src === chg; 1 of 2 simple transactions take place...
+          /// add from src to dst at sendtotal, if sendtotal or !changetotal
+          /// add from src to chg at changetotal, if changetotal
+          // when src !== chg; 1 OR 2 simple transactions take place...
+          /// add from src to dst at sendtotal, if sendtotal
+          /// add from src to chg at changetotal, if changetotal
+          const { txid, srctag, dsttag, chgtag, sendtotal, changetotal } = txe;
+          const src = srctag === Mochimo.DEFAULT_TAG ? txe.srcaddr : srctag;
+          const dst = dsttag === Mochimo.DEFAULT_TAG ? txe.dstaddr : dsttag;
+          const chg = chgtag === Mochimo.DEFAULT_TAG ? txe.chgaddr : chgtag;
+          history.txid = txid;
+          if (sendtotal || !changetotal) {
+            history.from = src;
+            history.to = dst;
+            history.amount = sendtotal;
+            _id = Mongo.util.id.history(bnum, bhash, txid, 'src-dst');
+            historyJSON.push(Object.assign({ _id }, history));
+          }
+          if ((!sendtotal && changetotal) || (src !== chg && changetotal)) {
+            history.from = src;
+            history.to = chg;
+            history.amount = changetotal;
+            _id = Mongo.util.id.history(bnum, bhash, txid, 'src-chg');
+            historyJSON.push(Object.assign({ _id }, history));
+          }
+          // prepend _id, bnum and bhash to minified txe
+          _id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
+          return Object.assign({ _id, bnum, bhash }, txe.toJSON(true));
         });
-      }
-      Mongo.util.filterBigInt(blockJSON);
-      const bInsert = await Mongo.insert('block', blockJSON);
-      if (bInsert < 1) {
-        throw new Error(
-          `${fid} insert error, inserted ${bInsert}/1 block documents`);
-      }
-      if (txDocuments.length) {
-        const txInsert = await Mongo.insert('transaction', txDocuments);
-        if (txInsert < txDocuments.length) {
-          throw new Error(`${fid} insert error, ` +
-            `inserted ${txInsert}/${txDocuments.length} transaction documents`);
-        }
+        // check txJSON for length, filter BigInt and insert in database
+        if (txJSON.length) {
+          Mongo.util.filterBigInt(txJSON);
+          const txInsert = await Mongo.insert('transaction', txJSON);
+          if (txInsert < txJSON.length) {
+            throw new Error(`${fid} insert error, inserted ${txInsert}/` +
+              txJSON.length + 'transaction documents');
+          }
+        } else throw new Error(`${fid} blockchain error, missing transactions`);
+        // check historyJSON for length, filter BigInt and insert in database
+        if (historyJSON.length) {
+          Mongo.util.filterBigInt(historyJSON);
+          const historyInsert = await Mongo.insert('history', historyJSON);
+          if (historyInsert < historyJSON.length) {
+            throw new Error(`${fid} insert error, inserted ${historyInsert}/` +
+              historyJSON.length + 'transaction documents');
+          }
+        } else throw new Error(`${fid} blockchain error, missing history`);
       }
       // send block data to visualizer for haiku visualization
       if (!noVisual) await Network.block.visualizer(blockJSON);

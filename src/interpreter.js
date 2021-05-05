@@ -54,6 +54,9 @@ const Parse = {
     address: (val) => ({
       $or: [{ srcaddr: val }, { dstaddr: val }, { chgaddr: val }]
     }),
+    history: (val) => ({
+      $or: [{ from: val }, { to: val }]
+    }),
     tag: (val) => ({
       $or: [{ srctag: val }, { dsttag: val }, { chgtag: val }]
     })

@@ -162,6 +162,13 @@ const Mongo = {
         } else throw new Error(`${fid} invalid bhash type`);
         return [bnum, bhash].join('-');
       },
+      history: (bnum, bhash, txid, d, fid) => {
+        fid = fid || fidFormat('Mongo.util.id.history', bnum, bhash, txid, d);
+        if (typeof txid === 'undefined') {
+          return [Mongo.util.id.block(bnum, bhash, fid), d].join('-');
+        }
+        return [Mongo.util.id.transaction(bnum, bhash, txid, fid), d].join('-');
+      },
       network: (ip, category, fid) => {
         fid = fid || fidFormat('Mongo.util.id.network', ip, category);
         const agg = [];
@@ -178,7 +185,7 @@ const Mongo = {
         if (typeof txid === 'string') {
           // console.debug(fid, 'force 64 char txid');
           txid = txid.slice(0, 64).padStart(64, '0');
-        } else throw new Error(`${fid} invalid bhash type`);
+        } else throw new Error(`${fid} invalid txid type`);
         return [Mongo.util.id.block(bnum, bhash, fid), txid].join('-');
       }
     },
