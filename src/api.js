@@ -175,6 +175,8 @@ const Network = {
         // obtain and format transactions in txJSON
         const txJSON = block.transactions.map(txe => {
           let _id;
+          // minify tx entry before processing
+          txe = txe.toJSON(true);
           // push simple transaction history to historyJSON~
           // when src === chg; 1 of 2 simple transactions take place...
           /// add from src to dst at sendtotal, if sendtotal or !changetotal
@@ -203,7 +205,7 @@ const Network = {
           }
           // prepend _id, bnum and bhash to minified txe
           _id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
-          return Object.assign({ _id, bnum, bhash }, txe.toJSON(true));
+          return Object.assign({ _id, bnum, bhash }, txe);
         });
         // check txJSON for length, filter BigInt and insert in database
         if (txJSON.length) {
