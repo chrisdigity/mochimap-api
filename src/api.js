@@ -65,12 +65,7 @@ const Network = {
       } else ip = node;
       if (bnum === 0n) return; // disregard B.O.D. checks
       if (!Network.block._cache.has(bhash)) {
-        // download tfile entries and validate against _chain
-        // add validated tfile entries to _chain
-        // download block data
-        // validate hashes???
-        // update database
-        // ... dumb for now ...
+        // check cache for recently discovered blocks
         Network.block._cache.add(bhash);
         if (Network.block._cache.size > SET_LIMIT) {
           Network.block._cache.delete(

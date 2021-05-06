@@ -17,7 +17,7 @@
   "homepage": "https://github.com/chrisdigity/mochimap.com#readme",
   "dependencies": {
     "dotenv": "^8.2.0",
-    "mochimo": "^0.3.1",
+    "mochimo": "git://github.com/chrisdigity/mochimo-nodejs.git",
     "mongodb": "^3.6.4"
   }
 }
