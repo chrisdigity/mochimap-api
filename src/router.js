@@ -44,9 +44,9 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/history\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/history/<"tag"||"address">/<address>',
-    hintCheck: /history|tag|address/gi,
+    path: /^\/history\/([0-9a-f]+)$/i,
+    hint: '[BaseURL]/history/<address>',
+    hintCheck: /history/gi,
     handler: Responder.history,
     enabled: true
   }, {
