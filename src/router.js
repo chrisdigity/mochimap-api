@@ -45,6 +45,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: /^\/history\/([0-9a-f]+)$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/history/<address>',
     hintCheck: /history/gi,
     handler: Responder.history,

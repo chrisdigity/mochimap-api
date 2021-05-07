@@ -71,7 +71,7 @@ const Responder = {
         { message: `${blockNumber} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  history: async (res, address) => {
+  history: async (res, address, ...args) => {
     const start = Date.now();
     let cursor;
     try {
@@ -80,6 +80,7 @@ const Responder = {
       // set defaults and interpret requested search params, from USVString
       const search = { query: {}, options: {} };
       Object.assign(search, Interpreter.search(query, true));
+      if (args.length) Object.assign(search, Interpreter.search(args[0], true));
       // query database for results
       cursor = await Mongo.find('history', search.query, search.options);
       const dbquery = { duration: null, found: await cursor.count() };
