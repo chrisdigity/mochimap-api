@@ -77,7 +77,7 @@ const Network = {
           try { // download/verify block is as advertised
             const block = await Network.block.download(ip, bnum, bhash);
             // initiate block update
-            await Network.block.update(block, noExtended);
+            await Network.block.update(ip, block, noExtended);
             // asynchronous check for previous blocks
             const phash = block.phash;
             const pbnum = block.bnum - 1n;
@@ -141,7 +141,7 @@ const Network = {
       }
       if (backscan > 0xffn) console.log(fid, 'integrity verified!');
     },
-    update: async (block, noVisual) => {
+    update: async (ip, block, noVisual) => {
       const fid = 'Network.block.update():';
       // expose bnum, bhash and stime from block data
       const { bnum, bhash, stime } = block;
@@ -152,8 +152,7 @@ const Network = {
       Server.broadcast('blockUpdates', 'block', blockJSON);
       // store raw block on disk, async (no overwrite, excl. neogenesis blocks)
       if (bnum & 0xffn) { // neogenesis blocks are generated, no need to store
-        const fname = blockJSON._id.replace('-', '.') + '.bc';
-        const fpath = path.join(BCDIR, fname);
+        const fpath = path.join(BCDIR, blockJSON._id);
         const failure = `failed to write raw block to ${path};`;
         fsp.mkdir(BCDIR, { recursive: true })
           .then(() => fsp.writeFile(fpath, block, { flag: 'wx' }))
@@ -225,6 +224,67 @@ const Network = {
               historyJSON.length + 'transaction documents');
           }
         } else throw new Error(`${fid} blockchain error, missing history`);
+      } else if (blockJSON.type === Mochimo.Block.NEOGENESIS) {
+        // obtain block hash of previous neogenesis block
+        const pngbnum = bnum - 256n;
+        const pngbhash = await Mochimo.getHash(ip, pngbnum);
+        const pngbid = Mongo.util.id.block(pngbnum, pngbhash);
+        const balanceJSON = [];
+        const balance = { timestamp: stime, bnum, bhash };
+        // check filesystem before downloading neogenesis from sourcepeer
+        let pngblock;
+        try {
+          pngblock = await fsp.readFile(pngbid);
+        } catch (ignore) {
+          pngblock = await Mochimo.getBlock(ip, pngbnum);
+        } finally {
+          if (pngblock) {
+            pngblock = new Mochimo.Block(pngblock);
+            balance.phash = pngblock.bhash;
+            // create list of previous tag balances
+            const ptags = {};
+            for (const lentry of pngblock.ledger) {
+              // check ledger entry has (non-default) tag
+              if (lentry.tag !== Mochimo.DEFAULT_TAG) {
+                ptags[lentry.tag] = lentry.balance;
+              }
+            }
+            // scan current neogenesis tags and compare to previous
+            for (const lentry of block.ledger) {
+              // check ledger entry has (non-default) tag
+              if (lentry.tag !== Mochimo.DEFAULT_TAG) {
+                const pbalance = ptags[lentry.tag] || 0;
+                if (pbalance !== lentry.balance) {
+                  // push balance deltas to balanceJSON
+                  const _id = Mongo.util.id.balance(bnum, bhash, lentry.tag);
+                  balance.tag = lentry.tag;
+                  balance.delta = lentry.balance - pbalance;
+                  balance.balance = lentry.balance;
+                  balanceJSON.push(Object.assign({ _id }, balance));
+                }
+                // remove tag from previous
+                delete ptags[lentry.tag];
+              }
+            }
+            // assume remaining ptags were spent to zero
+            balance.balance = 0;
+            for (const [tag, delta] of Object.entries(ptags)) {
+              const _id = Mongo.util.id.balance(bnum, bhash, tag);
+              balance.tag = tag;
+              balance.delta = -(delta);
+              balanceJSON.push(Object.assign({ _id }, balance));
+            }
+          }
+        }
+        // check balanceJSON for length, filter BigInt and insert
+        if (balanceJSON.length) {
+          Mongo.util.filterBigInt(balanceJSON);
+          const balanceInsert = await Mongo.insert('balance', balanceJSON);
+          if (balanceInsert < balanceJSON.length) {
+            throw new Error(`${fid} insert error, inserted ${balanceInsert}/` +
+              balanceJSON.length + 'balance documents');
+          }
+        } else throw new Error(`${fid} blockchain error, missing balance`);
       }
       // send block data to visualizer for haiku visualization
       if (!noVisual) await Network.block.visualizer(blockJSON);

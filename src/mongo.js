@@ -147,6 +147,14 @@ const Mongo = {
       return obj;
     },
     id: {
+      balance: (bnum, bhash, tag, fid) => {
+        fid = fid || fidFormat('Mongo.util.id.balance', bnum, bhash, tag);
+        if (typeof tag === 'string') {
+          // console.debug(fid, 'force 24 char tag');
+          tag = tag.slice(0, 24).padStart(24, '0');
+        } else throw new Error(`${fid} invalid tag type`);
+        return [Mongo.util.id.block(bnum, bhash, fid), tag].join('-');
+      },
       block: (bnum, bhash, fid) => {
         fid = fid || fidFormat('Mongo.util.id.block', bnum, bhash);
         if (typeof bnum === 'number' || typeof bnum === 'bigint') {

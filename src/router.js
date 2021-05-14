@@ -23,9 +23,17 @@ const Routes = [
   {
     method: 'GET',
     path: /^\/balance\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/balance/<"tag"||"address">/<address>',
+    hint: '[BaseURL]/balance/<"tag"||"address">/<partial tag or address>',
     hintCheck: /balance|tag|address/gi,
     handler: Responder.balance,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: /^\/balance\/history\/([0-9a-f]{24})$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    hint: '[BaseURL]/balance/history/<tag (must be 24 chars)>',
+    hintCheck: /balance|history/gi,
+    handler: Responder.balanceHistory,
     enabled: true
   }, {
     method: 'GET',
@@ -41,14 +49,6 @@ const Routes = [
     hint: '[BaseURL]/block/search?<param>=<paramValue>',
     hintCheck: /block|search/gi,
     handler: Responder.searchBlock,
-    enabled: true
-  }, {
-    method: 'GET',
-    path: /^\/history\/([0-9a-f]+)$/i,
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/history/<address>',
-    hintCheck: /history/gi,
-    handler: Responder.history,
     enabled: true
   }, {
     method: 'GET',
@@ -71,6 +71,14 @@ const Routes = [
     hint: '[BaseURL]/transaction/<txid>',
     hintCheck: /transaction/gi,
     handler: Responder.transaction,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: /^\/transaction\/history\/([0-9a-f]+)$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    hint: '[BaseURL]/transaction/history/<tag or address>',
+    hintCheck: /transaction|history/gi,
+    handler: Responder.transactionHistory,
     enabled: true
   }, {
     method: 'GET',

@@ -22,6 +22,16 @@ const Mochimo = require('mochimo');
 const Mongo = require('./mongo');
 const Interpreter = require('./interpreter');
 
+const expandResults = async (cursor, options, start) => {
+  const dbquery = { duration: null, found: await cursor.count() };
+  if (options.limit) { // update number of pages in results
+    dbquery.pages = Math.ceil(dbquery.found / options.limit);
+  } // apply cursor array to results and update duration stat
+  dbquery.results = await cursor.toArray();
+  dbquery.duration = Date.now() - start;
+  return dbquery;
+};
+
 const Responder = {
   _respond: (res, statusCode, json, statusMessage = false) => {
     if (!statusMessage) {
@@ -60,6 +70,25 @@ const Responder = {
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
+  balanceHistory: async (res, tag, params) => {
+    const start = Date.now();
+    let cursor;
+    try {
+      // set defaults and interpret requested search params
+      const search = { query: { tag }, options: {} };
+      if (params) Object.assign(search, Interpreter.search(params, true));
+      // query database for results
+      cursor = await Mongo.find('balance', search.query, search.options);
+      const dbquery = await expandResults(cursor, search.options, start);
+      // send succesfull query or 404
+      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
+      else Responder._respond(res, 404, dbquery, 'No results');
+    } catch (error) { // send 500 on internal error
+      Responder.unknownInternal(res, error);
+    } finally { // cleanup cursor
+      if (cursor && !cursor.isClosed()) await cursor.close();
+    }
+  },
   block: async (res, blockNumber) => {
     try {
       // convert blockNumber parameter to Long number type
@@ -70,32 +99,6 @@ const Responder = {
       return Responder._respond(res, block ? 200 : 404, block ||
         { message: `${blockNumber} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
-  },
-  history: async (res, address, additional) => {
-    const start = Date.now();
-    let cursor;
-    try {
-      // build USVString query from address
-      const query = (additional ? additional + '&' : '') + 'history=' + address;
-      // set defaults and interpret requested search params, from USVString
-      const search = { query: {}, options: {} };
-      Object.assign(search, Interpreter.search(query, true));
-      // query database for results
-      cursor = await Mongo.find('history', search.query, search.options);
-      const dbquery = { duration: null, found: await cursor.count() };
-      if (search.options.limit) { // update number of pages in results
-        dbquery.pages = Math.ceil(dbquery.found / search.options.limit);
-      } // apply cursor array to results and update duration stat
-      dbquery.results = await cursor.toArray();
-      dbquery.duration = Date.now() - start;
-      // send succesfull query or 404
-      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
-      else Responder._respond(res, 404, dbquery, 'No results');
-    } catch (error) { // send 500 on internal error
-      Responder.unknownInternal(res, error);
-    } finally { // cleanup cursor
-      if (cursor && !cursor.isClosed()) await cursor.close();
-    }
   },
   network: async (res, ip) => {
     try {
@@ -121,12 +124,7 @@ const Responder = {
       Object.assign(search, Interpreter.search(args[0], paged));
       // query database for results
       cursor = await Mongo.find(cName, search.query, search.options);
-      const dbquery = { duration: null, found: await cursor.count() };
-      if (search.options.limit) { // update number of pages in results
-        dbquery.pages = Math.ceil(dbquery.found / search.options.limit);
-      } // apply cursor array to results and update duration stat
-      dbquery.results = await cursor.toArray();
-      dbquery.duration = Date.now() - start;
+      const dbquery = await expandResults(cursor, search.options, start);
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
       else Responder._respond(res, 404, dbquery, 'No results');
@@ -147,6 +145,27 @@ const Responder = {
       return Responder._respond(res, transaction ? 200 : 404, transaction ||
         { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  transactionHistory: async (res, address, params) => {
+    const start = Date.now();
+    let cursor;
+    try {
+      // build USVString query from address
+      const query = (params ? params + '&' : '') + 'history=' + address;
+      // set defaults and interpret requested search params, from USVString
+      const search = { query: {}, options: {} };
+      Object.assign(search, Interpreter.search(query, true));
+      // query database for results
+      cursor = await Mongo.find('history', search.query, search.options);
+      const dbquery = await expandResults(cursor, search.options, start);
+      // send succesfull query or 404
+      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
+      else Responder._respond(res, 404, dbquery, 'No results');
+    } catch (error) { // send 500 on internal error
+      Responder.unknownInternal(res, error);
+    } finally { // cleanup cursor
+      if (cursor && !cursor.isClosed()) await cursor.close();
+    }
   },
   unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json),
   unknownInternal: (res, error) => {
