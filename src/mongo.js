@@ -1,5 +1,5 @@
 /**
- *  MochiMap MongoDB Interface
+ *  apiDatabase.js; MongoDB interface for the MochiMap api database
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -15,12 +15,6 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
- **
- * A MongoDB wrapper, for MochiMap, to simplify access and manage a cached
- * connection to the database and it's data. Also provides utilities for unique
- * id (_id) management and conversion to MongoDB's Long data type.
- * Note: the underscore (_) prefix denotes internal uage (primarily).
- *
  */
 
 /* global BigInt */
@@ -31,49 +25,57 @@
   value: RegExp.prototype.toString // JSON.stringify RegExp for console.debug
 }); */
 
+/* connection uri check */
+if (typeof process.env.DBURI === 'undefined') {
+  console.warn('// WARNING: MongoDB connection uri (DBURI .env) is undefined');
+  console.warn('// Database connection error expected...');
+}
+
 const { asUint64String, fidFormat } = require('./util');
 const { MongoClient, Long } = require('mongodb');
 
-const MongoClientOptions = { useUnifiedTopology: true };
-const MongoClientURI = process.env.MONGO;
-const Mongo = {
-  _client: null,
-  _clientConnecting: false, // for identifying client connection in progress
-  _clientWait: (poll = 0) => new Promise((resolve) => {
-    const checkConnecting = () => {
-      if (Mongo._clientConnecting) setTimeout(checkConnecting, poll);
-      else resolve();
-    };
-    checkConnecting();
-  }),
+let Client; // cached client connection
+let ClientConnecting = false; // for identifying client connection in progress
+const ClientOptions = { useUnifiedTopology: true };
+const ClientURI = process.env.DBURI;
+const ClientWait = (poll = 0) => new Promise((resolve) => {
+  const checkConnecting = () => {
+    if (ClientConnecting) setTimeout(checkConnecting, poll);
+    else resolve();
+  };
+  checkConnecting();
+});
+const Db = {
   _connect: async (cName) => {
-    const fid = fidFormat('Mongo._connect', cName);
-    if (Mongo._clientConnecting) {
+    const fid = fidFormat('Db._connect', cName);
+    if (ClientConnecting) {
       // console.debug(fid, 'client connection in progress, wait...');
-      await Mongo._clientWait(50);
+      await ClientWait(50);
     }
-    if (Mongo._client === null) {
+    if (Client === null) {
       // console.debug(fid, 'create new client...');
-      Mongo._client = new MongoClient(MongoClientURI, MongoClientOptions);
+      Client = new MongoClient(ClientURI, ClientOptions);
     } // else console.debug(fid, 'using cached client...');
-    if (!Mongo._client.isConnected()) {
+    if (!Client.isConnected()) {
       // console.debug(fid, 'connecting to database...');
-      Mongo._clientConnecting = true;
+      ClientConnecting = true;
       try {
-        await Mongo._client.connect();
+        await Client.connect();
+        // console.debug(fid, 'establish and verify connection to database...');
+        await Client.db().command({ ping: 1 });
         // console.debug(fid, 'client connected succesfully');
       } catch (error) {
-        Mongo._client = null;
+        Client = null;
         console.trace(fid, 'client connection failed;', error);
-      } finally { Mongo._clientConnecting = false; }
+      } finally { ClientConnecting = false; }
     }
     // console.debug(fid, 'fetch collection...');
-    const client = Mongo._client;
+    const client = Client;
     return { client, collection: client.db().collection(cName) };
   },
   insert: async (cName, docs) => {
-    const fid = fidFormat('Mongo.insert', cName, docs);
-    const conn = await Mongo._connect(cName, fid);
+    const fid = fidFormat('Db.insert', cName, docs);
+    const conn = await Db._connect(cName, fid);
     // console.debug(fid, 'insert documents...');
     const cmd = Array.isArray(docs)
       ? await conn.collection.insertMany(docs)
@@ -82,19 +84,20 @@ const Mongo = {
     return cmd.result.n;
   },
   find: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo.find', cName, query, options);
-    const conn = await Mongo._connect(cName, fid);
+    const fid = fidFormat('Db.find', cName, query, options);
+    const conn = await Db._connect(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
     // console.debug(fid, 'options applied;', JSON.stringify(options));
     const cursor = await conn.collection.find(query, options);
-    // console.debug(fid, await cursor.hasNext() ? 'return cursor...' : 'no results...');
+    // console.debug(fid, await cursor.hasNext()
+    //   ? 'return cursor...' : 'no results...');
     return cursor;
   },
   findOne: async (cName, query, options = {}) => {
-    const fid = fidFormat('Mongo._oneFind', cName, query, options);
-    const conn = await Mongo._connect(cName, fid);
+    const fid = fidFormat('Db._oneFind', cName, query, options);
+    const conn = await Db._connect(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
@@ -105,10 +108,10 @@ const Mongo = {
     return doc;
   },
   has: async (cName, ...args) => {
-    const fid = fidFormat('Mongo.has', cName, ...args);
-    const conn = await Mongo._connect(cName, fid);
+    const fid = fidFormat('Db.has', cName, ...args);
+    const conn = await Db._connect(cName, fid);
     // console.debug(fid, 'determine _id for query...');
-    const query = { _id: Mongo.util.id[cName](...args) };
+    const query = { _id: Db.util.id[cName](...args) };
     // console.debug(fid, 'count documents...');
     const options = { limit: 1, sort: { _id: -1 } };
     const count = await conn.collection.countDocuments(query, options);
@@ -116,8 +119,8 @@ const Mongo = {
     return count;
   },
   update: async (cName, update, query, options) => {
-    const fid = fidFormat('Mongo.update', cName, update, query);
-    const conn = await Mongo._connect(cName, fid);
+    const fid = fidFormat('Db.update', cName, update, query);
+    const conn = await Db._connect(cName, fid);
     // console.debug(fid, 'add atomic operators...');
     update = { $set: update };
     // console.debug(fid, 'update documents...');
@@ -130,16 +133,16 @@ const Mongo = {
   util: {
     filterBigInt: (obj) => {
       for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object') Mongo.util.filterBigInt(obj[key]);
+        if (typeof obj[key] === 'object') Db.util.filterBigInt(obj[key]);
         else if (typeof obj[key] === 'bigint') {
-          obj[key] = Mongo.util.long(obj[key]);
+          obj[key] = Db.util.long(obj[key]);
         }
       }
       return obj;
     },
     filterLong: (obj) => {
       for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object') Mongo.util.filterLong(obj[key]);
+        if (typeof obj[key] === 'object') Db.util.filterLong(obj[key]);
         else if (obj[key] instanceof Long) {
           obj[key] = BigInt(obj[key].toString());
         }
@@ -148,15 +151,15 @@ const Mongo = {
     },
     id: {
       balance: (bnum, bhash, tag, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.balance', bnum, bhash, tag);
+        fid = fid || fidFormat('Db.util.id.balance', bnum, bhash, tag);
         if (typeof tag === 'string') {
           // console.debug(fid, 'force 24 char tag');
           tag = tag.slice(0, 24).padStart(24, '0');
         } else throw new Error(`${fid} invalid tag type`);
-        return [Mongo.util.id.block(bnum, bhash, fid), tag].join('-');
+        return [Db.util.id.block(bnum, bhash, fid), tag].join('-');
       },
       block: (bnum, bhash, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.block', bnum, bhash);
+        fid = fid || fidFormat('Db.util.id.block', bnum, bhash);
         if (typeof bnum === 'number' || typeof bnum === 'bigint') {
           // console.debug(fid, 'force 64-bit hex bnum');
           bnum = asUint64String(bnum);
@@ -171,14 +174,14 @@ const Mongo = {
         return [bnum, bhash].join('-');
       },
       history: (bnum, bhash, txid, d, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.history', bnum, bhash, txid, d);
+        fid = fid || fidFormat('Db.util.id.history', bnum, bhash, txid, d);
         if (typeof txid === 'undefined') {
-          return [Mongo.util.id.block(bnum, bhash, fid), d].join('-');
+          return [Db.util.id.block(bnum, bhash, fid), d].join('-');
         }
-        return [Mongo.util.id.transaction(bnum, bhash, txid, fid), d].join('-');
+        return [Db.util.id.transaction(bnum, bhash, txid, fid), d].join('-');
       },
       network: (ip, category, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.network', ip, category);
+        fid = fid || fidFormat('Db.util.id.network', ip, category);
         const agg = [];
         if (typeof ip === 'string') agg.push(...ip.split('.'));
         else throw new Error(`${fid} invalid ip type`);
@@ -189,16 +192,16 @@ const Mongo = {
         return agg.join('-');
       },
       transaction: (bnum, bhash, txid, fid) => {
-        fid = fid || fidFormat('Mongo.util.id.transaction', bnum, bhash, txid);
+        fid = fid || fidFormat('Db.util.id.transaction', bnum, bhash, txid);
         if (typeof txid === 'string') {
           // console.debug(fid, 'force 64 char txid');
           txid = txid.slice(0, 64).padStart(64, '0');
         } else throw new Error(`${fid} invalid txid type`);
-        return [Mongo.util.id.block(bnum, bhash, fid), txid].join('-');
+        return [Db.util.id.block(bnum, bhash, fid), txid].join('-');
       }
     },
     long: (number) => Long.fromString(number.toString())
   }
 };
 
-module.exports = Mongo;
+export default Db;
