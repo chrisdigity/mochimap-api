@@ -46,8 +46,8 @@ const ClientWait = (poll = 0) => new Promise((resolve) => {
   checkConnecting();
 });
 const Db = {
-  _connect: async (cName) => {
-    const fid = fidFormat('Db._connect', cName);
+  _collection: async (cName) => {
+    const fid = fidFormat('Db._collection', cName);
     if (ClientConnecting) {
       // console.debug(fid, 'client connection in progress, wait...');
       await ClientWait(50);
@@ -70,63 +70,62 @@ const Db = {
       } finally { ClientConnecting = false; }
     }
     // console.debug(fid, 'fetch collection...');
-    const client = Client;
-    return { client, collection: client.db().collection(cName) };
+    return Client.db().collection(cName);
   },
   insert: async (cName, docs) => {
     const fid = fidFormat('Db.insert', cName, docs);
-    const conn = await Db._connect(cName, fid);
+    const col = await Db._collection(cName, fid);
     // console.debug(fid, 'insert documents...');
     const cmd = Array.isArray(docs)
-      ? await conn.collection.insertMany(docs)
-      : await conn.collection.insertOne(docs);
+      ? await col.insertMany(docs)
+      : await col.insertOne(docs);
     // console.debug(fid, cmd.result.n, 'documents inserted!');
     return cmd.result.n;
   },
   find: async (cName, query, options = {}) => {
     const fid = fidFormat('Db.find', cName, query, options);
-    const conn = await Db._connect(cName, fid);
+    const col = await Db._collection(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
     // console.debug(fid, 'options applied;', JSON.stringify(options));
-    const cursor = await conn.collection.find(query, options);
+    const cursor = await col.find(query, options);
     // console.debug(fid, await cursor.hasNext()
     //   ? 'return cursor...' : 'no results...');
     return cursor;
   },
   findOne: async (cName, query, options = {}) => {
     const fid = fidFormat('Db._oneFind', cName, query, options);
-    const conn = await Db._connect(cName, fid);
+    const col = await Db._collection(cName, fid);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
     // console.debug(fid, 'options applied;', JSON.stringify(options));
     // console.debug(fid, 'find document...');
-    const doc = await conn.collection.findOne(query, options);
+    const doc = await col.findOne(query, options);
     // console.debug(fid, doc ? 'return document...' : 'no result...');
     return doc;
   },
   has: async (cName, ...args) => {
     const fid = fidFormat('Db.has', cName, ...args);
-    const conn = await Db._connect(cName, fid);
+    const col = await Db._collection(cName, fid);
     // console.debug(fid, 'determine _id for query...');
     const query = { _id: Db.util.id[cName](...args) };
     // console.debug(fid, 'count documents...');
     const options = { limit: 1, sort: { _id: -1 } };
-    const count = await conn.collection.countDocuments(query, options);
+    const count = await col.countDocuments(query, options);
     // console.debug(fid, 'found', count, 'documents...');
     return count;
   },
   update: async (cName, update, query, options) => {
     const fid = fidFormat('Db.update', cName, update, query);
-    const conn = await Db._connect(cName, fid);
+    const col = await Db._collection(cName, fid);
     // console.debug(fid, 'add atomic operators...');
     update = { $set: update };
     // console.debug(fid, 'update documents...');
     const cmd = Array.isArray(update)
-      ? await conn.collection.updateMany(query, update, options)
-      : await conn.collection.updateOne(query, update, options);
+      ? await col.updateMany(query, update, options)
+      : await col.updateOne(query, update, options);
     // console.debug(fid, cmd.result.n, 'documents updated!');
     return cmd.result.n;
   },
