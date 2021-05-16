@@ -149,14 +149,6 @@ const Db = {
       return obj;
     },
     id: {
-      balance: (bnum, bhash, tag, fid) => {
-        fid = fid || fidFormat('Db.util.id.balance', bnum, bhash, tag);
-        if (typeof tag === 'string') {
-          // console.debug(fid, 'force 24 char tag');
-          tag = tag.slice(0, 24).padStart(24, '0');
-        } else throw new Error(`${fid} invalid tag type`);
-        return [Db.util.id.block(bnum, bhash, fid), tag].join('-');
-      },
       block: (bnum, bhash, fid) => {
         fid = fid || fidFormat('Db.util.id.block', bnum, bhash);
         if (typeof bnum === 'number' || typeof bnum === 'bigint') {
@@ -172,12 +164,13 @@ const Db = {
         } else throw new Error(`${fid} invalid bhash type`);
         return [bnum, bhash].join('-');
       },
-      history: (bnum, bhash, txid, d, fid) => {
-        fid = fid || fidFormat('Db.util.id.history', bnum, bhash, txid, d);
-        if (typeof txid === 'undefined') {
-          return [Db.util.id.block(bnum, bhash, fid), d].join('-');
-        }
-        return [Db.util.id.transaction(bnum, bhash, txid, fid), d].join('-');
+      ledger: (bnum, bhash, tag, fid) => {
+        fid = fid || fidFormat('Db.util.id.ledger', bnum, bhash, tag);
+        if (typeof tag === 'string') {
+          // console.debug(fid, 'force 24 char tag');
+          tag = tag.slice(0, 24).padStart(24, '0');
+        } else throw new Error(`${fid} invalid tag type`);
+        return [Db.util.id.block(bnum, bhash, fid), tag].join('-');
       },
       network: (ip, category, fid) => {
         fid = fid || fidFormat('Db.util.id.network', ip, category);
