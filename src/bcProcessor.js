@@ -28,8 +28,9 @@ const { informedShutdown, ms } = require('./apiUtils');
 const { processBlock } = require('./bcUtils');
 
 /* filesystem configuration */
-const BCDIR = process.env.BCDIR || path.join('~', 'mochimo', 'bin', 'd', 'bc');
-const ARCHIVEDIR = process.env.ARCHIVEDIR || path.join('~', 'archive');
+const HDIR = require('os').homedir();
+const BCDIR = process.env.BCDIR || path.join(HDIR, 'mochimo', 'bin', 'd', 'bc');
+const ARCHIVEDIR = process.env.ARCHIVEDIR || path.join(HDIR, 'archive');
 
 /* watcher */
 const Watcher = {
