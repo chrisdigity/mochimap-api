@@ -128,7 +128,7 @@ const processBlock = async (data, srcdir) => {
   }
   let logstr, errstr;
   // check database for existing store
-  const _id = Db.util.block(block.bnum, block.bhash);
+  const _id = Db.util.id.block(block.bnum, block.bhash);
   if (!(await Db.has('block', block.bnum, block.bhash))) {
     try {
       // build block component documents
