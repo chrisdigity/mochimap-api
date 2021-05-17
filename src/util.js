@@ -20,18 +20,18 @@
 /* global BigInt */
 const https = require('https');
 
-const asUint64String = (bigint) => {
+export const asUint64String = (bigint) => {
   return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
 };
 
-const objectIsEmpty = (obj) => {
+export const objectIsEmpty = (obj) => {
   for (const prop in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
   }
   return true;
 };
 
-const objectDifference = (objA, objB, depth = 0) => {
+export const objectDifference = (objA, objB, depth = 0) => {
   if (typeof objA !== 'object' || typeof objB !== 'object') {
     throw new TypeError('comparison parameters MUST BE objects');
   } else if (typeof depth !== 'number') {
@@ -50,7 +50,7 @@ const objectDifference = (objA, objB, depth = 0) => {
     }, {});
 };
 
-const fidFormat = (fid, ...args) => {
+export const fidFormat = (fid, ...args) => {
   const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
   const tJoin = (array, max, d) => {
     const end = array.length - 1;
@@ -59,7 +59,7 @@ const fidFormat = (fid, ...args) => {
   return [fid, '(', tJoin(args, 8, ', '), '):'].join('');
 };
 
-const invalidHexString = (hexStr, name) => {
+export const invalidHexString = (hexStr, name) => {
   if (typeof hexStr !== 'string') {
     // string is the only acceptable type for hexStr
     return 'invalid type, ' + name;
@@ -70,7 +70,7 @@ const invalidHexString = (hexStr, name) => {
   return false;
 };
 
-const checkRequest = (req, defaults) => {
+export const checkRequest = (req, defaults) => {
   // ensure request is an object
   if (typeof req === 'undefined') req = {};
   else if (typeof req !== 'object') return 'invalid request parameter';
@@ -136,7 +136,7 @@ const checkRequest = (req, defaults) => {
   return false;
 };
 
-const compareWeight = (weight1, weight2) => {
+export const compareWeight = (weight1, weight2) => {
   // ensure both strings are equal length
   const maxLen = Math.max(weight1.length, weight2.length);
   weight1 = weight1.padStart(maxLen, '0');
@@ -147,7 +147,7 @@ const compareWeight = (weight1, weight2) => {
   return 0;
 };
 
-const isPrivateIPv4 = (ip) => {
+export const isPrivateIPv4 = (ip) => {
   const b = new ArrayBuffer(4);
   const c = new Uint8Array(b);
   const dv = new DataView(b);
@@ -165,7 +165,7 @@ const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
-const ms = {
+export const ms = {
   second: 1000,
   minute: 60000,
   hour: 3600000,
@@ -173,7 +173,7 @@ const ms = {
   week: 604800000
 };
 
-const readWeb = (options, postData) => {
+export const readWeb = (options, postData) => {
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
       let body = [];
@@ -191,76 +191,7 @@ const readWeb = (options, postData) => {
   });
 };
 
-const visualizeHaiku = async (haiku, shadow) => {
-  const algo = (arr, ...comp) => { // condensed heuristic algorithm
-    let pi, ps, is, str;
-    const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
-    for (let i = pi = ps = is = 0; i < arr.length; i++, is = 0, str = '') {
-      for (const app of comp) str += ' ' + arr[i][app];
-      for (const reg of ts) is += (str.match(reg) || []).length;
-      if (is > ps) { ps = is; pi = i; }
-    } return { photo: arr[pi], ps };
-  };
-  // heuristically determine best picture query for haiku
-  const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
-  const query = search.join('%20');
-  const data = { img: { haiku, shadow } };
-  let results;
-  try { // request results from Pexels
-    results = await readWeb({
-      hostname: 'api.pexels.com',
-      path: `/v1/search?query=${query}&per_page=80`,
-      headers: { Authorization: process.env.PEXELS }
-    }); // apply algorithm or throw error
-    if (results.photos && results.photos.length) {
-      const sol = algo(results.photos, 'url');
-      if (!data.sol || data.sol.ps > sol.ps) {
-        data.sol = sol; // derive pexels photo data
-        data.img.author = sol.photo.photographer || 'Unknown';
-        data.img.authorurl = sol.photo.photographer_url || 'pexels.com';
-        data.img.desc = sol.photo.url.match(/\w+(?=-)/g).join(' ');
-        data.img.src = sol.photo.src.large;
-        data.img.srcid = 'Pexels';
-        data.img.srcurl = sol.photo.url;
-        data.img.thumb = sol.photo.src.tiny;
-      }
-    } else throw new Error(results.error || 'no "photos" in results');
-  } catch (error) { console.trace('Pexels request ERROR:', error); }
-  try { // request results from Unsplash
-    results = await readWeb({
-      hostname: 'api.unsplash.com',
-      path: `/search/photos?query=${query}&per_page=30`,
-      headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
-    }); // apply algorithm or throw error
-    if (results.results && results.results.length) {
-      const sol = algo(results.results, 'description', 'alt_description');
-      if (!data.sol || data.sol.ps > sol.ps) {
-        data.sol = sol; // derive pexels photo data
-        data.img.author = sol.photo.user.name || 'Unknown';
-        data.img.authorurl = sol.photo.user.links.html || 'unsplash.com';
-        data.img.desc = sol.photo.description;
-        data.img.src = sol.photo.urls.regular;
-        data.img.srcid = 'Unsplash';
-        data.img.srcurl = sol.photo.links.html;
-        data.img.thumb = sol.photo.urls.thumb;
-      }
-    } else throw new Error(results.errors || 'no "results" in results');
-  } catch (error) { console.trace('Unsplash request ERROR:', error); }
-  // throw error on no solution
-  if (!data.sol) throw new Error('failed to visualize Haiku');
-  delete data.sol;
-  return data;
-};
-
-module.exports = {
-  asUint64String,
-  checkRequest,
-  compareWeight,
-  fidFormat,
-  isPrivateIPv4,
-  ms,
-  objectDifference,
-  objectIsEmpty,
-  readWeb,
-  visualizeHaiku
+export const informedShutdown = (signal, origin = 'unknown') => {
+  console.error(`\n// SHUTDOWN: recv'd ${signal} from ${origin}`);
+  process.exit(Number(signal) || 1);
 };
