@@ -52,7 +52,7 @@ const Db = {
       // console.debug(fid, 'client connection in progress, wait...');
       await ClientWait(50);
     }
-    if (Client === null) {
+    if (!Client) {
       // console.debug(fid, 'create new client...');
       Client = new MongoClient(ClientURI, ClientOptions);
     } // else console.debug(fid, 'using cached client...');
@@ -65,7 +65,7 @@ const Db = {
         await Client.db().command({ ping: 1 });
         // console.debug(fid, 'client connected succesfully');
       } catch (error) {
-        Client = null;
+        Client = undefined;
         console.trace(fid, 'client connection failed;', error);
       } finally { ClientConnecting = false; }
     }
