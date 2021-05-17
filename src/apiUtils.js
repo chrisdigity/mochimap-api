@@ -184,7 +184,7 @@ const readWeb = (options, postData) => {
 };
 
 const informedShutdown = (signal, origin = 'unknown') => {
-  console.error(`\n// SHUTDOWN: recv'd ${signal} from ${origin}`);
+  console.log(`// SHUTDOWN: recv'd ${signal} from ${origin}`);
   process.exit(Number(signal) || 1);
 };
 
