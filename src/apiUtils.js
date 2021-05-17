@@ -20,18 +20,18 @@
 /* global BigInt */
 const https = require('https');
 
-export const asUint64String = (bigint) => {
+const asUint64String = (bigint) => {
   return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
 };
 
-export const objectIsEmpty = (obj) => {
+const objectIsEmpty = (obj) => {
   for (const prop in obj) {
     if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
   }
   return true;
 };
 
-export const objectDifference = (objA, objB, depth = 0) => {
+const objectDifference = (objA, objB, depth = 0) => {
   if (typeof objA !== 'object' || typeof objB !== 'object') {
     throw new TypeError('comparison parameters MUST BE objects');
   } else if (typeof depth !== 'number') {
@@ -50,7 +50,7 @@ export const objectDifference = (objA, objB, depth = 0) => {
     }, {});
 };
 
-export const fidFormat = (fid, ...args) => {
+const fidFormat = (fid, ...args) => {
   const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
   const tJoin = (array, max, d) => {
     const end = array.length - 1;
@@ -59,7 +59,7 @@ export const fidFormat = (fid, ...args) => {
   return [fid, '(', tJoin(args, 8, ', '), '):'].join('');
 };
 
-export const invalidHexString = (hexStr, name) => {
+const invalidHexString = (hexStr, name) => {
   if (typeof hexStr !== 'string') {
     // string is the only acceptable type for hexStr
     return 'invalid type, ' + name;
@@ -70,7 +70,7 @@ export const invalidHexString = (hexStr, name) => {
   return false;
 };
 
-export const checkRequest = (req, defaults) => {
+const checkRequest = (req, defaults) => {
   // ensure request is an object
   if (typeof req === 'undefined') req = {};
   else if (typeof req !== 'object') return 'invalid request parameter';
@@ -136,7 +136,7 @@ export const checkRequest = (req, defaults) => {
   return false;
 };
 
-export const compareWeight = (weight1, weight2) => {
+const compareWeight = (weight1, weight2) => {
   // ensure both strings are equal length
   const maxLen = Math.max(weight1.length, weight2.length);
   weight1 = weight1.padStart(maxLen, '0');
@@ -147,7 +147,7 @@ export const compareWeight = (weight1, weight2) => {
   return 0;
 };
 
-export const isPrivateIPv4 = (ip) => {
+const isPrivateIPv4 = (ip) => {
   const b = new ArrayBuffer(4);
   const c = new Uint8Array(b);
   const dv = new DataView(b);
@@ -165,15 +165,7 @@ export const isPrivateIPv4 = (ip) => {
   return 0; // public IP
 };
 
-export const ms = {
-  second: 1000,
-  minute: 60000,
-  hour: 3600000,
-  day: 86400000,
-  week: 604800000
-};
-
-export const readWeb = (options, postData) => {
+const readWeb = (options, postData) => {
   return new Promise((resolve, reject) => {
     const req = https.request(options, res => {
       let body = [];
@@ -191,7 +183,28 @@ export const readWeb = (options, postData) => {
   });
 };
 
-export const informedShutdown = (signal, origin = 'unknown') => {
+const informedShutdown = (signal, origin = 'unknown') => {
   console.error(`\n// SHUTDOWN: recv'd ${signal} from ${origin}`);
   process.exit(Number(signal) || 1);
+};
+
+const ms = {
+  second: 1000,
+  minute: 60000,
+  hour: 3600000,
+  day: 86400000,
+  week: 604800000
+};
+
+module.exports = {
+  asUint64String,
+  objectDifference,
+  objectIsEmpty,
+  fidFormat,
+  checkRequest,
+  compareWeight,
+  isPrivateIPv4,
+  readWeb,
+  informedShutdown,
+  ms
 };

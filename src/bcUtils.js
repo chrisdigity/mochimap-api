@@ -26,7 +26,132 @@ const {
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 
-export const visualizeHaiku = async (haiku, shadow) => {
+const buildBlockDocument = (block) => {
+  // expose bnum and bhash from block data
+  const { bnum, bhash } = block;
+  // prepend _id to minified block as JSON
+  const _id = Db.util.id.block(bnum, bhash);
+  const blockJSON = Object.assign({ _id }, block.toJSON(true));
+  // return BigInt filtered blockJSON as block document
+  return Db.util.filterBigInt(blockJSON);
+};
+
+const buildLedgerDocument = (block, srcdir) => {
+  // expose bnum, bhash and stime from block data
+  const { bnum, bhash, stime } = block;
+  // ensure block type is NEOGENESIS, before proceeding
+  if (block.type !== Mochimo.Block.NEOGENESIS) return;
+  // obtain previous neogenesis block data
+  const pngfname = path.join(srcdir, `b${asUint64String(bnum - 256n)}.bc`);
+  const pngdata = fs.readFileSync(pngfname);
+  // perform pre-checks on previous neogenesis block data
+  if (typeof pngdata !== 'object') {
+    throw new TypeError(`"pngdata" is not an object: ${typeof pngdata}`);
+  } else if (!pngdata.length >= Mochimo.BlockTrailer.length + 4) {
+    throw new Error(`"pngdata.length" is insufficient: ${pngdata.length}`);
+  }
+  // interpret pngdata as block and perform block hash verification check
+  const pngblock = new Mochimo.Block();
+  if (!pngblock.verifyBlockHash()) {
+    throw new Error('"pngblock" hash could not be verified');
+  }
+  // create list of previous tagged address balances
+  const ptags = {};
+  for (const lentry of pngblock.ledger) {
+    // check ledger entry has (non-default) tag
+    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
+      ptags[lentry.tag] = lentry.balance;
+    }
+  }
+  // build ledger JSON, as array of documents where tag balances have deltas
+  const ledgerJSON = [];
+  const ledgerPush = { timestamp: stime, bnum, bhash };
+  // scan current neogenesis tags and compare to previous
+  for (const lentry of block.ledger) {
+    // check ledger entry has (non-default) tag
+    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
+      const pbalance = ptags[lentry.tag] || 0;
+      if (pbalance !== lentry.balance) {
+        // push balance deltas to balanceJSON
+        const _id = Db.util.id.balance(bnum, bhash, lentry.tag);
+        ledgerPush.tag = lentry.tag;
+        ledgerPush.delta = lentry.balance - pbalance;
+        ledgerPush.balance = lentry.balance;
+        ledgerJSON.push(Object.assign({ _id }, ledgerPush));
+      }
+      // remove tag from previous
+      delete ptags[lentry.tag];
+    }
+  }
+  // assume remaining ptags were spent to zero
+  ledgerPush.balance = 0;
+  for (const [tag, delta] of Object.entries(ptags)) {
+    const _id = Db.util.id.balance(bnum, bhash, tag);
+    ledgerPush.tag = tag;
+    ledgerPush.delta = -(delta);
+    ledgerJSON.push(Object.assign({ _id }, ledgerPush));
+  }
+  // return BigInt filtered ledgerJSON as array of ledger documents
+  return Db.util.filterBigInt(ledgerJSON);
+};
+
+const buildTransactionDocument = (block) => {
+  // expose bnum, bhash and stime from block data
+  const { bnum, bhash, stime } = block;
+  // ensure block type is NORMAL, before proceeding
+  if (block.type !== Mochimo.Block.NORMAL) return;
+  // obtain and format transactions in transactionJSON
+  const transactionJSON = block.transactions.map(txe => {
+    // prepend _id, stime, bnum and bhash to minified txe
+    const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
+    return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
+  });
+  // push mining reward as extra transaction
+  const txe = { dstaddr: block.maddr, sendtotal: block.mreward };
+  const _id = Db.util.id.transaction(bnum, bhash, 'mreward');
+  transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
+  // return BigInt filtered transactionJSON as array of transaction documents
+  return Db.util.filterBigInt(transactionJSON);
+};
+
+const processBlock = async (data, srcdir) => {
+  // perform pre-checks on data
+  if (typeof data !== 'object') {
+    throw new TypeError(`"data" is not an object: ${typeof data}`);
+  } else if (!data.length >= Mochimo.BlockTrailer.length + 4) {
+    throw new Error(`"data.length" is insufficient: ${data.length}`);
+  }
+  // interpret data as Mochimo Block and perform block hash verification check
+  const block = new Mochimo.Block(data);
+  if (!block.verifyBlockHash()) {
+    throw new Error('"block" hash could not be verified');
+  }
+  let logstr, _id;
+  try {
+    // build block component documents
+    const docs = {
+      block: buildBlockDocument(block),
+      ledger: buildLedgerDocument(block, srcdir),
+      transaction: buildTransactionDocument(block)
+    };
+    // store _id
+    _id = docs.block._id;
+    // start log string
+    logstr = _id + '; ';
+    // insert applicable documents and log results
+    for (const [col, doc] of Object.entries(docs)) {
+      if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
+    }
+  } catch (error) {
+    console.log(logstr, error);
+  } finally {
+    console.log(logstr);
+  }
+  // return block identifier (_id)
+  return _id;
+};
+
+const visualizeHaiku = async (haiku, shadow) => {
   const algo = (arr, ...comp) => { // condensed heuristic algorithm
     let pi, ps, is, str;
     const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
@@ -87,127 +212,10 @@ export const visualizeHaiku = async (haiku, shadow) => {
   return data;
 };
 
-export const buildBlockDocument = (block) => {
-  // expose bnum and bhash from block data
-  const { bnum, bhash } = block;
-  // prepend _id to minified block as JSON
-  const _id = Db.util.id.block(bnum, bhash);
-  const blockJSON = Object.assign({ _id }, block.toJSON(true));
-  // return BigInt filtered blockJSON as block document
-  return Db.util.filterBigInt(blockJSON);
-};
-
-export const buildLedgerDocument = (block, srcdir) => {
-  // expose bnum, bhash and stime from block data
-  const { bnum, bhash, stime } = block;
-  // ensure block type is NEOGENESIS, before proceeding
-  if (block.type !== Mochimo.Block.NEOGENESIS) return;
-  // obtain previous neogenesis block data
-  const pngfname = path.join(srcdir, `b${asUint64String(bnum - 256n)}.bc`);
-  const pngdata = fs.readFileSync(pngfname);
-  // perform pre-checks on previous neogenesis block data
-  if (typeof pngdata !== 'object') {
-    throw new TypeError(`"pngdata" is not an object: ${typeof pngdata}`);
-  } else if (!pngdata.length >= Mochimo.BlockTrailer.length + 4) {
-    throw new Error(`"pngdata.length" is insufficient: ${pngdata.length}`);
-  }
-  // interpret pngdata as block and perform block hash verification check
-  const pngblock = new Mochimo.Block();
-  if (!pngblock.verifyBlockHash()) {
-    throw new Error('"pngblock" hash could not be verified');
-  }
-  // create list of previous tagged address balances
-  const ptags = {};
-  for (const lentry of pngblock.ledger) {
-    // check ledger entry has (non-default) tag
-    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-      ptags[lentry.tag] = lentry.balance;
-    }
-  }
-  // build ledger JSON, as array of documents where tag balances have deltas
-  const ledgerJSON = [];
-  const ledgerPush = { timestamp: stime, bnum, bhash };
-  // scan current neogenesis tags and compare to previous
-  for (const lentry of block.ledger) {
-    // check ledger entry has (non-default) tag
-    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-      const pbalance = ptags[lentry.tag] || 0;
-      if (pbalance !== lentry.balance) {
-        // push balance deltas to balanceJSON
-        const _id = Db.util.id.balance(bnum, bhash, lentry.tag);
-        ledgerPush.tag = lentry.tag;
-        ledgerPush.delta = lentry.balance - pbalance;
-        ledgerPush.balance = lentry.balance;
-        ledgerJSON.push(Object.assign({ _id }, ledgerPush));
-      }
-      // remove tag from previous
-      delete ptags[lentry.tag];
-    }
-  }
-  // assume remaining ptags were spent to zero
-  ledgerPush.balance = 0;
-  for (const [tag, delta] of Object.entries(ptags)) {
-    const _id = Db.util.id.balance(bnum, bhash, tag);
-    ledgerPush.tag = tag;
-    ledgerPush.delta = -(delta);
-    ledgerJSON.push(Object.assign({ _id }, ledgerPush));
-  }
-  // return BigInt filtered ledgerJSON as array of ledger documents
-  return Db.util.filterBigInt(ledgerJSON);
-};
-
-export const buildTransactionDocument = (block) => {
-  // expose bnum, bhash and stime from block data
-  const { bnum, bhash, stime } = block;
-  // ensure block type is NORMAL, before proceeding
-  if (block.type !== Mochimo.Block.NORMAL) return;
-  // obtain and format transactions in transactionJSON
-  const transactionJSON = block.transactions.map(txe => {
-    // prepend _id, stime, bnum and bhash to minified txe
-    const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
-    return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
-  });
-  // push mining reward as extra transaction
-  const txe = { dstaddr: block.maddr, sendtotal: block.mreward };
-  const _id = Db.util.id.transaction(bnum, bhash, 'mreward');
-  transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
-  // return BigInt filtered transactionJSON as array of transaction documents
-  return Db.util.filterBigInt(transactionJSON);
-};
-
-export const processBlock = async (data, srcdir) => {
-  // perform pre-checks on data
-  if (typeof data !== 'object') {
-    throw new TypeError(`"data" is not an object: ${typeof data}`);
-  } else if (!data.length >= Mochimo.BlockTrailer.length + 4) {
-    throw new Error(`"data.length" is insufficient: ${data.length}`);
-  }
-  // interpret data as Mochimo Block and perform block hash verification check
-  const block = new Mochimo.Block(data);
-  if (!block.verifyBlockHash()) {
-    throw new Error('"block" hash could not be verified');
-  }
-  let logstr, _id;
-  try {
-    // build block component documents
-    const docs = {
-      block: buildBlockDocument(block),
-      ledger: buildLedgerDocument(block, srcdir),
-      transaction: buildTransactionDocument(block)
-    };
-    // store _id
-    _id = docs.block._id;
-    // start log string
-    logstr = _id + '; ';
-    // insert applicable documents and log results
-    for (const [col, doc] of Object.entries(docs)) {
-      if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
-    }
-  } catch (error) {
-    console.log(logstr, error);
-  } finally {
-    console.log(logstr);
-  }
-  // return block identifier (_id)
-  return _id;
+module.exports = {
+  buildBlockDocument,
+  buildLedgerDocument,
+  buildTransactionDocument,
+  processBlock,
+  visualizeHaiku
 };

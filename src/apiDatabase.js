@@ -196,4 +196,4 @@ const Db = {
   }
 };
 
-export default Db;
+module.exports = Db;
