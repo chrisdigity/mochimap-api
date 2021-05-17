@@ -115,6 +115,7 @@ const buildTransactionDocument = (block) => {
 };
 
 const processBlock = async (data, srcdir) => {
+  let logstr = '';
   // perform pre-checks on data
   if (typeof data !== 'object') {
     throw new TypeError(`"data" is not an object: ${typeof data}`);
@@ -126,7 +127,6 @@ const processBlock = async (data, srcdir) => {
   if (!block.verifyBlockHash()) {
     throw new Error('"block" hash could not be verified');
   }
-  let logstr, errstr;
   // check database for existing store
   const _id = Db.util.id.block(block.bnum, block.bhash);
   if (!(await Db.has('block', block.bnum, block.bhash))) {
@@ -137,17 +137,13 @@ const processBlock = async (data, srcdir) => {
         ledger: buildLedgerDocument(block, srcdir),
         transaction: buildTransactionDocument(block)
       };
-      // start log string
-      logstr = _id + '; ';
       // insert applicable documents and log results
       for (const [col, doc] of Object.entries(docs)) {
         if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
       }
-    } catch (error) {
-      errstr = '' + error;
-    }
-  } else errstr = 'existing database entry found';
-  console.log(logstr, errstr || '');
+    } catch (error) { logstr += '' + error; }
+  } else logstr = 'database entry found';
+  console.log(_id.replace(/^0+/, '0x').slice(0, -8) + ';', logstr);
   // return block identifier (_id)
   return _id;
 };
