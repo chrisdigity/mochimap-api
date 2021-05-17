@@ -107,7 +107,7 @@ const buildTransactionDocument = (block) => {
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
   });
   // push mining reward as extra transaction
-  const txe = { dstaddr: block.maddr, sendtotal: block.mreward };
+  const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
   transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
   // return BigInt filtered transactionJSON as array of transaction documents
