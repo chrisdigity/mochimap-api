@@ -31,7 +31,7 @@ if (typeof process.env.DBURI === 'undefined') {
   console.warn('// Database connection error expected...');
 }
 
-const { asUint64String, fidFormat } = require('./util');
+const { asUint64String, fidFormat } = require('./apiUtils');
 const { MongoClient, Long } = require('mongodb');
 
 let Client; // cached client connection
