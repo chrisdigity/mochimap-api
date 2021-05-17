@@ -126,26 +126,28 @@ const processBlock = async (data, srcdir) => {
   if (!block.verifyBlockHash()) {
     throw new Error('"block" hash could not be verified');
   }
-  let logstr, _id;
-  try {
-    // build block component documents
-    const docs = {
-      block: buildBlockDocument(block),
-      ledger: buildLedgerDocument(block, srcdir),
-      transaction: buildTransactionDocument(block)
-    };
-    // store _id
-    _id = docs.block._id;
-    // start log string
-    logstr = _id + '; ';
-    // insert applicable documents and log results
-    for (const [col, doc] of Object.entries(docs)) {
-      if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
+  // check database for existing store
+  const _id = Db.util.block(block.bnum, block.bhash);
+  if (!(await Db.has('block', block.bnum, block.bhash))) {
+    let logstr, errstr;
+    try {
+      // build block component documents
+      const docs = {
+        block: buildBlockDocument(block),
+        ledger: buildLedgerDocument(block, srcdir),
+        transaction: buildTransactionDocument(block)
+      };
+      // start log string
+      logstr = _id + '; ';
+      // insert applicable documents and log results
+      for (const [col, doc] of Object.entries(docs)) {
+        if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
+      }
+    } catch (error) {
+      errstr = '' + error;
+    } finally {
+      console.log(logstr, errstr || '');
     }
-  } catch (error) {
-    console.log(logstr, error);
-  } finally {
-    console.log(logstr);
   }
   // return block identifier (_id)
   return _id;
