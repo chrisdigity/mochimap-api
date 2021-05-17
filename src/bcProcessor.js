@@ -18,7 +18,7 @@
  *
  */
 
-console.log('\n// START:', __filename, '@', __dirname);
+console.log('\n// START:', __filename);
 
 /* environment variables */
 require('dotenv').config();
