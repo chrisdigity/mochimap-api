@@ -27,7 +27,7 @@
 
 /* connection uri check */
 if (typeof process.env.DBURI === 'undefined') {
-  console.warn('// WARNING: MongoDB connection uri (DBURI .env) is undefined');
+  console.warn('// WARNING: MongoDB connection uri is undefined');
   console.warn('// Database connection error expected...');
 }
 
