@@ -126,10 +126,10 @@ const processBlock = async (data, srcdir) => {
   if (!block.verifyBlockHash()) {
     throw new Error('"block" hash could not be verified');
   }
+  let logstr, errstr;
   // check database for existing store
   const _id = Db.util.block(block.bnum, block.bhash);
   if (!(await Db.has('block', block.bnum, block.bhash))) {
-    let logstr, errstr;
     try {
       // build block component documents
       const docs = {
@@ -145,10 +145,9 @@ const processBlock = async (data, srcdir) => {
       }
     } catch (error) {
       errstr = '' + error;
-    } finally {
-      console.log(logstr, errstr || '');
     }
-  }
+  } else errstr = 'existing database entry found';
+  console.log(logstr, errstr || '');
   // return block identifier (_id)
   return _id;
 };
