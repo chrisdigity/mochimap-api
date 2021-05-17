@@ -79,8 +79,10 @@ const Watcher = {
 
 /* set cleanup signal traps */
 const cleanup = (e, src) => {
-  console.log('// CLEANUP: terminating watcher timeout...');
-  if (Watcher._timeout) clearTimeout(Watcher._timeout);
+  if (Watcher._timeout) {
+    console.log('// CLEANUP: terminating watcher timeout...');
+    clearTimeout(Watcher._timeout);
+  }
   return informedShutdown(e, src);
 };
 process.on('SIGINT', cleanup);
