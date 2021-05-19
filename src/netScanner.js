@@ -103,7 +103,10 @@ const Scanner = {
         current.add(ip);
         node.peers.forEach((peer) => {
           // ignore private IP addresses
-          if (!isPrivateIPv4(peer)) current.add(peer);
+          if (!isPrivateIPv4(peer)) {
+            Scanner._recent.add(peer);
+            current.add(peer);
+          }
         });
       }
     });
@@ -157,12 +160,6 @@ const Scanner = {
       // build node options and perform peerlist request for latest state
       const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
       let node = await Mochimo.Node.callserver(nodeOptions);
-      // add available peers to _recent
-      const { peers } = node;
-      const sizeBefore = Scanner._recent.size;
-      if (Array.isArray(peers)) peers.forEach((ip) => Scanner._recent.add(ip));
-      const sizeDiff = Scanner._recent.size - sizeBefore;
-      if (sizeDiff) console.log(ip, 'added', sizeDiff, 'peers to _recent');
       // obtain latest timestamp from node and determine uptimestamp
       const { timestamp } = node;
       let lastVEOK;
