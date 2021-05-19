@@ -184,13 +184,10 @@ const Scanner = {
       // add _id, filter BigInt and update database with state of node
       const _id = Db.util.id.network(ip);
       node = Object.assign({ _id }, Db.util.filterBigInt(node));
-      if (await Db.has('network', ip)) {
-        const insert = await Db.update('network', node, { _id });
-        console.log(ip, 'update', (insert ? '' : 'not ') + 'acccepted...');
-      } else {
-        const update = await Db.insert('network', node);
-        console.log(ip, 'insert', (update ? '' : 'not ') + 'acccepted...');
-      }
+      try {
+        if (await Db.has('network', ip)) Db.update('network', node, { _id });
+        else if (await Db.insert('network', node)) console.log(ip, 'accepted');
+      } catch (error) { console.log(ip, 'database error;', error); }
       /* check for outdated host data on cached state
       // const hostOffset = now - ms.week; // calc host offset
       if (!cachedNode || cachedNode.host.timestamp < hostOffset) {
