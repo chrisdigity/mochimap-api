@@ -226,7 +226,7 @@ const Scanner = {
 /* set cleanup signal traps */
 const cleanup = (e, src) => {
   if (Scanner._timeout) {
-    console.log('// CLEANUP: terminating watcher timeout...');
+    console.log('// CLEANUP: terminating scanner timeout...');
     clearTimeout(Scanner._timeout);
   }
   return informedShutdown(e, src);
