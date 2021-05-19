@@ -186,10 +186,10 @@ const Scanner = {
       node = Object.assign({ _id }, Db.util.filterBigInt(node));
       if (await Db.has('network', ip)) {
         const insert = await Db.update('network', node, { _id });
-        console.log(ip, 'insert', (insert ? '' : 'not ') + 'acccepted...');
+        console.log(ip, 'update', (insert ? '' : 'not ') + 'acccepted...');
       } else {
         const update = await Db.insert('network', node);
-        console.log(ip, 'update', (update ? '' : 'not ') + 'acccepted...');
+        console.log(ip, 'insert', (update ? '' : 'not ') + 'acccepted...');
       }
       /* check for outdated host data on cached state
       // const hostOffset = now - ms.week; // calc host offset
