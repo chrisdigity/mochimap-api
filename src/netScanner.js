@@ -74,22 +74,20 @@ const Scanner = {
   _timemonitor: Date.now(),
   _timeout: undefined,
   init: async () => {
-    console.log('// INIT: begin network scanner initialization...');
+    console.log('// INIT: network scanner...');
     for (const source of STARTLIST) {
       if (!source) return;
       try { // download and decipher data from source
+        const sizeBefore = Scanner._recent.size;
         let data = source.startsWith('http')
           ? await readWeb(source) : await fsp.readFile(source, 'utf8');
         if (typeof data === 'string') {
           data = (data.match(/(^|(?<=\n))[\w.]+/g) || []);
           data = data.filter(ip => isIPv4(ip) && !isPrivateIPv4(ip));
-          if (data.length) {
-            const sizeBefore = Scanner._recent.size;
-            for (const ip of data) Scanner._recent.add(ip);
-            const sizeDiff = Scanner._recent.size - sizeBefore;
-            console.log(source, 'added', sizeDiff, 'peers to recent');
-          } else console.log(source, 'contained no valid peers...');
-        } else console.log(source, 'contained no data...');
+          if (data.length) for (const ip of data) Scanner._recent.add(ip);
+        }
+        const sizeDiff = Scanner._recent.size - sizeBefore;
+        console.log(source, `(${sizeDiff})`);
       } catch (error) { console.error(source, error); }
     }
   },
@@ -124,7 +122,7 @@ const Scanner = {
     // check for network communication loss
     if (!current.size && !Scanner._timeidle) {
       console.log('// NETWORK: communication loss detected!');
-      console.log('// performing network scan on ALL recorded peers...');
+      console.log('// performing scan on "recent" peers...');
       Scanner._timeidle = Date.now(); // record timestamp of communication loss
       Scanner._recent.forEach(Scanner.scan);
     } else if (current.size) { // assume network ok
@@ -134,7 +132,7 @@ const Scanner = {
       const idleTime = now - Scanner._timeidle;
       const idleOffset = now - INTERVAL.idle; // calc idle offset
       if (idleTime > idleOffset) {
-        console.log('// NETWORK: ongoing communication loss exceeded limit!');
+        console.log('// NETWORK: ongoing communication loss!');
         console.log('// performing network re-initialization...');
         Scanner._timeidle = 0; // reset idle time
         Scanner.init(); // asynchronous
@@ -198,7 +196,7 @@ const Scanner = {
       // add _id, filter BigInt and update database with state of node
       const _id = Db.util.id.network(ip);
       node = Object.assign({ _id }, Db.util.filterBigInt(node));
-      try {
+      try { // asynchronously submit to database
         if (await Db.has('network', ip)) Db.update('network', node, { _id });
         else if (await Db.insert('network', node)) console.log(ip, 'accepted');
       } catch (error) { console.log(ip, 'database error;', error); }
