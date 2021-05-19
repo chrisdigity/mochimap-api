@@ -168,7 +168,7 @@ const Scanner = {
         const connection = {};
         const { status, ping, baud } = node;
         connection[REGION] = { status, ping, baud, timestamp, uptimestamp };
-        node = Object.assign(connection, node);
+        node = Object.assign({ connection }, node);
       }
       delete node.lastVEOK; // not included in database
       delete node.uptimestamp;
