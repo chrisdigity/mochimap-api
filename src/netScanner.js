@@ -185,7 +185,7 @@ const Scanner = {
       const _id = Db.util.id.network(ip);
       node = Object.assign({ _id }, Db.util.filterBigInt(node));
       if (await Db.has('network', ip)) {
-        const insert = await Db.update('network', node);
+        const insert = await Db.update('network', node, { _id });
         console.log(ip, 'insert', (insert ? '' : 'not ') + 'acccepted...');
       } else {
         const update = await Db.insert('network', node);
