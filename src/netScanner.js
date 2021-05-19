@@ -86,7 +86,9 @@ const Scanner = {
       } catch (error) { console.error(source, error); }
     }
   },
-  run: async () => {
+  run: () => {
+    // queue next Scanner.run()
+    Scanner._timeout = setTimeout(Scanner.run, Scanner._timeinterval);
     // rebuild current (global) peerlist from active and associated peers
     const current = new Set();
     Scanner._cache.forEach((node, ip) => {
@@ -128,11 +130,9 @@ const Scanner = {
         console.log('// NETWORK: ongoing communication loss exceeded limit!');
         console.log('// performing network re-initialization...');
         Scanner._timeidle = 0; // reset idle time
-        await Scanner.init();
+        Scanner.init(); // asynchronous
       }
     }
-    // queue next Scanner.run()
-    Scanner._timeout = setTimeout(Scanner.run, Scanner._timeinterval);
   },
   scan: async (ip) => {
     // add ip to _scanning, or bail to avoid overlapping requests
