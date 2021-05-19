@@ -31,25 +31,6 @@ const objectIsEmpty = (obj) => {
   return true;
 };
 
-const objectDifference = (objA, objB, depth = 0) => {
-  if (typeof objA !== 'object' || typeof objB !== 'object') {
-    throw new TypeError('comparison parameters MUST BE objects');
-  } else if (typeof depth !== 'number') {
-    throw new TypeError('depth parameter CANNOT be assigned a non-number type');
-  }
-  return Object.entries(objB)
-    .filter(([key, value]) => objA[key] !== value)
-    .reduce((objC, [key, value]) => {
-      if (typeof value === 'object' && typeof objA[key] === 'object') {
-        if (depth - 1 !== 0) {
-          value = objectDifference(objA[key], value, depth - 1);
-          if (objectIsEmpty(value)) return objC;
-        }
-      }
-      return { ...objC, [key]: value };
-    }, {});
-};
-
 const fidFormat = (fid, ...args) => {
   const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
   const tJoin = (array, max, d) => {
@@ -198,7 +179,6 @@ const ms = {
 
 module.exports = {
   asUint64String,
-  objectDifference,
   objectIsEmpty,
   fidFormat,
   checkRequest,
