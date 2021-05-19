@@ -121,7 +121,7 @@ const Db = {
     const fid = fidFormat('Db.stream', cName, pipeline, options);
     const col = await Db._collection(cName, fid);
     // console.debug(fid, 'obtain change stream...');
-    return col.watch(cName, pipeline, options);
+    return col.watch(pipeline, options);
   },
   update: async (cName, update, query, options) => {
     const fid = fidFormat('Db.update', cName, update, query);
