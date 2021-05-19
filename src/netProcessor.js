@@ -30,9 +30,9 @@ const Db = require('./apiDatabase');
 /* watcher */
 const Watcher = {
   _timeout: undefined,
-  init: () => {
+  init: async () => {
     try { // create change stream on network collection
-      Db.stream('network').on('change', (changeEvent) => {
+      (await Db.stream('network')).on('change', (changeEvent) => {
         console.log(changeEvent);
       });
     } catch (error) {
