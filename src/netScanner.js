@@ -58,13 +58,20 @@ const STARTLIST = [
   'https://mochimo.org/startnodes.lst',
   process.env.STARTLIST
 ];
+const INTERVAL = {
+  idle: ms.second * 60, // allowable network communications loss
+  monitor: ms.second * 337.5, // target Mochimo block time
+  run: ms.second,
+  stale: ms.day * 3,
+  update: ms.second * 30
+};
 
 const Scanner = {
   _cache: new Map(),
   _recent: new Set(),
   _scanning: new Set(),
-  _timeidle: 0,
-  _timeinterval: ms.second,
+  _timeidle: undefined,
+  _timemonitor: Date.now(),
   _timeout: undefined,
   init: async () => {
     console.log('// INIT: begin network scanner initialization...');
@@ -87,8 +94,9 @@ const Scanner = {
     }
   },
   run: () => {
-    // queue next Scanner.run()
-    Scanner._timeout = setTimeout(Scanner.run, Scanner._timeinterval);
+    const now = Date.now();
+    // queue next Scanner.run() to execute approx. every second
+    Scanner._timeout = setTimeout(Scanner.run, INTERVAL.run);
     // rebuild current (global) peerlist from active and associated peers
     const current = new Set();
     Scanner._cache.forEach((node, ip) => {
@@ -102,7 +110,7 @@ const Scanner = {
       }
     });
     // remove stale nodes from cache
-    const staleOffset = Date.now() - (ms.day * 3); // calc stale offset
+    const staleOffset = Date.now() - INTERVAL.stale; // calc stale offset
     Scanner._cache.forEach((node, ip) => {
       // check node for inactivity (!VEOK), drop from cache if stale
       /// - must NOT be included in current (global) peerlist
@@ -120,12 +128,11 @@ const Scanner = {
       Scanner._timeidle = Date.now(); // record timestamp of communication loss
       Scanner._recent.forEach(Scanner.scan);
     } else if (current.size) { // assume network ok
-      Scanner._timeidle = 0;
+      Scanner._timeidle = undefined;
       current.forEach(Scanner.scan);
     } else { // assume ongoing network communications loss
-      const now = Date.now();
       const idleTime = now - Scanner._timeidle;
-      const idleOffset = now - (ms.second * 30); // calc idle offset
+      const idleOffset = now - INTERVAL.idle; // calc idle offset
       if (idleTime > idleOffset) {
         console.log('// NETWORK: ongoing communication loss exceeded limit!');
         console.log('// performing network re-initialization...');
@@ -133,12 +140,19 @@ const Scanner = {
         Scanner.init(); // asynchronous
       }
     }
+    // check for monitor update
+    const monitorOffset = now - INTERVAL.monitor; // calc monitor offset
+    if (Scanner._timemonitor < monitorOffset) {
+      Scanner._timemonitor = now;
+      console.log('Network State;',
+        Scanner._recent.size, 'recent,', current.size, 'current...');
+    }
   },
   scan: async (ip) => {
     // add ip to _scanning, or bail to avoid overlapping requests
     if (Scanner._scanning.has(ip)) return; else Scanner._scanning.add(ip);
     // obtain relative offsets and previous node state
-    const updateOffset = Date.now() - (ms.second * 30); // calc update offset
+    const updateOffset = Date.now() - INTERVAL.update; // calc update offset
     const cachedNode = Scanner._cache.get(ip);
     // check for outdated node state
     if (!cachedNode || cachedNode.timestamp < updateOffset) {
