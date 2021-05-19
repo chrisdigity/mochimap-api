@@ -92,7 +92,7 @@ const Scanner = {
     Scanner._cache.forEach((node, ip) => {
       if (node.status === Mochimo.VEOK) {
         // add node host ip and peerlist ip's
-        current.add(node.host.ip);
+        current.add(ip);
         node.peers.forEach((peer) => {
           // ignore private IP addresses
           if (!isPrivateIPv4(peer)) current.add(peer);
