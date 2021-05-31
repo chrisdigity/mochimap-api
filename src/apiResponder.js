@@ -17,6 +17,12 @@
  *
  */
 
+/* full node ipv4 check */
+if (typeof process.env.FULLNODE === 'undefined') {
+  console.warn('// WARNING: Mochimo full node ipv4 is undefined');
+  console.warn('// Balance requests produce unexpected results...');
+}
+
 const { isPrivateIPv4 } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
