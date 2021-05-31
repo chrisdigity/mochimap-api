@@ -1,5 +1,5 @@
 /**
- *  MochiMap Responder - Responds to requests made to the API
+ *  apiResponder.js; Handles responses to API requests for MochiMap
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -17,10 +17,10 @@
  *
  */
 
-const { isPrivateIPv4 } = require('./util');
+const { isPrivateIPv4 } = require('./apiUtils');
+const Interpreter = require('./apiInterpreter');
+const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
-const Mongo = require('./mongo');
-const Interpreter = require('./interpreter');
 
 const expandResults = async (cursor, options, start) => {
   const dbquery = { duration: null, found: await cursor.count() };
@@ -78,7 +78,7 @@ const Responder = {
       const search = { query: { tag }, options: {} };
       if (params) Object.assign(search, Interpreter.search(params, true));
       // query database for results
-      cursor = await Mongo.find('balance', search.query, search.options);
+      cursor = await Db.find('balance', search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
@@ -92,9 +92,9 @@ const Responder = {
   block: async (res, blockNumber) => {
     try {
       // convert blockNumber parameter to Long number type
-      const bnum = Mongo.util.long(blockNumber);
+      const bnum = Db.util.long(blockNumber);
       // perform block query
-      const block = await Mongo.findOne('block', { bnum });
+      const block = await Db.findOne('block', { bnum });
       // send successfull query or 404
       return Responder._respond(res, block ? 200 : 404, block ||
         { message: `${blockNumber} could not be found...` });
@@ -109,7 +109,7 @@ const Responder = {
         return Responder._respond(res, 400, { error, message });
       }
       // perform network query
-      const node = await Mongo.findOne('network', { ip });
+      const node = await Db.findOne('network', { ip });
       // send successfull query or 404
       return Responder._respond(res, node ? 200 : 404, node ||
         { message: `${ip} could not be found...` });
@@ -123,7 +123,7 @@ const Responder = {
       const search = { query: {}, options: {} };
       Object.assign(search, Interpreter.search(args[0], paged));
       // query database for results
-      cursor = await Mongo.find(cName, search.query, search.options);
+      cursor = await Db.find(cName, search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);
@@ -140,7 +140,7 @@ const Responder = {
   transaction: async (res, txid) => {
     try {
       // perform transaction query
-      const transaction = await Mongo.findOne('transaction', { txid });
+      const transaction = await Db.findOne('transaction', { txid });
       // send successfull query or 404
       return Responder._respond(res, transaction ? 200 : 404, transaction ||
         { message: `${txid} could not be found...` });
@@ -156,7 +156,7 @@ const Responder = {
       const search = { query: {}, options: {} };
       Object.assign(search, Interpreter.search(query, true));
       // query database for results
-      cursor = await Mongo.find('history', search.query, search.options);
+      cursor = await Db.find('history', search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
       // send succesfull query or 404
       if (dbquery.results.length) Responder._respond(res, 200, dbquery);

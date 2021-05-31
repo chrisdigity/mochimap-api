@@ -1,5 +1,5 @@
 /**
- *  MochiMap Interpreter - Interprets various forms of input data for the API
+ *  apiInterpreter.js; Interprets input data of API requests for MochiMap
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify

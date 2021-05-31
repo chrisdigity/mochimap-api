@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- *  MochiMap   Realtime network analysis for the Mochimo Cryptocurrency Network
+ *  apiServer.js; Mochimo Cryptocurrency Network API (primarily) for MochiMap
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -18,495 +18,70 @@
  *
  */
 
+console.log('\n// START:', __filename);
+
+/* environment variables */
 require('dotenv').config();
 
-/* global BigInt */
-/* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
-BigInt.prototype.toJSON = function () { return this.toString(); };
-
+/* modules and utilities */
 const fs = require('fs');
-const fsp = fs.promises;
-const path = require('path');
 const http = require('http');
 const https = require('https');
-// const crypto = require('crypto');
-const { isIPv4 } = require('net');
-const {
-  isPrivateIPv4,
-  ms,
-  // objectDifference,
-  // objectIsEmpty,
-  readWeb,
-  visualizeHaiku
-} = require('./util');
-const Mongo = require('./mongo');
-const Mochimo = require('mochimo');
-const Router = require('./router');
+const { informedShutdown } = require('./apiUtils');
+const Router = require('./apiRouter');
 
-/* pre-core */
-// const GENESIS_HASH =
-//   '00170c6711b9dc3ca746c46cc281bc69e303dfad2f333ba397ba061eccefde03';
-const SET_LIMIT = 0xfff;
-const DATADIR = path.join('.', 'data');
-const BCDIR = path.join(DATADIR, 'bc');
-
-const Network = {
-  block: {
-    _cache: new Set(), // TODO: switch to using _chain
-    _chain: new Map(),
-    check: async (node, bnum, bhash, noExtended) => {
-      const fid = 'Network.block.check():';
-      let ip;
-      if (typeof node === 'object') {
-        noExtended = node.noExtended;
-        bhash = node.cblockhash;
-        bnum = node.cblock;
-        ip = node.ip;
-      } else ip = node;
-      if (bnum === 0n) return; // disregard B.O.D. checks
-      if (!Network.block._cache.has(bhash)) {
-        // check cache for recently discovered blocks
-        Network.block._cache.add(bhash);
-        if (Network.block._cache.size > SET_LIMIT) {
-          Network.block._cache.delete(
-            Network.block._cache.values().next().value);
-        }
-        // check database has received block update
-        const hasBlock = await Mongo.has('block', bnum, bhash);
-        if (!hasBlock) {
-          try { // download/verify block is as advertised
-            const block = await Network.block.download(ip, bnum, bhash);
-            // initiate block update
-            await Network.block.update(ip, block, noExtended);
-            // asynchronous check for previous blocks
-            const phash = block.phash;
-            const pbnum = block.bnum - 1n;
-            await Network.block.check(ip, pbnum, phash, true);
-          } catch (error) { // trace errors
-            Network.block._cache.add(bhash);
-            console.trace(fid, error);
-          } finally { // check integrity of stored blockchain
-            if (!noExtended) await Network.block.integrity(bnum, bhash);
-          }
-        }
-      }
-    },
-    download: async (ip, bnum, bhash) => {
-      const fid = 'Network.block.download():';
-      const block = await Mochimo.getBlock(ip, bnum);
-      if (block.bnum !== bnum) {
-        // drop blocks where the advertised block number does not match received
-        throw new Error(`${fid} Downloaded ${bnum} from ${ip}, got ${bnum}`);
-      } else if (block.bhash !== bhash) {
-        // drop blocks where the advertised block hash does not match received
-        throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
-          `${ip} got ${block.bnum}/${block.bhash.slice(0, 8)}~`);
-      } else if (block.type === Mochimo.Block.INVALID) {
-        // drop blocks where the Block.type cannot be determined
-        throw new Error(`${fid} Downloaded ${bnum}/${bhash.slice(0, 8)}~ from` +
-          ip + 'got invalid block type');
-      } else if (!block.verifyBlockHash()) {
-        // drop blocks where the block hash does not match calculated result
-        throw new Error(`${fid} sha256 block hash mismatch`);
-      }
-      return block;
-    },
-    integrity: async (bnum, bhash) => {
-      const fid = 'Network.block.integrity():';
-      let backscan = ((~(bnum - 1n)) & bnum) * 2n; // determine backscan depth
-      if (backscan > bnum) backscan = bnum; // apply bnum backscan limit
-      if (backscan > 0xffn) console.log(fid, backscan, 'block backscan...');
-      while (backscan--) {
-        let block;
-        try { // check database for block
-          const _id = Mongo.util.id.block(bnum, bhash);
-          block = await Mongo.findOne('block', { _id });
-        } catch (error) { console.trace(fid, error); }
-        if (!block) { // query all nodes for block if not found
-          for (const node of Network.node._list.values()) {
-            if (node.status) return; // ignore nodes with issues
-            try { // download block from next node
-              block = await Network.block.download(node.ip, bnum, bhash);
-              await Network.block.update(block); // process block update
-              break; // block check/update successful
-            } catch (error) { // download failed, report and try next node
-              console.error(fid, error);
-            }
-          }
-        } // check for block again, TODO: send email report alerting failure
-        if (!block) return console.trace(fid, 'blockchain integrity failure!');
-        // update bnum and bhash
-        bnum -= 1n;
-        bhash = block.phash;
-      }
-      if (backscan > 0xffn) console.log(fid, 'integrity verified!');
-    },
-    update: async (ip, block, noVisual) => {
-      const fid = 'Network.block.update():';
-      // expose bnum, bhash and stime from block data
-      const { bnum, bhash, stime } = block;
-      // prepend _id to minified block JSON
-      const _bid = Mongo.util.id.block(bnum, bhash);
-      const blockJSON = Object.assign({ _id: _bid }, block.toJSON(true));
-      // send block JSON to Server interface for asynchronous broadcast
-      Server.broadcast('blockUpdates', 'block', blockJSON);
-      // store raw block on disk, async (no overwrite, excl. neogenesis blocks)
-      if (bnum & 0xffn) { // neogenesis blocks are generated, no need to store
-        const fpath = path.join(BCDIR, blockJSON._id);
-        const failure = `failed to write raw block to ${path};`;
-        fsp.mkdir(BCDIR, { recursive: true })
-          .then(() => fsp.writeFile(fpath, block, { flag: 'wx' }))
-          .catch(error => console.error(fid, failure, error));
-      }
-      // filter BigInt from blockJSON and insert in database
-      Mongo.util.filterBigInt(blockJSON);
-      if (await Mongo.insert('block', blockJSON) < 1) {
-        throw new Error(`${fid} insert error, block document insert failed`);
-      }
-      // handle transactions on normal blocks
-      if (blockJSON.type === Mochimo.Block.NORMAL) {
-        // push mining reward to historyJSON
-        const _hid = Mongo.util.id.history(bnum, bhash, undefined, 'mreward');
-        const history = { timestamp: stime, bnum, bhash };
-        const historyJSON = [Object.assign({ _id: _hid }, history)];
-        historyJSON[0].to = blockJSON.maddr;
-        historyJSON[0].amount = blockJSON.mreward;
-        // obtain and format transactions in txJSON
-        const txJSON = block.transactions.map(txe => {
-          let _id;
-          // minify tx entry before processing
-          txe = txe.toJSON(true);
-          // push simple transaction history to historyJSON~
-          // when src === chg; 1 of 2 simple transactions take place...
-          /// add from src to dst at sendtotal, if sendtotal or !changetotal
-          /// add from src to chg at changetotal, if changetotal
-          // when src !== chg; 1 OR 2 simple transactions take place...
-          /// add from src to dst at sendtotal, if sendtotal
-          /// add from src to chg at changetotal, if changetotal
-          const { txid, srctag, dsttag, chgtag, sendtotal, changetotal } = txe;
-          const src = srctag === Mochimo.DEFAULT_TAG ? txe.srcaddr : srctag;
-          const dst = dsttag === Mochimo.DEFAULT_TAG ? txe.dstaddr : dsttag;
-          const chg = chgtag === Mochimo.DEFAULT_TAG ? txe.chgaddr : chgtag;
-          history.txid = txid;
-          if (sendtotal || !changetotal) {
-            history.from = src;
-            history.to = dst;
-            history.amount = sendtotal;
-            _id = Mongo.util.id.history(bnum, bhash, txid, 'src-dst');
-            historyJSON.push(Object.assign({ _id }, history));
-          }
-          if ((!sendtotal && changetotal) || (src !== chg && changetotal)) {
-            history.from = src;
-            history.to = chg;
-            history.amount = changetotal;
-            _id = Mongo.util.id.history(bnum, bhash, txid, 'src-chg');
-            historyJSON.push(Object.assign({ _id }, history));
-          }
-          // prepend _id, bnum and bhash to minified txe
-          _id = Mongo.util.id.transaction(bnum, bhash, txe.txid);
-          return Object.assign({ _id, bnum, bhash }, txe);
-        });
-        // check txJSON for length, filter BigInt and insert in database
-        if (txJSON.length) {
-          Mongo.util.filterBigInt(txJSON);
-          const txInsert = await Mongo.insert('transaction', txJSON);
-          if (txInsert < txJSON.length) {
-            throw new Error(`${fid} insert error, inserted ${txInsert}/` +
-              txJSON.length + 'transaction documents');
-          }
-        } else throw new Error(`${fid} blockchain error, missing transactions`);
-        // check historyJSON for length, filter BigInt and insert in database
-        if (historyJSON.length) {
-          Mongo.util.filterBigInt(historyJSON);
-          const historyInsert = await Mongo.insert('history', historyJSON);
-          if (historyInsert < historyJSON.length) {
-            throw new Error(`${fid} insert error, inserted ${historyInsert}/` +
-              historyJSON.length + 'transaction documents');
-          }
-        } else throw new Error(`${fid} blockchain error, missing history`);
-      } else if (blockJSON.type === Mochimo.Block.NEOGENESIS) {
-        // obtain block hash of previous neogenesis block
-        const pngbnum = bnum - 256n;
-        const pngbhash = await Mochimo.getHash(ip, pngbnum);
-        const pngbid = Mongo.util.id.block(pngbnum, pngbhash);
-        const balanceJSON = [];
-        const balance = { timestamp: stime, bnum, bhash };
-        // check filesystem before downloading neogenesis from sourcepeer
-        let pngblock;
-        try {
-          pngblock = await fsp.readFile(pngbid);
-        } catch (ignore) {
-          pngblock = await Mochimo.getBlock(ip, pngbnum);
-        } finally {
-          if (pngblock) {
-            pngblock = new Mochimo.Block(pngblock);
-            balance.phash = pngblock.bhash;
-            // create list of previous tag balances
-            const ptags = {};
-            for (const lentry of pngblock.ledger) {
-              // check ledger entry has (non-default) tag
-              if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-                ptags[lentry.tag] = lentry.balance;
-              }
-            }
-            // scan current neogenesis tags and compare to previous
-            for (const lentry of block.ledger) {
-              // check ledger entry has (non-default) tag
-              if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-                const pbalance = ptags[lentry.tag] || 0;
-                if (pbalance !== lentry.balance) {
-                  // push balance deltas to balanceJSON
-                  const _id = Mongo.util.id.balance(bnum, bhash, lentry.tag);
-                  balance.tag = lentry.tag;
-                  balance.delta = lentry.balance - pbalance;
-                  balance.balance = lentry.balance;
-                  balanceJSON.push(Object.assign({ _id }, balance));
-                }
-                // remove tag from previous
-                delete ptags[lentry.tag];
-              }
-            }
-            // assume remaining ptags were spent to zero
-            balance.balance = 0;
-            for (const [tag, delta] of Object.entries(ptags)) {
-              const _id = Mongo.util.id.balance(bnum, bhash, tag);
-              balance.tag = tag;
-              balance.delta = -(delta);
-              balanceJSON.push(Object.assign({ _id }, balance));
-            }
-          }
-        }
-        // check balanceJSON for length, filter BigInt and insert
-        if (balanceJSON.length) {
-          Mongo.util.filterBigInt(balanceJSON);
-          const balanceInsert = await Mongo.insert('balance', balanceJSON);
-          if (balanceInsert < balanceJSON.length) {
-            throw new Error(`${fid} insert error, inserted ${balanceInsert}/` +
-              balanceJSON.length + 'balance documents');
-          }
-        } else throw new Error(`${fid} blockchain error, missing balance`);
-      }
-      // send block data to visualizer for haiku visualization
-      if (!noVisual) await Network.block.visualizer(blockJSON);
-      // return block for promise chaining
-      return block;
-    },
-    visualizer: async (block) => {
-      const bhash = block.bhash;
-      const bnum = block.bnum;
-      // find appropriate block to use for haiku visualization
-      let checkback = 0;
-      let shadow = 0;
-      while (block.type !== Mochimo.Block.NORMAL || checkback > 0) {
-        shadow |= checkback;
-        if (block.type === Mochimo.Block.NORMAL) checkback--; // decrease checkback
-        else {
-          shadow |= ++checkback; // increase checkback and trigger shadow haiku
-          // get previous block data (if available) and start over
-          const _id = Mongo.util.id.block(BigInt(block.bnum) - 1n, block.bhash);
-          block = await Mongo.findOne('block', { _id });
-          if (block) continue;
-          break;
-        }
-      }
-      // visualize Haiku from appropriate block data
-      if (block) {
-        shadow = Boolean(shadow);
-        const haiku = Mochimo.Trigg.expand(block.nonce, shadow);
-        const visual = await visualizeHaiku(haiku, shadow);
-        // send haiku to Server interface for asynchronous broadcast
-        Server.broadcast('haikuUpdates', 'haiku', visual);
-        // send haiku to Mongo interface for asynchronous database update
-        const _id = Mongo.util.id.block(BigInt(bnum), bhash);
-        await Mongo.update('block', visual, { _id });
-      } else console.warn(`cannot visualize bnum ${bnum} at this time...`);
-    }
-  },
-  node: {
-    _idle: 0,
-    _list: new Map(),
-    _start: [
-      path.join(DATADIR, 'startnodes.lst'),
-      'https://www.mochimap.com/startnodes.lst',
-      'https://mochimo.org/startnodes.lst',
-      'https://www.mochimap.net/startnodes.lst',
-      false // indicates failure
-    ],
-    _timer: null,
-    add: async (fid, ip, source) => {
-      console.log(fid, 'adding', ip, 'via', source);
-      const node = new Mochimo.Node({ ip }).toJSON();
-      Network.node._list.set(ip, node); // add to _list
-      await Network.node.update(node, ip); // update node
-    },
-    consensus: () => {
-      const chains = new Map();
-      let consensus = null;
-      Network.node._list.forEach(node => {
-        // ensure node has cblockhash and VEOK status
-        if (!node.cblockhash || node.status) return;
-        // increment consensus for chain
-        if (chains.has(node.cblockhash)) {
-          chains.set(node.cblockhash, chains.get(node.cblockhash) + 1);
-        } else chains.set(node.cblockhash, 1);
-        // determine consensus
-        if (!consensus || chains.get(node.cblockhash) > chains.get(consensus)) {
-          consensus = { bnum: node.cblock, bhash: node.cblockhash };
-        }
-      });
-      return consensus;
-    },
-    scan: async () => {
-      const fid = 'Network.node.scan():';
-      // setup scan parameters and scan all registered nodes, asynchronously
-      const len = Network.node._list.size;
-      let active = 0;
-      Network.node._list.forEach((nodeJSON, ip) => {
-        if (nodeJSON.status === Mochimo.VEOK) active++;
-        Network.node.update(nodeJSON, ip).catch(console.trace);
-      });
-      // fresh start or complete network blackout check
-      if (!active && !Network.node._idle) Network.node._idle = Date.now();
-      else if (active) Network.node._idle = 0;
-      const idleTime = Network.node._idle ? Date.now() - Network.node._idle : 0;
-      if (idleTime > Network.node._intervalUpdate || len === 0) {
-        console.log(`Active/Total Nodes: ${active}/${len}; Seek more nodes...`);
-        for (const source of Network.node._start) {
-          if (!source) { // check source failure
-            Network.node._timer = setTimeout(Network.node.scan, ms.minute);
-            return console.error(fid, 'failure! Retry in 60 seconds...');
-          } else console.log(fid, 'trying', source);
-          try { // download and decipher data from source
-            let data = source.startsWith('http')
-              ? await readWeb(source) : await fsp.readFile(source, 'utf8');
-            if (typeof data !== 'string') throw new Error('no string data');
-            data = (data.match(/(^|(?<=\n))[\w.]+/g) || []);
-            data = data.filter(ip =>
-              isIPv4(ip) && !isPrivateIPv4(ip) && !Network.node._list.has(ip));
-            if (!data.length) throw new Error('no additional/valid IP data');
-            // add valid nodes to network node list
-            for (const ip of data) await Network.node.add(fid, ip, source);
-            break; // end loop
-          } catch (error) { console.error(fid, source, 'failure;', error); }
-        }
-      }
-      Network.node._timer = setTimeout(Network.node.scan, ms.second);
-    },
-    update: async (nodeJSON) => {
-      const internalCall = typeof nodeJSON.status === 'undefined';
-      const fid = `Network.node.update(${internalCall ? 'internal' : 'scan'}):`;
-      const ip = nodeJSON.ip; // dereference ip
-      const now = Date.now(); // get timestamp
-      const dropOffset = now - ms.day; // calc drop offset
-      const updateOffset = now - (ms.second * 20); // calc update offset
-      // remove stale nodes after 1 day, otherwise check node update condition
-      if (typeof nodeJSON.lastOk === 'undefined') nodeJSON.lastOk = now;
-      if (nodeJSON.lastOk < dropOffset) return Network.node._list.delete(ip);
-      if (typeof nodeJSON.lastTouch === 'undefined') nodeJSON.lastTouch = 0;
-      if (nodeJSON.lastTouch < updateOffset) {
-        nodeJSON.lastTouch = now; // update before peerlist request
-        // build options and perform peerlist request
-        const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
-        const node = (await Mochimo.Node.callserver(nodeOptions)).toJSON();
-        // initiate asynchronous block check on nodes returning a blockhash
-        if (node.cblockhash) Network.block.check(node).catch(console.trace);
-        // check for additional nodes in resulting peerlist
-        if (Array.isArray(node.peers)) {
-          for (const peer of node.peers) {
-            if (isPrivateIPv4(peer) || Network.node._list.has(peer)) continue;
-            // queue asynchronous add and scan of additional peers on peerlist
-            Network.node.add(fid, peer, ip).catch(console.trace);
-          }
-        }
-        // check geolocation update condition
-        const ipinfoOffset = now - ms.week; // calc geo offset
-        if (typeof nodeJSON.ipinfoTime === 'undefined') nodeJSON.ipinfoTime = 0;
-        if (nodeJSON.ipinfoTime < ipinfoOffset) {
-          const ipinfoSource =
-            `https://ipinfo.io/${ip}/json?token=${process.env.IPINFO}`;
-          const ipinfo = await readWeb(ipinfoSource);
-          if (typeof ipinfo === 'object') {
-            node.ipinfoTime = Date.now();
-            if (!ipinfo.error) {
-              delete ipinfo.ip;
-              node.ipinfo = ipinfo;
-            } else console.trace(ipinfoSource, JSON.stringify(ipinfo.error));
-          } else console.trace(ipinfoSource, 'failed to return json data');
-        }
-        /* // check for realtime changes to map structure
-        const oldNode = Network.node._list.get(ip);
-        if (oldNode) {
-          // determine differences between latest node data and broadcast
-          const updates = objectDifference(oldNode, node);
-          if (!objectIsEmpty(updates)) {
-            updates.ip = ip; // ensure identification integrity
-            Server.broadcast('networkUpdates', 'network', updates);
-          }
-        } else Server.broadcast('networkUpdates', 'network', node); */
-        // assign node data to network list
-        Object.assign(nodeJSON, node);
-        // filter BigInt values from node for Mongo compatibility
-        const filter = { upsert: true };
-        const query = { _id: Mongo.util.id.network(ip) };
-        Mongo.update('network', Mongo.util.filterBigInt(node), query, filter);
-      }
-    }
-  }
-}; // end const Network...
+/* server */
 const Server = {
   _api: null,
-  _apiConnections: new Set(),
+  _connections: new Set(),
+  _sockets: new Set(),
   broadcast: (type, event, data) => { /* noop until websockets */ },
-  start: () => new Promise((resolve, reject) => {
+  init: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
     console.log(fid, 'creating new http/s server...');
-    // create http/s server
-    Server._api = process.env.PRODUCTION
-      ? https.createServer({ // secure production server
-        key: fs.readFileSync('/etc/ssl/private/mochimap.com.key'),
-        cert: fs.readFileSync('/etc/ssl/certs/mochimap.com.pem')
-      }) : http.createServer(); // insecure development server
-    // set http server events
-    Server._api.on('request', Router);
-    Server._api.on('error', reject);
-    Server._api.on('connect', (res, socket/* , head */) => {
-      Server._apiConnections.add(socket); // track connections
-      socket.on('end', () => Server._apiConnections.delete(socket));
-    });
-    Server._api.on('listening', () => {
-      const { address, port } = Server._api.address();
-      console.log(fid, `${address}:${port} ready`);
-      resolve();
-    });
-    // start http server
-    Server._api.listen(process.env.PRODUCTION ? 443 : 80, '0.0.0.0');
+    try {
+      // create http/s server
+      Server._api = process.env.DEVELOPMENT
+        ? http.createServer() // insecure development server
+        : https.createServer({ // secure production server
+          key: fs.readFileSync('/etc/ssl/private/mochimap.com.key'),
+          cert: fs.readFileSync('/etc/ssl/certs/mochimap.com.pem')
+        });
+      // set http server events
+      Server._api.on('request', Router);
+      Server._api.on('error', reject);
+      Server._api.on('connect', (res, socket/* , head */) => {
+        Server._connections.add(socket); // track connections
+        socket.on('end', () => Server._apiConnections.delete(socket));
+      });
+      Server._api.on('listening', () => {
+        const { address, port } = Server._api.address();
+        console.log(fid, `${address}:${port} ready`);
+        resolve();
+      });
+      // start http server
+      Server._api.listen(process.env.DEVELOPMENT ? 80 : 443, '0.0.0.0');
+    } catch (error) {
+      console.error('An ERROR occurred during server initialization;', error);
+    }
   })
 };
 
 /* cleanup */
-const gracefulShutdown = (err, origin = 'unknown') => {
-  console.error(`\nSHUTDOWN recv'd ${err} frpm ${origin}`);
-  // clear timers
-  if (Network.node._timer) clearTimeout(Network.node._timer);
-  // close server and/or exit
+const cleanup = (e, src) => {
+  // end server (removing connections) and/or exit
   if (Server._api) {
-    // initiate server shutdown
-    Server._api.close(() => {
-      console.log('Server closed...\n');
-      process.exit(Number(err) || 1);
-    });
-    // disconnect existing connections
+    console.log('// CLEANUP: initiating server shutdown...');
+    Server._api.close().then(() => informedShutdown(e, src));
+    console.log('// CLEANUP: disconnecting current connection requests...');
     Server._apiConnections.forEach(socket => socket.destroy());
-  } else {
-    console.log('Nothing to finish...\n');
-    process.exit(Number(err) || 1);
-  }
+  } else return informedShutdown(e, src);
 };
-process.on('SIGINT', gracefulShutdown);
-process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', cleanup);
+process.on('SIGTERM', cleanup);
 process.on('uncaughtException', console.trace);
 
 /* startup */
 console.log('Begin startup...');
 // start api server and begin network scanning
-Server.start().then(Network.node.scan).catch(gracefulShutdown);
+Server.init();

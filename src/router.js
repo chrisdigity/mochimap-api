@@ -1,5 +1,5 @@
 /**
- *  MochiMap Router - Routes API requests appropriately
+ *  apiRouter.js; API request router for MochiMap appropriately
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -17,7 +17,7 @@
  *
  */
 
-const Responder = require('./responder');
+const Responder = require('./apiResponder');
 const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
