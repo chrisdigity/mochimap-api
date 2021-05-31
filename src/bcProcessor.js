@@ -23,6 +23,16 @@ console.log('\n// START:', __filename);
 /* environment variables */
 require('dotenv').config();
 
+/* token check */
+if (typeof process.env.PEXELS === 'undefined') {
+  console.warn('// WARNING: Pexels token is undefined');
+  console.warn('// haiku visualization will not contain Pexels images...');
+}
+if (typeof process.env.UNSPLASH === 'undefined') {
+  console.warn('// WARNING: Unsplash token is undefined');
+  console.warn('// haiku visualization will not contain Unsplash images...');
+}
+
 /* modules and utilities */
 const fs = require('fs');
 const path = require('path');
