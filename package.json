@@ -1,9 +1,8 @@
 {
-  "main": "src/api.js",
   "scripts": {
-    "restart": "npm run stop && npm run start",
-    "start": "pm2 start src/api.js --name MochiMapIO -l log.txt --time",
-    "stop": "pm2 stop MochiMapIO"
+    "restart": "pm2 restart all",
+    "start": "pm2 start all",
+    "stop": "pm2 stop all"
   },
   "repository": {
     "type": "git",
