@@ -126,8 +126,6 @@ const Db = {
   update: async (cName, update, query, options) => {
     const fid = fidFormat('Db.update', cName, update, query);
     const col = await Db._collection(cName, fid);
-    // console.debug(fid, 'add atomic operators...');
-    update = { $set: update };
     // console.debug(fid, 'update documents...');
     const cmd = Array.isArray(update)
       ? await col.updateMany(query, update, options)
@@ -136,6 +134,16 @@ const Db = {
     return cmd.result.n;
   },
   util: {
+    dotNotationUpdateExpression: (obj, depth = 0, keychain = '', add) => {
+      return Object.entries(obj).reduce((expr, [key, value]) => {
+        const d1 = depth - 1;
+        const keyring = keychain + key;
+        if (typeof value === 'object' && d1 !== 0) {
+          add = Db.util.dotNotationUpdateExpression(value, d1, keyring + '.');
+        } else add = { [keychain + key]: value };
+        return { ...expr, ...add };
+      }, {});
+    },
     filterBigInt: (obj) => {
       for (const key of Object.keys(obj)) {
         if (typeof obj[key] === 'object') Db.util.filterBigInt(obj[key]);

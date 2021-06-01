@@ -193,8 +193,9 @@ const Scanner = {
       // add _id, filter BigInt and update database with state of node
       const _id = Db.util.id.network(ip);
       node = Object.assign({ _id }, Db.util.filterBigInt(node));
-      try { // asynchronously submit to database
-        Db.update('network', node, { _id }, { upsert: true });
+      try { // generate update expression and update database (asynchronously)
+        const update = { $set: Db.util.dotNotationUpdateExpression(node) };
+        Db.update('network', update, { _id }, { upsert: true });
       } catch (error) { console.log(ip, 'database error;', error); }
       /* check for outdated host data on cached state
       // const hostOffset = now - ms.week; // calc host offset
