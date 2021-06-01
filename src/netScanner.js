@@ -190,12 +190,17 @@ const Scanner = {
       node = Object.assign({ host: { ip, port } }, node);
       delete node.port;
       delete node.ip;
-      // add _id, convert to dot notation expression and filter BigInt
-      const _id = Db.util.id.network(ip);
-      node = Object.assign({ _id }, Db.util.dotNotationUpdateExpression(node));
-      node = Db.util.filterBigInt(node);
-      try { // add atomimc operator $set and asynchronously update database
-        Db.update('network', { $set: node }, { _id }, { upsert: true });
+      try { // add _id and filter BigInt
+        const _id = Db.util.id.network(ip);
+        node = Object.assign({ _id }, Db.util.filterBigInt(node));
+        // check appropriate update/insert operation
+        if (cachedNode || await Db.has('network', ip)) {
+          // convert connection object to dot notation before update
+          node['connection.' + REGION] = node.connection[REGION];
+          delete node.connection; // remove obsolete connection property
+          // add atomimc operator $set and asynchronously update database
+          Db.update('network', { $set: node }, { _id }, { upsert: true });
+        } else await Db.insert('network', node);
       } catch (error) { console.log(ip, 'database error;', error); }
       /* check for outdated host data on cached state
       // const hostOffset = now - ms.week; // calc host offset
