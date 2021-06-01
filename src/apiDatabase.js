@@ -138,7 +138,7 @@ const Db = {
       return Object.entries(obj).reduce((expr, [key, value]) => {
         const d1 = depth - 1;
         const keyring = keychain + key;
-        if (typeof value === 'object' && d1 !== 0) {
+        if (typeof value === 'object' && !Array.isArray(value) && d1 !== 0) {
           add = Db.util.dotNotationUpdateExpression(value, d1, keyring + '.');
         } else add = { [keychain + key]: value };
         return { ...expr, ...add };
