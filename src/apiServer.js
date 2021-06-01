@@ -74,7 +74,7 @@ const cleanup = (e, src) => {
     console.log('// CLEANUP: initiating server shutdown...');
     Server._api.close(() => informedShutdown(e, src));
     console.log('// CLEANUP: disconnecting current connection requests...');
-    Server._apiConnections.forEach(socket => socket.destroy());
+    Server._connections.forEach(socket => socket.destroy());
   } else return informedShutdown(e, src);
 };
 process.on('SIGINT', cleanup);
