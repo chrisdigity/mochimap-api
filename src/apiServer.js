@@ -72,7 +72,7 @@ const cleanup = (e, src) => {
   // end server (removing connections) and/or exit
   if (Server._api) {
     console.log('// CLEANUP: initiating server shutdown...');
-    Server._api.close().then(() => informedShutdown(e, src));
+    Server._api.close(() => informedShutdown(e, src));
     console.log('// CLEANUP: disconnecting current connection requests...');
     Server._apiConnections.forEach(socket => socket.destroy());
   } else return informedShutdown(e, src);
