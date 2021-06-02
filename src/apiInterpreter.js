@@ -73,8 +73,9 @@ const Interpreter = {
       for (let param of parameters) {
         let [keymod, value] = param.split('=');
         const [key, mod] = keymod.split(':');
+        const finalKey = key.split('.').pop();
         // parse known key and modifier queries
-        if (Parse.key[key]) value = Parse.key[key](value);
+        if (Parse.key[finalKey]) value = Parse.key[finalKey](value);
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
