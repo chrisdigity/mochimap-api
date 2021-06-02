@@ -22,18 +22,18 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
-    path: /^\/balance\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/balance/<"tag"||"address">/<partial tag or address>',
-    hintCheck: /balance|tag|address/gi,
-    handler: Responder.balance,
+    path: /^\/ledger\/(tag|address)\/([0-9a-f]+)$/i,
+    hint: '[BaseURL]/ledger/<"tag"||"address">/<partial Tag or Address>',
+    hintCheck: /ledger|tag|address/gi,
+    handler: Responder.ledger,
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/balance\/history\/([0-9a-f]{24})$/i,
+    path: /^\/legder\/history\/([0-9a-f]{24})$/i,
     param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/balance/history/<tag (must be 24 chars)>',
-    hintCheck: /balance|history/gi,
-    handler: Responder.balanceHistory,
+    hint: '[BaseURL]/ledger/history/<24 character Tag>',
+    hintCheck: /ledger|history/gi,
+    handler: Responder.ledgerHistory,
     enabled: true
   }, {
     method: 'GET',

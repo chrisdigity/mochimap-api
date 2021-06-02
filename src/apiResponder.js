@@ -66,35 +66,6 @@ const Responder = {
     res.writeHead(statusCode, statusMessage, headers);
     res.end(body);
   },
-  balance: async (res, addressType, address) => {
-    try {
-      // perform balance request
-      const isTag = Boolean(addressType === 'tag');
-      const le = await Mochimo.getBalance(process.env.FULLNODE, address, isTag);
-      // send successfull query or 404
-      return Responder._respond(res, le ? 200 : 404, le ||
-        { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
-    } catch (error) { Responder.unknownInternal(res, error); }
-  },
-  balanceHistory: async (res, tag, params) => {
-    const start = Date.now();
-    let cursor;
-    try {
-      // set defaults and interpret requested search params
-      const search = { query: { tag }, options: {} };
-      if (params) Object.assign(search, Interpreter.search(params, true));
-      // query database for results
-      cursor = await Db.find('balance', search.query, search.options);
-      const dbquery = await expandResults(cursor, search.options, start);
-      // send succesfull query or 404
-      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
-      else Responder._respond(res, 404, dbquery, 'No results');
-    } catch (error) { // send 500 on internal error
-      Responder.unknownInternal(res, error);
-    } finally { // cleanup cursor
-      if (cursor && !cursor.isClosed()) await cursor.close();
-    }
-  },
   block: async (res, blockNumber) => {
     try {
       // convert blockNumber parameter to Long number type
@@ -105,6 +76,35 @@ const Responder = {
       return Responder._respond(res, block ? 200 : 404, block ||
         { message: `${blockNumber} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  ledger: async (res, addressType, address) => {
+    try {
+      // perform balance request
+      const isTag = Boolean(addressType === 'tag');
+      const le = await Mochimo.getBalance(process.env.FULLNODE, address, isTag);
+      // send successfull query or 404
+      return Responder._respond(res, le ? 200 : 404, le ||
+        { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  ledgerHistory: async (res, tag, params) => {
+    const start = Date.now();
+    let cursor;
+    try {
+      // set defaults and interpret requested search params
+      const search = { query: { tag }, options: {} };
+      if (params) Object.assign(search, Interpreter.search(params, true));
+      // query database for results
+      cursor = await Db.find('ledger', search.query, search.options);
+      const dbquery = await expandResults(cursor, search.options, start);
+      // send succesfull query or 404
+      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
+      else Responder._respond(res, 404, dbquery, 'No results');
+    } catch (error) { // send 500 on internal error
+      Responder.unknownInternal(res, error);
+    } finally { // cleanup cursor
+      if (cursor && !cursor.isClosed()) await cursor.close();
+    }
   },
   network: async (res, ip) => {
     try {
