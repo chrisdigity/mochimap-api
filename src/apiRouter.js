@@ -60,7 +60,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/network/search',
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z.-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_.]+(?::[a-z]+)*[=]+[0-9a-z.-]+(?:$|&))+$/i,
     hint: '[BaseURL]/network/search?<param>=<paramValue>',
     hintCheck: /network|node|search/gi,
     handler: Responder.searchNetwork,
