@@ -55,39 +55,40 @@ const buildLedgerDocument = (block, srcdir) => {
   if (!pngblock.verifyBlockHash()) {
     throw new Error('"pngblock" hash could not be verified');
   }
-  // create list of previous tagged address balances
-  const ptags = {};
+  // create list of previous address balances (prioritise Tags)
+  const addrs = {};
   for (const lentry of pngblock.ledger) {
-    // check ledger entry has (non-default) tag
     if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-      ptags[lentry.tag] = lentry.balance;
-    }
+      addrs[lentry.address.slice(0, 64)] = lentry.balance;
+    } else addrs[lentry.tag] = lentry.balance;
   }
-  // build ledger JSON, as array of documents where tag balances have deltas
+  // build ledger JSON, as array of documents where address balances have deltas
   const ledgerJSON = [];
   const ledgerPush = { timestamp: stime, bnum, bhash };
   // scan current neogenesis tags and compare to previous
   for (const lentry of block.ledger) {
-    // check ledger entry has (non-default) tag
-    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
-      const pbalance = ptags[lentry.tag] || 0;
-      if (pbalance !== lentry.balance) {
-        // push balance deltas to balanceJSON
-        const _id = Db.util.id.balance(bnum, bhash, lentry.tag);
-        ledgerPush.tag = lentry.tag;
-        ledgerPush.delta = lentry.balance - pbalance;
-        ledgerPush.balance = lentry.balance;
-        ledgerJSON.push(Object.assign({ _id }, ledgerPush));
-      }
-      // remove tag from previous
-      delete ptags[lentry.tag];
+    // get appropriate address/balance and check for a change in balance
+    const addr = lentry.tag === Mochimo.DEFAULT_TAG
+      ? lentry.address.slice(0, 64) : lentry.tag;
+    const pbalance = addrs[addr] || 0;
+    if (pbalance !== lentry.balance) {
+      // push balance delta to ledgerJSON
+      const _id = Db.util.id.ledger(bnum, bhash, addr);
+      ledgerPush.address = addr;
+      ledgerPush.balance = lentry.balance;
+      ledgerPush.delta = lentry.balance - pbalance;
+      ledgerJSON.push(Object.assign({ _id }, ledgerPush));
     }
+    // remove tag from previous
+    delete addrs[addr];
   }
   // assume remaining ptags were spent to zero
   ledgerPush.balance = 0;
-  for (const [tag, delta] of Object.entries(ptags)) {
-    const _id = Db.util.id.balance(bnum, bhash, tag);
-    ledgerPush.tag = tag;
+  for (const [addr, delta] of Object.entries(addrs)) {
+    // push balance delta as 0 balance address to ledgerJSON
+    const _id = Db.util.id.balance(bnum, bhash, addr);
+    ledgerPush.address = addr;
+    ledgerPush.balance = 0;
     ledgerPush.delta = -(delta);
     ledgerJSON.push(Object.assign({ _id }, ledgerPush));
   }
