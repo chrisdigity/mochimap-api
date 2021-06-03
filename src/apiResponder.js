@@ -115,7 +115,7 @@ const Responder = {
         return Responder._respond(res, 400, { error, message });
       }
       // perform network query
-      const node = await Db.findOne('network', { host: { ip } });
+      const node = await Db.findOne('network', { 'host.ip': ip });
       // send successfull query or 404
       return Responder._respond(res, node ? 200 : 404, node ||
         { message: `${ip} could not be found...` });
