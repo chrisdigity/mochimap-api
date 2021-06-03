@@ -106,7 +106,7 @@ const Responder = {
       if (cursor && !cursor.isClosed()) await cursor.close();
     }
   },
-  network: async (res, ip) => {
+  network: async (res, ip, status) => {
     try {
       // check IPv4 for private formats
       if (isPrivateIPv4(ip)) {
@@ -116,6 +116,21 @@ const Responder = {
       }
       // perform network query
       const node = await Db.findOne('network', { 'host.ip': ip });
+      // apply applicable status filter
+      if (node && status === 'active') {
+        // check for incomplete data
+        if (typeof node.connection !== 'object') {
+          Responder.unknownInternal(res,
+            { message: `${ip} is missing connection object...` });
+        }
+        // check all available regions
+        for (const region of node.connection) {
+          if (region.status) { // send 404 if any region returns not OK status
+            return Responder._respond(res, 404,
+              { message: `${ip} node is not OK in all regions...` });
+          }
+        }
+      }
       // send successfull query or 404
       return Responder._respond(res, node ? 200 : 404, node ||
         { message: `${ip} could not be found...` });

@@ -52,7 +52,7 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/network\/(?=\d+\.\d+\.\d+\.\d+$)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})$/i,
+    path: /^\/network\/(?=\d+\.\d+\.\d+\.\d+)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})(?:\/([a-z]+))?$/i,
     hint: '[BaseURL]/network/<IPv4>',
     hintCheck: /network|node/gi,
     handler: Responder.network,
