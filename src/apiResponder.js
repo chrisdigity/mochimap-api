@@ -124,7 +124,7 @@ const Responder = {
             { message: `${ip} is missing connection object...` });
         }
         // check all available regions
-        for (const region of node.connection) {
+        for (const region of Object.values(node.connection)) {
           if (region.status) { // send 404 if any region returns not OK status
             return Responder._respond(res, 404,
               { message: `${ip} node is not OK in all regions...` });
