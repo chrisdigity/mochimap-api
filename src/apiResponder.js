@@ -106,8 +106,10 @@ const Responder = {
       if (cursor && !cursor.isClosed()) await cursor.close();
     }
   },
-  network: async (res, ip, status) => {
+  network: async (res, status, ip) => {
     try {
+      // move ip argument if no status was provided
+      ip = ip || status;
       // check IPv4 for private formats
       if (isPrivateIPv4(ip)) {
         const error = 'Invalid IPv4 address';
