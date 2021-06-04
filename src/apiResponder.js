@@ -17,6 +17,14 @@
  *
  */
 
+/* global BigInt */
+
+// monkey-patch BigInt serialization
+/* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
+Object.defineProperty(BigInt.prototype, 'toJSON', {
+  value: BigInt.prototype.toString // JSON.stringify BigInt for console.debug
+});
+
 /* full node ipv4 check */
 if (typeof process.env.FULLNODE === 'undefined') {
   console.warn('// WARNING: Mochimo full node ipv4 is undefined');
