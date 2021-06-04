@@ -21,9 +21,7 @@
 
 // monkey-patch BigInt serialization
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
-Object.defineProperty(BigInt.prototype, 'toJSON', {
-  value: BigInt.prototype.toString // JSON.stringify BigInt for console.debug
-});
+BigInt.prototype.toJSON = function () { return this.toString(); };
 
 /* full node ipv4 check */
 if (typeof process.env.FULLNODE === 'undefined') {
