@@ -30,7 +30,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: /^\/legder\/history\/([0-9a-f]{24})$/i,
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/ledger/history/<24 character Tag>',
     hintCheck: /ledger|history/gi,
     handler: Responder.ledgerHistory,
@@ -45,7 +45,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/block/search',
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/block/search?<param>=<paramValue>',
     hintCheck: /block|search/gi,
     handler: Responder.searchBlock,
@@ -60,7 +60,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/network/search',
-    param: /^[?]?(?:[0-9a-z_.]+(?::[a-z]+)*[=]+[0-9a-z.-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_.]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z.-]+(?:$|&))+$/i,
     hint: '[BaseURL]/network/search?<param>=<paramValue>',
     hintCheck: /network|node|search/gi,
     handler: Responder.searchNetwork,
@@ -75,7 +75,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: /^\/transaction\/history\/([0-9a-f]+)$/i,
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/transaction/history/<tag or address>',
     hintCheck: /transaction|history/gi,
     handler: Responder.transactionHistory,
@@ -83,7 +83,7 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/transaction/search',
-    param: /^[?]?(?:[0-9a-z_]+(?::[a-z]+)*[=]+[0-9a-z-]+(?:$|&))+$/i,
+    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/transaction/search?<param>=<paramValue>',
     hintCheck: /transaction|search/gi,
     handler: Responder.searchTransaction,
