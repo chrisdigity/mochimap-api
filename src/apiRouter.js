@@ -127,8 +127,10 @@ const Router = async (req, res) => {
         if (search && routeMatch.param instanceof RegExp) {
           // ensure search query is valid
           if (!routeMatch.param.test(search)) {
-            return Responder.unknown(res, 400,
-              { message: 'invalid search parameters, check request...' });
+            return Responder.unknown(res, 400, {
+              message: 'invalid search parameters, check request...',
+              parameters: search
+            });
           } // add search query as parameter
           params.push(search);
         }
