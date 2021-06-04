@@ -71,8 +71,9 @@ const Interpreter = {
       const $and = [];
       // parse search parameters
       for (let param of parameters) {
+        const keymodSeparator = param.includes(':') ? ':' : '%3A';
         let [keymod, value] = param.split('=');
-        const [key, mod] = keymod.split(':');
+        const [key, mod] = keymod.includes(keymodSeparator);
         const finalKey = key.split('.').pop();
         // parse known key and modifier queries
         if (Parse.key[finalKey]) value = Parse.key[finalKey](value);
