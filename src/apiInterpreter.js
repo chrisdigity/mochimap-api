@@ -73,7 +73,7 @@ const Interpreter = {
       for (let param of parameters) {
         const keymodSeparator = param.includes(':') ? ':' : '%3A';
         let [keymod, value] = param.split('=');
-        const [key, mod] = keymod.includes(keymodSeparator);
+        const [key, mod] = keymod.split(keymodSeparator);
         const finalKey = key.split('.').pop();
         // parse known key and modifier queries
         if (Parse.key[finalKey]) value = Parse.key[finalKey](value);
