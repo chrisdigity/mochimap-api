@@ -29,9 +29,9 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/legder\/history\/([0-9a-f]{24})$/i,
+    path: /^\/ledger\/history\/([0-9a-f]{24}|[0-9a-f]{64})$/i,
     param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/ledger/history/<24 character Tag>',
+    hint: '[BaseURL]/ledger/history/<Tag or Address (24 or 64 characters)>',
     hintCheck: /ledger|history/gi,
     handler: Responder.ledgerHistory,
     enabled: true
