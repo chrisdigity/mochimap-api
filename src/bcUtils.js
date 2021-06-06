@@ -58,7 +58,7 @@ const buildLedgerDocument = (block, srcdir) => {
   // create list of previous address balances (prioritise Tags)
   const addrs = {};
   for (const lentry of pngblock.ledger) {
-    const byte = Number('0x' + lentry.slice(0, 2));
+    const byte = Number('0x' + lentry.tag.slice(0, 2));
     if (Mochimo.UNTAGGED_BYTES.includes(byte)) {
       addrs[lentry.address.slice(0, 64)] = lentry.balance;
     } else addrs[lentry.tag] = lentry.balance;
@@ -69,7 +69,7 @@ const buildLedgerDocument = (block, srcdir) => {
   // scan current neogenesis tags and compare to previous
   for (const lentry of block.ledger) {
     // get appropriate address/balance and check for a change in balance
-    const byte = Number('0x' + lentry.slice(0, 2));
+    const byte = Number('0x' + lentry.tag.slice(0, 2));
     const addr = Mochimo.UNTAGGED_BYTES.includes(byte)
       ? lentry.address.slice(0, 64) : lentry.tag;
     const pbalance = addrs[addr] || 0n;
