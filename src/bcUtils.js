@@ -86,7 +86,7 @@ const buildLedgerDocument = (block, srcdir) => {
   ledgerPush.balance = 0n;
   for (const [addr, delta] of Object.entries(addrs)) {
     // push balance delta as 0 balance address to ledgerJSON
-    const _id = Db.util.id.balance(bnum, bhash, addr);
+    const _id = Db.util.id.ledger(bnum, bhash, addr);
     ledgerPush.address = addr;
     ledgerPush.delta = -(delta);
     ledgerJSON.push(Object.assign({ _id }, ledgerPush));
