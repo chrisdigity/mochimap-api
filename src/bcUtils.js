@@ -70,7 +70,7 @@ const buildLedgerDocument = (block, srcdir) => {
     // get appropriate address/balance and check for a change in balance
     const addr = lentry.tag === Mochimo.DEFAULT_TAG
       ? lentry.address.slice(0, 64) : lentry.tag;
-    const pbalance = addrs[addr] || 0;
+    const pbalance = addrs[addr] || 0n;
     if (pbalance !== lentry.balance) {
       // push balance delta to ledgerJSON
       const _id = Db.util.id.ledger(bnum, bhash, addr);
@@ -83,12 +83,11 @@ const buildLedgerDocument = (block, srcdir) => {
     delete addrs[addr];
   }
   // assume remaining ptags were spent to zero
-  ledgerPush.balance = 0;
+  ledgerPush.balance = 0n;
   for (const [addr, delta] of Object.entries(addrs)) {
     // push balance delta as 0 balance address to ledgerJSON
     const _id = Db.util.id.balance(bnum, bhash, addr);
     ledgerPush.address = addr;
-    ledgerPush.balance = 0;
     ledgerPush.delta = -(delta);
     ledgerJSON.push(Object.assign({ _id }, ledgerPush));
   }
