@@ -58,7 +58,7 @@ const buildLedgerDocument = (block, srcdir) => {
   // create list of previous address balances (prioritise Tags)
   const addrs = {};
   for (const lentry of pngblock.ledger) {
-    if (lentry.tag !== Mochimo.DEFAULT_TAG) {
+    if (lentry.tag === Mochimo.DEFAULT_TAG) {
       addrs[lentry.address.slice(0, 64)] = lentry.balance;
     } else addrs[lentry.tag] = lentry.balance;
   }
