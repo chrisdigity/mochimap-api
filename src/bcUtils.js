@@ -51,7 +51,7 @@ const buildLedgerDocument = (block, srcdir) => {
     throw new Error(`"pngdata.length" is insufficient: ${pngdata.length}`);
   }
   // interpret pngdata as block and perform block hash verification check
-  const pngblock = new Mochimo.Block();
+  const pngblock = new Mochimo.Block(pngdata);
   if (!pngblock.verifyBlockHash()) {
     throw new Error('"pngblock" hash could not be verified');
   }
