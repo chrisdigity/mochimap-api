@@ -51,17 +51,19 @@ const Parse = {
     ne: (val) => ({ $ne: val })
   },
   special: {
-    address: (val) => ({
-      $or: [{ srcaddr: val }, { dstaddr: val }, { chgaddr: val }]
-    }),
-    tag: (val) => ({
-      $or: [{ srctag: val }, { dsttag: val }, { chgtag: val }]
-    })
+    transaction: {
+      address: (val) => ({
+        $or: [{ srcaddr: val }, { dstaddr: val }, { chgaddr: val }]
+      }),
+      tag: (val) => ({
+        $or: [{ srctag: val }, { dsttag: val }, { chgtag: val }]
+      })
+    }
   }
 };
 
 const Interpreter = {
-  search: (query, paged) => {
+  search: (query, paged, cName) => {
     const results = { query: {}, options: {} };
     if (paged) results.options.limit = 8;
     // remove any preceding '?'
@@ -86,8 +88,9 @@ const Interpreter = {
         }
         // expand special parameters and/or add to $and
         param = {}; // reused...
-        if (Parse.special[key]) param = Parse.special[key](value);
-        else param[key] = value;
+        if (Parse.special[cName] && Parse.special[cName][key]) {
+          param = Parse.special[cName][key](value);
+        } else param[key] = value;
         $and.push(param);
       }
       // finally, assign parameters to query

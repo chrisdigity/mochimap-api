@@ -138,7 +138,7 @@ const Responder = {
     try {
       // set defaults and interpret requested search params as necessary
       const search = { query: {}, options: {} };
-      Object.assign(search, Interpreter.search(args[0], paged));
+      Object.assign(search, Interpreter.search(args[0], paged, cName));
       // query database for results
       cursor = await Db.find(cName, search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
