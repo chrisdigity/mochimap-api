@@ -55,11 +55,14 @@ const buildLedgerDocument = (block, srcdir) => {
   }
   // create list of previous address balances (prioritise Tags for id)
   const pngaddr = {};
-  for (const lentry of pngblock.ledger) {
-    const { address, balance, tag } = lentry;
+  const pngledger = pngblock.ledger;
+  for (const lentry of pngledger) {
+    let { address } = lentry;
+    const { balance, tag } = lentry;
     const addressHash = createHash('sha256').update(address).digest('hex');
     const byte = Number('0x' + tag.slice(0, 2));
     const id = Mochimo.UNTAGGED_BYTES.includes(byte) ? addressHash : tag;
+    address = address.slice(0, 64);
     pngaddr[id] = { address, addressHash, tag, balance, delta: -(balance) };
   }
   // build ledger JSON, as array of documents where address balances have deltas
@@ -68,7 +71,8 @@ const buildLedgerDocument = (block, srcdir) => {
   // scan current neogenesis block and compare to previous
   for (const lentry of block.ledger) {
     // get appropriate address/balance and check for a change in balance
-    const { address, balance, tag } = lentry;
+    let { address } = lentry;
+    const { balance, tag } = lentry;
     const addressHash = createHash('sha256').update(address).digest('hex');
     const byte = Number('0x' + tag.slice(0, 2));
     const id = Mochimo.UNTAGGED_BYTES.includes(byte) ? addressHash : tag;
@@ -77,6 +81,7 @@ const buildLedgerDocument = (block, srcdir) => {
       // push balance delta and details to ledgerJSON
       const delta = balance - pbalance;
       const _id = Db.util.id.ledger(bnum, bhash, id);
+      address = address.slice(0, 64);
       Object.assign(ledgerPush, { address, addressHash, tag, balance, delta });
       ledgerJSON.push(Object.assign({ _id }, ledgerPush));
     }
