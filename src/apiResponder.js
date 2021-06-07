@@ -29,6 +29,7 @@ if (typeof process.env.FULLNODE === 'undefined') {
   console.warn('// Balance requests produce unexpected results...');
 }
 
+const { createHash } = require('crypto');
 const { isPrivateIPv4 } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
@@ -87,19 +88,24 @@ const Responder = {
     try {
       // perform balance request
       const isTag = Boolean(addressType === 'tag');
-      const le = await Mochimo.getBalance(process.env.FULLNODE, address, isTag);
+      let le = await Mochimo.getBalance(process.env.FULLNODE, address, isTag);
+      if (le) { // deconstruct ledger entry and compute sha256 of address
+        const { address, balance, tag } = le;
+        const addressHash = createHash('sha256').update(address).digest('hex');
+        // reconstruct ledger entry with sha256
+        le = { address, addressHash, tag, balance };
+      }
       // send successfull query or 404
       return Responder._respond(res, le ? 200 : 404, le ||
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  ledgerHistory: async (res, tag, params) => {
+  ledgerHistory: async (res, addrHash) => {
     const start = Date.now();
     let cursor;
     try {
       // set defaults and interpret requested search params
-      const search = { query: { tag }, options: {} };
-      if (params) Object.assign(search, Interpreter.search(params, true));
+      const search = { query: { addrHash }, options: {} };
       // query database for results
       cursor = await Db.find('ledger', search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);

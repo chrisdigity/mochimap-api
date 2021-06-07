@@ -22,21 +22,6 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
-    path: /^\/ledger\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/ledger/<"tag"||"address">/<partial Tag or Address>',
-    hintCheck: /ledger|tag|address/gi,
-    handler: Responder.ledger,
-    enabled: true
-  }, {
-    method: 'GET',
-    path: /^\/ledger\/history\/([0-9a-f]{24}|[0-9a-f]{64})$/i,
-    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/ledger/history/<Tag or Address (24 or 64 characters)>',
-    hintCheck: /ledger|history/gi,
-    handler: Responder.ledgerHistory,
-    enabled: true
-  }, {
-    method: 'GET',
     path: /^\/block\/([0-9]+)|(0x[0-9a-f]+)$/i,
     hint: '[BaseURL]/block/<blockNumber>',
     hintCheck: /block/gi,
@@ -49,6 +34,20 @@ const Routes = [
     hint: '[BaseURL]/block/search?<param>=<paramValue>',
     hintCheck: /block|search/gi,
     handler: Responder.searchBlock,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: /^\/ledger\/(tag|address)\/([0-9a-f]+)$/i,
+    hint: '[BaseURL]/ledger/<"tag"||"address">/<partial Tag or Address>',
+    hintCheck: /ledger|tag|address/gi,
+    handler: Responder.ledger,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: /^\/ledger\/history\/[0-9a-f]{64}$/i,
+    hint: '[BaseURL]/ledger/history/<address hash>',
+    hintCheck: /ledger|history/gi,
+    handler: Responder.ledgerHistory,
     enabled: true
   }, {
     method: 'GET',
