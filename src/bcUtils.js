@@ -84,7 +84,7 @@ const buildLedgerDocument = (block, srcdir) => {
     delete pngaddr[id];
   }
   // process remaining pngaddr as emptied
-  for (const [id, details] of Object.values(pngaddr)) {
+  for (const [id, details] of Object.entries(pngaddr)) {
     // push balance delta as 0 balance address to ledgerJSON
     details.balance = 0n;
     const _id = Db.util.id.ledger(bnum, bhash, id);
