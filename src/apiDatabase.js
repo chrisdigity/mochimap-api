@@ -164,46 +164,24 @@ const Db = {
     },
     id: {
       block: (bnum, bhash, fid) => {
-        fid = fid || fidFormat('Db.util.id.block', bnum, bhash);
         if (typeof bnum === 'number' || typeof bnum === 'bigint') {
-          // console.debug(fid, 'force 64-bit hex bnum');
+          // console.debug('Db.util.id.block: force 64-bit hex bnum');
           bnum = asUint64String(bnum);
-        } else if (typeof bnum === 'string') {
-          // console.debug(fid, 'force 16 char bnum');
-          bnum = bnum.slice(0, 16).padStart(16, '0');
-        } else throw new Error(`${fid} invalid bnum type`);
-        if (typeof bhash === 'string') {
-          // console.debug(fid, 'force 16 char bhash');
-          bhash = bhash.slice(0, 16).padStart(16, '0');
-        } else throw new Error(`${fid} invalid bhash type`);
+        }
+        // console.debug('Db.util.id.blockforce 16 char bhash');
+        bhash = bhash.slice(0, 16).padStart(16, '0');
         return [bnum, bhash].join('-');
       },
-      ledger: (bnum, bhash, tag, fid) => {
-        fid = fid || fidFormat('Db.util.id.ledger', bnum, bhash, tag);
-        if (typeof tag === 'string') {
-          // console.debug(fid, 'force 24 char tag');
-          tag = tag.slice(0, 24).padStart(24, '0');
-        } else throw new Error(`${fid} invalid tag type`);
-        return [Db.util.id.block(bnum, bhash, fid), tag].join('-');
+      ledger: (bnum, bhash, addr) => {
+        return [Db.util.id.block(bnum, bhash), addr].join('-');
       },
-      network: (ip, category, fid) => {
-        fid = fid || fidFormat('Db.util.id.network', ip, category);
-        const agg = [];
-        if (typeof ip === 'string') agg.push(...ip.split('.'));
-        else throw new Error(`${fid} invalid ip type`);
-        if (typeof category !== 'undefined') { // optional
-          if (typeof category === 'string') agg.push(category);
-          else throw new Error(`${fid} invalid category type`);
-        }
+      network: (ip, category) => {
+        const agg = [...ip.split('.')];
+        if (typeof category !== 'undefined') agg.push(category); // optional
         return agg.join('-');
       },
-      transaction: (bnum, bhash, txid, fid) => {
-        fid = fid || fidFormat('Db.util.id.transaction', bnum, bhash, txid);
-        if (typeof txid === 'string') {
-          // console.debug(fid, 'force 64 char txid');
-          txid = txid.slice(0, 64).padStart(64, '0');
-        } else throw new Error(`${fid} invalid txid type`);
-        return [Db.util.id.block(bnum, bhash, fid), txid].join('-');
+      transaction: (bnum, bhash, txid) => {
+        return [Db.util.id.block(bnum, bhash), txid].join('-');
       }
     },
     long: (number) => Long.fromString(number.toString())
