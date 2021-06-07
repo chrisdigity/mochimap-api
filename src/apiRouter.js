@@ -44,7 +44,7 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/ledger\/history\/[0-9a-f]{64}$/i,
+    path: /^\/ledger\/history\/([0-9a-f]{64})$/i,
     hint: '[BaseURL]/ledger/history/<address hash>',
     hintCheck: /ledger|history/gi,
     handler: Responder.ledgerHistory,
