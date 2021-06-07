@@ -100,24 +100,6 @@ const Responder = {
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  ledgerHistory: async (res, addressHash) => {
-    const start = Date.now();
-    let cursor;
-    try {
-      // set defaults and interpret requested search params
-      const search = { query: { addressHash }, options: {} };
-      // query database for results
-      cursor = await Db.find('ledger', search.query, search.options);
-      const dbquery = await expandResults(cursor, search.options, start);
-      // send succesfull query or 404
-      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
-      else Responder._respond(res, 404, dbquery, 'No results');
-    } catch (error) { // send 500 on internal error
-      Responder.unknownInternal(res, error);
-    } finally { // cleanup cursor
-      if (cursor && !cursor.isClosed()) await cursor.close();
-    }
-  },
   network: async (res, status, ip) => {
     try {
       // move ip argument if no status was provided
@@ -170,6 +152,7 @@ const Responder = {
     }
   },
   searchBlock: (...args) => Responder.search('block', 1, ...args),
+  searchLedger: (...args) => Responder.search('ledger', 1, ...args),
   searchNetwork: (...args) => Responder.search('network', 0, ...args),
   searchTransaction: (...args) => Responder.search('transaction', 1, ...args),
   transaction: async (res, txid) => {
@@ -180,27 +163,6 @@ const Responder = {
       return Responder._respond(res, transaction ? 200 : 404, transaction ||
         { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
-  },
-  transactionHistory: async (res, address, params) => {
-    const start = Date.now();
-    let cursor;
-    try {
-      // build USVString query from address
-      const query = (params ? params + '&' : '') + 'history=' + address;
-      // set defaults and interpret requested search params, from USVString
-      const search = { query: {}, options: {} };
-      Object.assign(search, Interpreter.search(query, true));
-      // query database for results
-      cursor = await Db.find('history', search.query, search.options);
-      const dbquery = await expandResults(cursor, search.options, start);
-      // send succesfull query or 404
-      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
-      else Responder._respond(res, 404, dbquery, 'No results');
-    } catch (error) { // send 500 on internal error
-      Responder.unknownInternal(res, error);
-    } finally { // cleanup cursor
-      if (cursor && !cursor.isClosed()) await cursor.close();
-    }
   },
   unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json),
   unknownInternal: (res, error) => {

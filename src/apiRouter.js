@@ -44,10 +44,11 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/ledger\/history\/([0-9a-f]{64})$/i,
-    hint: '[BaseURL]/ledger/history/<address hash>',
-    hintCheck: /ledger|history/gi,
-    handler: Responder.ledgerHistory,
+    path: '/ledger/search',
+    param: /^[?]?(?:[0-9a-z_.]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z.-]+(?:$|&))+$/i,
+    hint: '[BaseURL]/network/search?<param>=<paramValue>',
+    hintCheck: /ledger|search/gi,
+    handler: Responder.searchLedger,
     enabled: true
   }, {
     method: 'GET',
@@ -70,14 +71,6 @@ const Routes = [
     hint: '[BaseURL]/transaction/<txid>',
     hintCheck: /transaction/gi,
     handler: Responder.transaction,
-    enabled: true
-  }, {
-    method: 'GET',
-    path: /^\/transaction\/history\/([0-9a-f]+)$/i,
-    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/transaction/history/<tag or address>',
-    hintCheck: /transaction|history/gi,
-    handler: Responder.transactionHistory,
     enabled: true
   }, {
     method: 'GET',
