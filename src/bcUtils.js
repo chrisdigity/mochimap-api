@@ -19,10 +19,8 @@
 
 const fs = require('fs');
 const path = require('path');
-const {
-  asUint64String,
-  readWeb
-} = require('./apiUtils');
+const { createHash } = require('crypto');
+const { asUint64String, readWeb } = require('./apiUtils');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 
@@ -55,43 +53,42 @@ const buildLedgerDocument = (block, srcdir) => {
   if (!pngblock.verifyBlockHash()) {
     throw new Error('"pngblock" hash could not be verified');
   }
-  // create list of previous address balances (prioritise Tags)
-  const addrs = {};
+  // create list of previous address balances (prioritise Tags for id)
+  const pngaddr = {};
   for (const lentry of pngblock.ledger) {
-    const byte = Number('0x' + lentry.tag.slice(0, 2));
-    if (Mochimo.UNTAGGED_BYTES.includes(byte)) {
-      addrs[lentry.address.slice(0, 64)] = lentry.balance;
-    } else addrs[lentry.tag] = lentry.balance;
+    const { address, balance, tag } = lentry;
+    const addressHash = createHash('sha256').update(address).digest('hex');
+    const byte = Number('0x' + tag.slice(0, 2));
+    const id = Mochimo.UNTAGGED_BYTES.includes(byte) ? addressHash : tag;
+    pngaddr[id] = { address, addressHash, tag, balance, delta: -(balance) };
   }
   // build ledger JSON, as array of documents where address balances have deltas
   const ledgerJSON = [];
-  const ledgerPush = { timestamp: stime, bnum, bhash };
-  // scan current neogenesis tags and compare to previous
+  const ledgerPush = { bhash, timestamp: stime, bnum };
+  // scan current neogenesis block and compare to previous
   for (const lentry of block.ledger) {
     // get appropriate address/balance and check for a change in balance
-    const byte = Number('0x' + lentry.tag.slice(0, 2));
-    const addr = Mochimo.UNTAGGED_BYTES.includes(byte)
-      ? lentry.address.slice(0, 64) : lentry.tag;
-    const pbalance = addrs[addr] || 0n;
-    if (pbalance !== lentry.balance) {
-      // push balance delta to ledgerJSON
-      const _id = Db.util.id.ledger(bnum, bhash, addr);
-      ledgerPush.address = addr;
-      ledgerPush.balance = lentry.balance;
-      ledgerPush.delta = lentry.balance - pbalance;
+    const { address, balance, tag } = lentry;
+    const addressHash = createHash('sha256').update(address).digest('hex');
+    const byte = Number('0x' + tag.slice(0, 2));
+    const id = Mochimo.UNTAGGED_BYTES.includes(byte) ? addressHash : tag;
+    const pbalance = pngaddr[id] ? pngaddr[id].balance : 0n;
+    if (pbalance !== balance) {
+      // push balance delta and details to ledgerJSON
+      const delta = balance - pbalance;
+      const _id = Db.util.id.ledger(bnum, bhash, id);
+      Object.assign(ledgerPush, { address, addressHash, tag, balance, delta });
       ledgerJSON.push(Object.assign({ _id }, ledgerPush));
     }
-    // remove tag from previous
-    delete addrs[addr];
+    // remove entry from previous cache
+    delete pngaddr[id];
   }
-  // assume remaining ptags were spent to zero
-  ledgerPush.balance = 0n;
-  for (const [addr, delta] of Object.entries(addrs)) {
+  // process remaining pngaddr as emptied
+  for (const [id, details] of Object.values(pngaddr)) {
     // push balance delta as 0 balance address to ledgerJSON
-    const _id = Db.util.id.ledger(bnum, bhash, addr);
-    ledgerPush.address = addr;
-    ledgerPush.delta = -(delta);
-    ledgerJSON.push(Object.assign({ _id }, ledgerPush));
+    details.balance = 0n;
+    const _id = Db.util.id.ledger(bnum, bhash, id);
+    ledgerJSON.push(Object.assign({ _id }, Object.assign(ledgerPush, details)));
   }
   // return BigInt filtered ledgerJSON as array of ledger documents
   return Db.util.filterBigInt(ledgerJSON);
