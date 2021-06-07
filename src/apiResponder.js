@@ -100,12 +100,12 @@ const Responder = {
         { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  ledgerHistory: async (res, addrHash) => {
+  ledgerHistory: async (res, addressHash) => {
     const start = Date.now();
     let cursor;
     try {
       // set defaults and interpret requested search params
-      const search = { query: { addrHash }, options: {} };
+      const search = { query: { addressHash }, options: {} };
       // query database for results
       cursor = await Db.find('ledger', search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
