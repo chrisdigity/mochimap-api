@@ -44,40 +44,50 @@ const HDIR = require('os').homedir();
 const BCDIR = process.env.BCDIR || path.join(HDIR, 'mochimo', 'bin', 'd', 'bc');
 const ARCHIVEDIR = process.env.ARCHIVEDIR || path.join(HDIR, 'archive');
 
+/* routines */
+const fileHandler = (eventType, filename) => {
+  // accept only 'rename' events where filename extension is '.bc'
+  if (filename && filename.endsWith('.bc') && eventType === 'rename') {
+    const bcpath = path.join(BCDIR, filename);
+    let blockdata;
+    // check 'renamed' filename is accessible then read
+    fs.promises.access(bcpath, fs.constants.R_OK).then(() => {
+      return fs.promises.readFile(bcpath);
+    }).then((data) => { // file read successfull, process block data
+      blockdata = data;
+      return processBlock(data, BCDIR);
+    }).then((bid) => { // processBlock returns block ID on valid block
+      if (bid) filename = bid;
+    }).catch((error) => { // error occured during file access/read/process
+      if (error.code !== 'ENOENT') console.error(filename, '::', error);
+    }).finally(() => { // archive block data to archive directory
+      if (blockdata) {
+        const archivepath = path.join(ARCHIVEDIR, filename);
+        fs.promises.mkdir(ARCHIVEDIR, { recursive: true }).then(() => {
+          return fs.promises.writeFile(archivepath, blockdata);
+        }).catch((error) => {
+          console.error('// ARCHIVE: failure,', filename, '::', error);
+        });
+      }
+    }); // end }).finally...
+  } // end if (filename...
+}; // end const fileHandler...
+
 /* watcher */
 const Watcher = {
   _timeout: undefined,
   init: () => {
     // check BCDIR is accessible
     fs.promises.access(BCDIR).then(() => { // create directory watcher
-      fs.watch(BCDIR, (eventType, filename) => {
-        // accept only 'rename' events where filename extension is '.bc'
-        if (filename && filename.endsWith('.bc') && eventType === 'rename') {
-          const bcpath = path.join(BCDIR, filename);
-          let blockdata;
-          // check 'renamed' filename is accessible then read
-          fs.promises.access(bcpath, fs.constants.R_OK).then(() => {
-            return fs.promises.readFile(bcpath);
-          }).then((data) => { // file read successfull, process block data
-            blockdata = data;
-            return processBlock(data, BCDIR);
-          }).then((bid) => { // processBlock returns block ID on valid block
-            if (bid) filename = bid;
-          }).catch((error) => { // error occured during file access/read/process
-            if (error.code !== 'ENOENT') console.error(filename, '::', error);
-          }).finally(() => { // archive block data to archive directory
-            if (blockdata) {
-              const archivepath = path.join(ARCHIVEDIR, filename);
-              fs.promises.mkdir(ARCHIVEDIR, { recursive: true }).then(() => {
-                return fs.promises.writeFile(archivepath, blockdata);
-              }).catch((error) => {
-                console.error('// ARCHIVE: failure,', filename, '::', error);
-              });
-            }
-          }); // end }).finally...
-        }
-      }); // end fs.watch...
+      fs.watch(BCDIR, fileHandler);
       console.log('// INIT: watcher started...');
+      fs.readdir(BCDIR, (err, files) => {
+        if (err) console.error('// INIT: failed to catchup...');
+        else {
+          files.forEach((filename) => fileHandler('rename', filename));
+          console.log('// INIT: catchup executed on', files.length, 'files...');
+        }
+      });
     }).catch((error) => { // BCDIR is inaccessible, set reinit timout
       console.error('// INIT:', error);
       console.error('// INIT: failure, could not access', BCDIR);
