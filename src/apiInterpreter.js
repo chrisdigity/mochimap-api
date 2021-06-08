@@ -97,6 +97,7 @@ const Interpreter = {
             results.options.limit = value;
             results.options.skip = results.options.limit * page;
           }
+          continue;
         }
         // expand special parameters and/or add to $and
         param = {}; // reused...
