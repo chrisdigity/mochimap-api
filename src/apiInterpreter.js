@@ -86,16 +86,21 @@ const Interpreter = {
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
           value = parseInt(value);
-          if (value-- > 0) {
+          if (value-- > 0 && results.options.limit) {
             results.options.skip = results.options.limit * value;
           }
           continue;
-        } else if (paged && key === 'perpage' && !isNaN(value)) {
-          value = parseInt(value);
-          if (value > 0) {
-            const page = results.options.skip / results.options.limit;
-            results.options.limit = value;
-            results.options.skip = results.options.limit * page;
+        } else if (paged && key === 'perpage') {
+          if (value === 'all') {
+            delete results.options.limit;
+            delete results.options.skip;
+          } else {
+            value = parseInt(value);
+            if (value > 0) {
+              const page = results.options.skip / results.options.limit;
+              results.options.limit = value;
+              results.options.skip = results.options.limit * page;
+            }
           }
           continue;
         }
