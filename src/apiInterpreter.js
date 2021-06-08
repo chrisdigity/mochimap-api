@@ -65,7 +65,10 @@ const Parse = {
 const Interpreter = {
   search: (query, paged, cName) => {
     const results = { query: {}, options: {} };
-    if (paged) results.options.limit = 8;
+    if (paged) {
+      results.options.skip = 0;
+      results.options.limit = 8;
+    }
     // remove any preceding '?'
     if (typeof query === 'string' && query) {
       if (query.startsWith('?')) query = query.slice(1);
@@ -82,9 +85,18 @@ const Interpreter = {
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
-          value = parseInt(value) - 1;
-          if (value) results.options.skip = results.options.limit * value;
+          value = parseInt(value);
+          if (value-- > 0) {
+            results.options.skip = results.options.limit * value;
+          }
           continue;
+        } else if (paged && key === 'perpage' && !isNaN(value)) {
+          value = parseInt(value);
+          if (value > 0) {
+            const page = results.options.skip / results.options.limit;
+            results.options.limit = value;
+            results.options.skip = results.options.limit * page;
+          }
         }
         // expand special parameters and/or add to $and
         param = {}; // reused...
