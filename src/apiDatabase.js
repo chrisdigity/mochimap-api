@@ -146,23 +146,17 @@ const Db = {
     },
     filterBigInt: (obj) => {
       for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object') Db.util.filterBigInt(obj[key]);
-        else if (typeof obj[key] === 'bigint') {
-          obj[key] = Db.util.long(obj[key]);
-        }
+        if (typeof obj[key] === 'bigint') obj[key] = Db.util.long(obj[key]);
+        else if (typeof obj[key] === 'object') Db.util.filterBigInt(obj[key]);
       }
       return obj;
     },
     filterLong: (obj) => {
-      const newObj = {};
       for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object') {
-          newObj[key] = Db.util.filterLong(obj[key]);
-        } else if (obj[key] instanceof Long) {
-          newObj[key] = BigInt(obj[key].toString());
-        } else newObj[key] = obj[key];
+        if (obj[key] instanceof Long) obj[key] = BigInt(obj[key].toString());
+        else if (typeof obj[key] === 'object') Db.util.filterLong(obj[key]);
       }
-      return newObj;
+      return obj;
     },
     id: {
       block: (bnum, bhash, fid) => {
