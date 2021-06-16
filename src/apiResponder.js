@@ -117,6 +117,7 @@ const Responder = {
                 try { // obtain ledger amount from database
                   const query = { _id: Db.util.id.block(bnum, bhash) };
                   const ng = await Db.findOne('block', query);
+                  Db.util.filterLong(ng); // ensure long values are BigInt
                   if (ng && ng.amount) {
                     // calculate supply
                     supply = ng.amount + aeonRewards;
@@ -126,10 +127,8 @@ const Responder = {
                     Object.assign(temp, { maxSupply, supply });
                   }
                 } catch (ignore) {}
-              } else {
-                if (!tcount) aeonPseudoblocks++;
-                else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
-              }
+              } else if (!tcount) aeonPseudoblocks++;
+              else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
             }
             const dT = trailer.stime - trailer.time0;
             if (dT) {
