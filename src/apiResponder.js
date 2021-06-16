@@ -137,7 +137,7 @@ const Responder = {
             }
           }
           // transfer ownership of trailer to chain if supply was successfull
-          if ('supply' in temp) chain = temp;
+          if (temp && 'supply' in temp) chain = temp;
           // if chain is undefined by this point, neogenesis search failed ~3x
           if (chain) { // chain is available, perform remaining calculations
             const json = reqTrailer.toJSON();
