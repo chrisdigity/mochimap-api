@@ -102,7 +102,8 @@ const Responder = {
         const reqTrailer = tfile.trailer(tfileCount - 1);
         if (blockNumber < 0 || blockNumber === Number(reqTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
-          let supply, aeonPseudoblocks, aeonRewards, temp;
+          let supply, aeonPseudoblocks, temp;
+          let aeonRewards = 0n;
           const blocktimes = [];
           const hashrates = [];
           let index = tfile.length / Mochimo.BlockTrailer.length;
