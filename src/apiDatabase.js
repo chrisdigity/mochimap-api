@@ -154,13 +154,15 @@ const Db = {
       return obj;
     },
     filterLong: (obj) => {
+      const newObj = {};
       for (const key of Object.keys(obj)) {
-        if (typeof obj[key] === 'object') Db.util.filterLong(obj[key]);
-        else if (obj[key] instanceof Long) {
-          obj[key] = BigInt(obj[key].toString());
-        }
+        if (typeof obj[key] === 'object') {
+          newObj[key] = Db.util.filterLong(obj[key]);
+        } else if (obj[key] instanceof Long) {
+          newObj[key] = BigInt(obj[key].toString());
+        } else newObj[key] = obj[key];
       }
-      return obj;
+      return newObj;
     },
     id: {
       block: (bnum, bhash, fid) => {
