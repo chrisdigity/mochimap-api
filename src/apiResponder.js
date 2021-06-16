@@ -30,7 +30,7 @@ if (typeof process.env.FULLNODE === 'undefined') {
 }
 
 const { createHash } = require('crypto');
-const { isPrivateIPv4 } = require('./apiUtils');
+const { isPrivateIPv4, blockReward, projectedSupply } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
@@ -75,13 +75,96 @@ const Responder = {
   },
   block: async (res, blockNumber) => {
     try {
-      // convert blockNumber parameter to Long number type
-      const bnum = Db.util.long(blockNumber);
+      const query = {}; // undefined blockNumber will find latest
+      if (typeof blockNumber !== 'undefined') {
+        // convert blockNumber parameter to Long number type
+        query.bnum = Db.util.long(blockNumber);
+      }
       // perform block query
-      const block = await Db.findOne('block', { bnum });
+      const block = await Db.findOne('block', query);
       // send successfull query or 404
       return Responder._respond(res, block ? 200 : 404, block ||
         { message: `${blockNumber} could not be found...` });
+    } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  chain: async (res, blockNumber) => {
+    try {
+      let chain;
+      // convert blockNumber to Number value
+      if (typeof blockNumber === 'undefined') blockNumber = -1;
+      else blockNumber = Number(blockNumber);
+      // calculate partial tfile parameters
+      const count = blockNumber < 1000 ? Math.abs(blockNumber) + 1 : 1000;
+      const start = blockNumber > -1 ? blockNumber - (count - 1) : blockNumber;
+      const tfile = await Mochimo.getTfile(process.env.FULLNODE, start, count);
+      if (tfile) { // ensure tfile contains the requested block
+        const tfileCount = tfile.length / Mochimo.BlockTrailer.length;
+        const reqTrailer = tfile.trailer(tfileCount - 1);
+        if (blockNumber < 0 || blockNumber === Number(reqTrailer.bnum)) {
+          // deconstruct trailers and perform chain calculations
+          let supply, aeonPseudoblocks, aeonRewards, temp;
+          const blocktimes = [];
+          const hashrates = [];
+          let index = tfile.length / Mochimo.BlockTrailer.length;
+          for (index; index >= 0; index--) {
+            const trailer = tfile.trailer(index);
+            const { bnum, bhash, mfee, tcount } = trailer;
+            if (!supply) {
+              if (bnum & 0xffn === 0) {
+                if (!temp) temp = { aeonRewards, aeonPseudoblocks };
+                try { // obtain ledger amount from database
+                  const query = { _id: Db.util.id.block(bnum, bhash) };
+                  const ng = await Db.findOne('block', query);
+                  if (ng && ng.amount) {
+                    // calculate supply
+                    supply = ng.amount + aeonRewards;
+                    // calculate lost supply and subtract from max supply
+                    const lostSupply = projectedSupply(blockNumber) - supply;
+                    const maxSupply = projectedSupply() - lostSupply;
+                    Object.assign(temp, { maxSupply, supply });
+                  }
+                } catch (ignore) {}
+              } else {
+                if (!tcount) aeonPseudoblocks++;
+                else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
+              }
+            }
+            const dT = trailer.stime - trailer.time0;
+            if (dT) {
+              blocktimes.push(dT);
+              hashrates.push(Math.floor(Math.pow(2, trailer.difficulty) / dT));
+            }
+          }
+          // transfer ownership of trailer to chain if supply was successfull
+          if ('supply' in temp) chain = temp;
+          // if chain is undefined by this point, neogenesis search failed ~3x
+          if (chain) { // chain is available, perform remaining calculations
+            const json = reqTrailer.toJSON();
+            json.reward = blockReward(json.bnum);
+            json.txfees = json.mfee * BigInt(json.tcount);
+            json.mreward = json.reward + json.txfees;
+            json.blocktime = json.stime - json.time0;
+            if (blocktimes.length) {
+              json.blocktime_avg = blocktimes.reduce((acc, curr) => {
+                return acc + curr;
+              }, 0) / blocktimes.length;
+            }
+            json.hashrate = json.blocktime === 0 ? 0
+              : Math.floor(Math.pow(2, json.difficulty) / json.blocktime);
+            if (hashrates) {
+              json.hashrate_avg = hashrates.reduce((acc, curr) => {
+                return acc + curr;
+              }, 0) / hashrates.length;
+            }
+            // add json trailer of requested block number to chain request
+            chain = Object(json, chain);
+          }
+        }
+      }
+      // ensure chain was filled
+      // send successfull acquisition or 404
+      return Responder._respond(res, chain ? 200 : 404, chain ||
+        { message: 'chain data unavailable...' });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   ledger: async (res, addressType, address) => {

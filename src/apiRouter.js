@@ -22,9 +22,9 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
-    path: /^\/block\/([0-9]+)|(0x[0-9a-f]+)$/i,
-    hint: '[BaseURL]/block/<blockNumber>',
-    hintCheck: /block/gi,
+    path: /^\/block(?:\/([0-9]+)|\/(0x[0-9a-f]+))?$/i,
+    hint: '[BaseURL]/block/<optional BlockNumber>',
+    hintCheck: /block|0x/gi,
     handler: Responder.block,
     enabled: true
   }, {
@@ -37,8 +37,15 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: /^\/chain(?:\/([0-9]+)|\/(0x[0-9a-f]+))?$/i,
+    hint: '[BaseURL]/chain/<optional BlockNumber>',
+    hintCheck: /chain|0x/gi,
+    handler: Responder.chain,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/ledger\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/ledger/<"tag"||"address">/<partial Tag or Address>',
+    hint: '[BaseURL]/ledger/<"tag" or "address">/<partial Tag or Address>',
     hintCheck: /ledger|tag|address/gi,
     handler: Responder.ledger,
     enabled: true
@@ -52,9 +59,9 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/network(?:\/([a-z]+))?\/(?=\d+\.\d+\.\d+\.\d+)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})$/i,
-    hint: '[BaseURL]/network/<IPv4> || [BaseURL]/network/active/<IPv4>',
-    hintCheck: /network|node/gi,
+    path: /^\/network(?:\/(active))?\/(?=\d+\.\d+\.\d+\.\d+)((?:(?:25[0-5]|2[0-4]\d|1\d{2}|[1-9]\d|\d)\.?){4})$/i,
+    hint: '[BaseURL]/network/<optional "active">/<IPv4>',
+    hintCheck: /network|node|active/gi,
     handler: Responder.network,
     enabled: true
   }, {

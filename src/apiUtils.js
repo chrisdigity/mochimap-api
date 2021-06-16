@@ -177,6 +177,51 @@ const ms = {
   week: 604800000
 };
 
+const blockReward = (bnum) => {
+  // 'delta' reward adjustments, 'base' rewards & 'trigger' blocks
+  const delta = [56000n, 150000n, 28488n];
+  const base = [5000000000n, 5917392000n, 59523942000n];
+  const trigger = [17185n, 373761n, 2097152n];
+  // Reward after final block reward distribution + block height check
+  if (bnum > trigger[2] || bnum <= 0n) return 0n;
+  // Reward before v2.0 block trigger 0x4000
+  if (bnum < trigger[0]) return (base[0] + delta[0] * --bnum);
+  // Reward first remaining ~4 years (post v2.0) of distribution
+  if (bnum < trigger[1]) return (base[1] + delta[1] * (bnum - trigger[0]));
+  // Reward for last ~18 years of distribution
+  return (base[2] - delta[2] * (bnum - trigger[1]));
+};
+
+const projectedSupply = (bnum) => {
+  const instamine = 4757066000000000n; // inclusive of any locked dev coins
+  const Sn = (n, b1, bn) => {
+    return n * (blockReward(b1) + blockReward(bn)) / 2n;
+  }; // Sum of an Arithmetic Sequence; Sn = n(A1+An)/2
+  // without input, project maximum supply at block 0x200000
+  bnum = bnum || 2097152n;
+  // Due to hard fork @ 0x4321, formula is split into 3 separate calculations
+  var allblocks = 0n;
+  var neogen = 0n;
+  var nn = 0n;
+  // 0x1 to 0x4320...
+  nn = Math.min(0x4320n, bnum); // max 0x4320
+  allblocks += Sn(nn, 1, nn);
+  nn = Math.min(0x4300n, bnum) >> 8n << 8n; // max 0x4300
+  neogen += Sn(nn >> 8n, 256n, nn);
+  // 0x4321 to 0x5B400...
+  nn = Math.min(0x5B400n, bnum); // max 0x5B400
+  allblocks += Sn(bnum > 0x4320n ? nn - 0x4320n : 0n, 0x4321n, nn);
+  nn = Math.min(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
+  neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8 : 0, 0x4400n, nn);
+  // 0x5B401 to 0x200000
+  nn = Math.min(0x200000n, bnum); // max 0x200000
+  allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
+  nn = Math.min(0x200000n, bnum) >> 8n << 8n; // max 0x200000
+  neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400) >> 8n : 0n, 0x5B500n, nn);
+  // return the result of instamine plus all block rewards minus neogen rewards
+  return instamine + allblocks - neogen;
+};
+
 module.exports = {
   asUint64String,
   objectIsEmpty,
@@ -186,5 +231,7 @@ module.exports = {
   isPrivateIPv4,
   readWeb,
   informedShutdown,
-  ms
+  ms,
+  blockReward,
+  projectedSupply
 };
