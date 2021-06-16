@@ -106,7 +106,7 @@ const Responder = {
           const blocktimes = [];
           const hashrates = [];
           let index = tfile.length / Mochimo.BlockTrailer.length;
-          for (index; index >= 0; index--) {
+          for (index--; index >= 0; index--) {
             const trailer = tfile.trailer(index);
             const { bnum, bhash, mfee, tcount } = trailer;
             if (!supply) {
