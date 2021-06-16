@@ -110,7 +110,7 @@ const Responder = {
             const trailer = tfile.trailer(index);
             const { bnum, bhash, mfee, tcount } = trailer;
             if (!supply) {
-              if (bnum & 0xffn === 0) {
+              if (!(bnum & 0xffn)) {
                 if (!temp) temp = { aeonRewards, aeonPseudoblocks };
                 try { // obtain ledger amount from database
                   const query = { _id: Db.util.id.block(bnum, bhash) };
