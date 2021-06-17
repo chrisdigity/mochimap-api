@@ -99,8 +99,8 @@ const Responder = {
       const tfile = await Mochimo.getTfile(process.env.FULLNODE, start, count);
       if (tfile) { // ensure tfile contains the requested block
         const tfileCount = tfile.length / Mochimo.BlockTrailer.length;
-        const reqTrailer = tfile.trailer(tfileCount - 1);
-        if (blockNumber < 0 || blockNumber === Number(reqTrailer.bnum)) {
+        const rTrailer = tfile.trailer(tfileCount - 1);
+        if (blockNumber < 0 || blockNumber === Number(rTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
           let supply, temp;
           let aeonPseudoblocks = 0;
@@ -122,7 +122,7 @@ const Responder = {
                     // calculate supply
                     supply = ng.amount + aeonRewards;
                     // calculate lost supply and subtract from max supply
-                    const lostSupply = projectedSupply(blockNumber) - supply;
+                    const lostSupply = projectedSupply(rTrailer.bnum) - supply;
                     const maxSupply = projectedSupply() - lostSupply;
                     Object.assign(temp, { maxSupply, supply });
                   }
@@ -140,10 +140,10 @@ const Responder = {
           if (temp && 'supply' in temp) chain = temp;
           // if chain is undefined by this point, neogenesis search failed ~3x
           if (chain) { // chain is available, perform remaining calculations
-            const json = reqTrailer.toJSON();
-            json.reward = blockReward(json.bnum);
+            const json = rTrailer.toJSON();
             json.txfees = json.mfee * BigInt(json.tcount);
-            json.mreward = json.reward + json.txfees;
+            json.reward = blockReward(json.bnum);
+            json.mreward = json.txfees + json.reward;
             json.blocktime = json.stime - json.time0;
             if (blocktimes.length) {
               json.blocktime_avg = blocktimes.reduce((acc, curr) => {
@@ -158,7 +158,7 @@ const Responder = {
               }, 0) / hashrates.length;
             }
             // add json trailer of requested block number to chain request
-            chain = Object(json, chain);
+            chain = Object.assign(json, chain);
           }
         }
       }

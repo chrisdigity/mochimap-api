@@ -206,19 +206,19 @@ const projectedSupply = (bnum) => {
   var nn = 0n;
   // 0x1 to 0x4320...
   nn = BigIntMin(0x4320n, bnum); // max 0x4320
-  allblocks += Sn(nn, 1, nn);
+  allblocks += Sn(nn, 1n, nn);
   nn = BigIntMin(0x4300n, bnum) >> 8n << 8n; // max 0x4300
   neogen += Sn(nn >> 8n, 256n, nn);
   // 0x4321 to 0x5B400...
   nn = BigIntMin(0x5B400n, bnum); // max 0x5B400
   allblocks += Sn(bnum > 0x4320n ? nn - 0x4320n : 0n, 0x4321n, nn);
   nn = BigIntMin(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
-  neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8 : 0, 0x4400n, nn);
+  neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8n : 0n, 0x4400n, nn);
   // 0x5B401 to 0x200000
   nn = BigIntMin(0x200000n, bnum); // max 0x200000
   allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
   nn = BigIntMin(0x200000n, bnum) >> 8n << 8n; // max 0x200000
-  neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400) >> 8n : 0n, 0x5B500n, nn);
+  neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400n) >> 8n : 0n, 0x5B500n, nn);
   // return the result of instamine plus all block rewards minus neogen rewards
   return Instamine + allblocks - neogen;
 };
