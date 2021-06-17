@@ -193,7 +193,8 @@ const blockReward = (bnum) => {
 };
 
 const projectedSupply = (bnum) => {
-  const instamine = 4757066000000000n; // inclusive of any locked dev coins
+  const Instamine = 4757066000000000n; // inclusive of any locked dev coins
+  const BigIntMin = (...args) => args.reduce((m, e) => e < m ? e : m);
   const Sn = (n, b1, bn) => {
     return n * (blockReward(b1) + blockReward(bn)) / 2n;
   }; // Sum of an Arithmetic Sequence; Sn = n(A1+An)/2
@@ -204,22 +205,22 @@ const projectedSupply = (bnum) => {
   var neogen = 0n;
   var nn = 0n;
   // 0x1 to 0x4320...
-  nn = Math.min(0x4320n, bnum); // max 0x4320
+  nn = BigIntMin(0x4320n, bnum); // max 0x4320
   allblocks += Sn(nn, 1, nn);
-  nn = Math.min(0x4300n, bnum) >> 8n << 8n; // max 0x4300
+  nn = BigIntMin(0x4300n, bnum) >> 8n << 8n; // max 0x4300
   neogen += Sn(nn >> 8n, 256n, nn);
   // 0x4321 to 0x5B400...
-  nn = Math.min(0x5B400n, bnum); // max 0x5B400
+  nn = BigIntMin(0x5B400n, bnum); // max 0x5B400
   allblocks += Sn(bnum > 0x4320n ? nn - 0x4320n : 0n, 0x4321n, nn);
-  nn = Math.min(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
+  nn = BigIntMin(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
   neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8 : 0, 0x4400n, nn);
   // 0x5B401 to 0x200000
-  nn = Math.min(0x200000n, bnum); // max 0x200000
+  nn = BigIntMin(0x200000n, bnum); // max 0x200000
   allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
-  nn = Math.min(0x200000n, bnum) >> 8n << 8n; // max 0x200000
+  nn = BigIntMin(0x200000n, bnum) >> 8n << 8n; // max 0x200000
   neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400) >> 8n : 0n, 0x5B500n, nn);
   // return the result of instamine plus all block rewards minus neogen rewards
-  return instamine + allblocks - neogen;
+  return Instamine + allblocks - neogen;
 };
 
 module.exports = {
