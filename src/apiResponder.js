@@ -146,16 +146,16 @@ const Responder = {
             json.mreward = json.txfees + json.reward;
             json.blocktime = json.stime - json.time0;
             if (blocktimes.length) {
-              json.blocktime_avg = blocktimes.reduce((acc, curr) => {
+              json.blocktime_avg = (blocktimes.reduce((acc, curr) => {
                 return acc + curr;
-              }, 0) / blocktimes.length;
+              }, 0) / blocktimes.length).toFixed(1);
             }
             json.hashrate = json.blocktime === 0 ? 0
               : Math.floor(Math.pow(2, json.difficulty) / json.blocktime);
             if (hashrates) {
-              json.hashrate_avg = hashrates.reduce((acc, curr) => {
+              json.hashrate_avg = (hashrates.reduce((acc, curr) => {
                 return acc + curr;
-              }, 0) / hashrates.length;
+              }, 0) / hashrates.length) | 0;
             }
             // add json trailer of requested block number to chain request
             chain = Object.assign(json, chain);
