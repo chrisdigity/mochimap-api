@@ -102,10 +102,11 @@ const Responder = {
         const rTrailer = tfile.trailer(tfileCount - 1);
         if (blockNumber < 0 || blockNumber === Number(rTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
-          let supply, temp, hashesStart, hashesEnd;
+          let supply, temp;
           let aeonPseudoblocks = 0;
           let aeonRewards = 0n;
           const blocktimes = [];
+          const hashestimes = [];
           const hashes = [];
           let index = tfile.length / Mochimo.BlockTrailer.length;
           for (index--; index >= 0; index--) {
@@ -130,10 +131,10 @@ const Responder = {
               else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
             }
             if (bnum & 0xffn) {
-              blocktimes.push(trailer.stime - trailer.time0);
+              const dT = trailer.stime - trailer.time0;
+              blocktimes.push(dT);
               if (tcount) {
-                hashesEnd = trailer.stime;
-                if (!hashesStart) hashesStart = trailer.time0;
+                hashestimes.push(dT);
                 hashes.push(Math.pow(2, trailer.difficulty));
               }
             }
@@ -158,7 +159,9 @@ const Responder = {
             if (hashes) {
               json.hashrate_avg = (hashes.reduce((acc, curr) => {
                 return acc + curr;
-              }, 0) / (hashesStart - hashesEnd)) | 0;
+              }, 0) / hashestimes.reduce((acc, curr) => {
+                return acc + curr;
+              }, 0)) | 0;
             }
             // add json trailer of requested block number to chain request
             chain = Object.assign(json, chain);
