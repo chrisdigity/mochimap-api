@@ -102,15 +102,15 @@ const Responder = {
         const rTrailer = tfile.trailer(tfileCount - 1);
         if (blockNumber < 0 || blockNumber === Number(rTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
-          let supply, temp;
+          let supply, temp, hashesStart, hashesEnd;
           let aeonPseudoblocks = 0;
           let aeonRewards = 0n;
           const blocktimes = [];
-          const hashrates = [];
+          const hashes = [];
           let index = tfile.length / Mochimo.BlockTrailer.length;
           for (index--; index >= 0; index--) {
             const trailer = tfile.trailer(index);
-            const { bnum, bhash, mfee, tcount, difficulty } = trailer;
+            const { bnum, bhash, mfee, tcount } = trailer;
             if (!supply) {
               if (!(bnum & 0xffn)) {
                 if (!temp) temp = { aeonRewards, aeonPseudoblocks };
@@ -129,11 +129,12 @@ const Responder = {
               } else if (!tcount) aeonPseudoblocks++;
               else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
             }
-            const dT = trailer.stime - trailer.time0;
-            if (dT) {
-              blocktimes.push(dT);
+            if (bnum & 0xffn) {
+              blocktimes.push(trailer.stime - trailer.time0);
               if (tcount) {
-                hashrates.push(Math.floor(Math.pow(2, difficulty) / dT));
+                hashesEnd = trailer.stime;
+                if (!hashesStart) hashesStart = trailer.time0;
+                hashes.push(Math.pow(2, trailer.difficulty));
               }
             }
           }
@@ -152,12 +153,12 @@ const Responder = {
                 return acc + curr;
               }, 0) / blocktimes.length) * 100) | 0) / 100;
             }
-            json.hashrate = json.blocktime === 0 ? 0
+            json.hashrate = json.blocktime === 0 || json.tcount === 0 ? 0
               : Math.floor(Math.pow(2, json.difficulty) / json.blocktime);
-            if (hashrates) {
-              json.hashrate_avg = (hashrates.reduce((acc, curr) => {
+            if (hashes) {
+              json.hashrate_avg = (hashes.reduce((acc, curr) => {
                 return acc + curr;
-              }, 0) / hashrates.length) | 0;
+              }, 0) / (hashesStart - hashesEnd)) | 0;
             }
             // add json trailer of requested block number to chain request
             chain = Object.assign(json, chain);
