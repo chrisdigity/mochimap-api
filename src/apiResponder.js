@@ -94,7 +94,7 @@ const Responder = {
       if (typeof blockNumber === 'undefined') blockNumber = -1;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
-      const count = blockNumber < 1000 ? Math.abs(blockNumber) + 1 : 1000;
+      const count = blockNumber < 768 ? Math.abs(blockNumber) + 1 : 768;
       const start = blockNumber > -1 ? blockNumber - (count - 1) : blockNumber;
       const tfile = await Mochimo.getTfile(process.env.FULLNODE, start, count);
       if (tfile) { // ensure tfile contains the requested block
@@ -110,7 +110,7 @@ const Responder = {
           let index = tfile.length / Mochimo.BlockTrailer.length;
           for (index--; index >= 0; index--) {
             const trailer = tfile.trailer(index);
-            const { bnum, bhash, mfee, tcount } = trailer;
+            const { bnum, bhash, mfee, tcount, difficulty } = trailer;
             if (!supply) {
               if (!(bnum & 0xffn)) {
                 if (!temp) temp = { aeonRewards, aeonPseudoblocks };
@@ -118,8 +118,7 @@ const Responder = {
                   const query = { _id: Db.util.id.block(bnum, bhash) };
                   const ng = await Db.findOne('block', query);
                   Db.util.filterLong(ng); // ensure long values are BigInt
-                  if (ng && ng.amount) {
-                    // calculate supply
+                  if (ng && ng.amount) { // preform supply calculations
                     supply = ng.amount + aeonRewards;
                     // calculate lost supply and subtract from max supply
                     const lostSupply = projectedSupply(rTrailer.bnum) - supply;
@@ -133,7 +132,9 @@ const Responder = {
             const dT = trailer.stime - trailer.time0;
             if (dT) {
               blocktimes.push(dT);
-              hashrates.push(Math.floor(Math.pow(2, trailer.difficulty) / dT));
+              if (tcount) {
+                hashrates.push(Math.floor(Math.pow(2, difficulty) / dT));
+              }
             }
           }
           // transfer ownership of trailer to chain if supply was successfull
@@ -141,14 +142,15 @@ const Responder = {
           // if chain is undefined by this point, neogenesis search failed ~3x
           if (chain) { // chain is available, perform remaining calculations
             const json = rTrailer.toJSON();
-            json.txfees = json.mfee * BigInt(json.tcount);
-            json.reward = blockReward(json.bnum);
-            json.mreward = json.txfees + json.reward;
-            json.blocktime = json.stime - json.time0;
+            const isNeogenesis = Boolean(!(json.bnum & 0xffn));
+            json.txfees = isNeogenesis ? 0 : json.mfee * BigInt(json.tcount);
+            json.reward = isNeogenesis ? 0 : blockReward(json.bnum);
+            json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
+            json.blocktime = isNeogenesis ? 0 : json.stime - json.time0;
             if (blocktimes.length) {
               json.blocktime_avg = (((blocktimes.reduce((acc, curr) => {
                 return acc + curr;
-              }, 0) / blocktimes.length) * 10) | 0) / 10;
+              }, 0) / blocktimes.length) * 100) | 0) / 100;
             }
             json.hashrate = json.blocktime === 0 ? 0
               : Math.floor(Math.pow(2, json.difficulty) / json.blocktime);
