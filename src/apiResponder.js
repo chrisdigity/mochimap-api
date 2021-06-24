@@ -93,7 +93,7 @@ const Responder = {
       let chain;
       // convert blockNumber to Number value
       if (typeof blockNumber === 'undefined') blockNumber = blockHex;
-      if (typeof blockNumber === 'undefined') blockNumber = -1;
+      if (typeof blockNumber === 'undefined') blockNumber = -768;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
       const count = blockNumber < 768 ? Math.abs(blockNumber) + 1 : 768;
