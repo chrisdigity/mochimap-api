@@ -73,9 +73,10 @@ const Responder = {
     res.writeHead(statusCode, statusMessage, headers);
     res.end(body);
   },
-  block: async (res, blockNumber) => {
+  block: async (res, blockNumber, blockHex) => {
     try {
-      const query = {}; // undefined blockNumber will find latest
+      const query = {}; // undefined blockNumber/blockHex will find latest
+      if (typeof blockNumber !== 'undefined') blockNumber = blockHex;
       if (typeof blockNumber !== 'undefined') {
         // convert blockNumber parameter to Long number type
         query.bnum = Db.util.long(blockNumber);
@@ -87,10 +88,11 @@ const Responder = {
         { message: `${blockNumber} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  chain: async (res, blockNumber) => {
+  chain: async (res, blockNumber, blockHex) => {
     try {
       let chain;
       // convert blockNumber to Number value
+      if (typeof blockNumber !== 'undefined') blockNumber = blockHex;
       if (typeof blockNumber === 'undefined') blockNumber = -1;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
