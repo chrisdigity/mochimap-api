@@ -22,7 +22,7 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
-    path: /^\/block(?:\/([0-9]+)|\/(0x[0-9a-f]+))?$/i,
+    path: /^\/block(?:\/(?:([0-9]+)|(0x[0-9a-f]+)))?$/i,
     hint: '[BaseURL]/block/<optional BlockNumber>',
     hintCheck: /block|0x/gi,
     handler: Responder.block,
@@ -37,7 +37,7 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/chain(?:\/([0-9]+)|\/(0x[0-9a-f]+))?$/i,
+    path: /^\/chain(?:\/(?:([0-9]+)|(0x[0-9a-f]+)))?$/i,
     hint: '[BaseURL]/chain/<optional BlockNumber>',
     hintCheck: /chain|0x/gi,
     handler: Responder.chain,
