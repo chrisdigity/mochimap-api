@@ -76,7 +76,7 @@ const Responder = {
   block: async (res, blockNumber, blockHex) => {
     try {
       const query = {}; // undefined blockNumber/blockHex will find latest
-      if (typeof blockNumber !== 'undefined') blockNumber = blockHex;
+      if (typeof blockNumber === 'undefined') blockNumber = blockHex;
       if (typeof blockNumber !== 'undefined') {
         // convert blockNumber parameter to Long number type
         query.bnum = Db.util.long(blockNumber);
@@ -92,7 +92,7 @@ const Responder = {
     try {
       let chain;
       // convert blockNumber to Number value
-      if (typeof blockNumber !== 'undefined') blockNumber = blockHex;
+      if (typeof blockNumber === 'undefined') blockNumber = blockHex;
       if (typeof blockNumber === 'undefined') blockNumber = -1;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
