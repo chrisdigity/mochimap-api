@@ -78,8 +78,8 @@ const Responder = {
       const query = {}; // undefined blockNumber/blockHex will find latest
       if (typeof blockNumber === 'undefined') blockNumber = blockHex;
       if (typeof blockNumber !== 'undefined') {
-        // convert blockNumber parameter to Long number type
-        query.bnum = Db.util.long(blockNumber);
+        // convert blockNumber parameter to Long number type from Big Integer
+        query.bnum = Db.util.long(BigInt(blockNumber));
       }
       // perform block query
       const block = await Db.findOne('block', query);
