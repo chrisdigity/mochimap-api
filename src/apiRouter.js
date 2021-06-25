@@ -22,6 +22,11 @@ const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
   {
     method: 'GET',
+    path: /^\/$/,
+    handler: Responder.unknown,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/block(?:\/(?:([0-9]+)|(0x[0-9a-f]+))?)?$/i,
     hint: '[BaseURL]/block/<optional BlockNumber>',
     hintCheck: /block|0x/gi,
@@ -71,13 +76,6 @@ const Routes = [
     hint: '[BaseURL]/network/search?<param>=<paramValue>',
     hintCheck: /network|node|search/gi,
     handler: Responder.searchNetwork,
-    enabled: true
-  }, {
-    method: 'GET',
-    path: /^\/status(?:\/([0-9]+)?(?:\/([a-z]+)?)?)?$/i,
-    hint: '[BaseURL]/status/<optional code>/<optional message>',
-    hintCheck: /status/gi,
-    handler: Responder.unknown,
     enabled: true
   }, {
     method: 'GET',
