@@ -74,7 +74,9 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/status(?:\/)?$/i,
+    path: /^\/status(?:\/([0-9]+)?(?:\/([a-z]+)?)?)?$/i,
+    hint: '[BaseURL]/status/<optional code>/<optional message>',
+    hintCheck: /status/gi,
     handler: Responder.unknown,
     enabled: true
   }, {
