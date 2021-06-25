@@ -256,14 +256,15 @@ const Responder = {
         { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  unknown: (res, code = 404, json = {}) => Responder._respond(res, code, json),
+  unknown: (res, code = 200, json = {}) => Responder._respond(res, code, json),
   unknownInternal: (res, error) => {
     // log error and send alert response
     console.trace(error);
     const date = new Date();
     Responder.unknown(res, 500, {
-      message: 'please consider opening a issue detailing this error @ ' +
-        'https://github.com/chrisdigity/mochimap.com/issues',
+      message: 'MochiMap API has encountered an unexpected error. ' +
+        'Please consider opening a issue detailing this error @ ' +
+        'https://github.com/chrisdigity/api.mochimap.com/issues',
       timestamp: date.toISOString()
     });
   }

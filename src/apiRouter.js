@@ -74,6 +74,11 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: /^\/status(?:\/)?$/i,
+    handler: Responder.unknown,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/transaction\/([0-9a-f]+)$/i,
     hint: '[BaseURL]/transaction/<txid>',
     hintCheck: /transaction/gi,
