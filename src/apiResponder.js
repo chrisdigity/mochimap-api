@@ -65,8 +65,12 @@ const Responder = {
     const body = JSON.stringify(json, null, 2) || '';
     const headers = {
       'X-Robots-Tag': 'none',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'X-XSS-Protection': '1; mode=block',
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
+      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
       'Access-Control-Allow-Origin': '*'
     };
     // send response
