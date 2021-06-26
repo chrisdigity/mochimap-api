@@ -68,6 +68,7 @@ const Responder = {
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block',
+      'Referrer-Policy': 'no-referrer',
       'Content-Type': 'application/json',
       'Content-Length': Buffer.byteLength(body),
       'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
