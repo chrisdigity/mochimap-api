@@ -1,7 +1,6 @@
 <h1 align="center">
   <img
     alt="MochiMap banner"
-    style="margin-bottom:-88px;"
     src="docs/mochimap-banner.png"
   /><br />
   <a
@@ -26,9 +25,6 @@
     alt="GitHub contributors"
     src="https://img.shields.io/github/contributors/chrisdigity/mochimap.com?logo=github&label=Contributors&style=plastic"
   /><br /><img src="https://contrib.rocks/image?repo=chrisdigity/mochimap.com" /></a><br />
-  <a href="https://github.com/chrisdigity/mochimap.com/graphs/contributors">
-
-</a>
 </h1>
 
 The MochiMap API is a selfless service *(pats self on back)* provided to the [Mochimo](https://mochimo.org/) community, for access to Mochimo Block data, Transaction data, Chain statistics and Network Node details via secure and reliable HTTP requests and developer friendly JSON responses.
