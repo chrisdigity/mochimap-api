@@ -27,14 +27,12 @@
   /><br /><img src="https://contrib.rocks/image?repo=chrisdigity/mochimap.com" /></a><br />
 </h1>
 
-The MochiMap API is a selfless service *(pats self on back)* provided to the [Mochimo](https://mochimo.org/) community, for access to Mochimo Block data, Transaction data, Chain statistics and Network Node details via secure and reliable HTTP requests and developer friendly JSON responses.
+The MochiMap API is a selfless service *(pats self on back)* provided to the [Mochimo](https://mochimo.org/) community, for access to Mochimo Block data, Transaction data, Chain statistics and Network Node details via secure and reliable HTTPS requests and JSON responses.
+
+The MochiMap API interprets blockchain and transaction data from the Mochimo Cryptocurrency Network and stores it as Developer friendly JSON data. This data is publicly accessible via the MochiMap API endpoints, listed below, allowing for both simple and complex queries and search patterns for querying exactly the data you might need.
 
 ## API Status and Uptime
 The [MochiMap API status page](https://stats.uptimerobot.com/KEPZ9hqnYo) is powered by the UptimeRobot and contains global and regional uptime history of the MochiMap API across all of it's publicly accessible servers.
-
-
-## API Usage
-The MochiMap API interprets blockchain and transaction data from the Mochimo Cryptocurrency Network and stores it as Developer friendly JSON data. This data is publicly accessible via the MochiMap API endpoints, listed below, allowing for both simple and complex queries and search patterns for querying exactly the data you might need.
 
 ## API Domains
 The MochiMap API can be accessed using a few different domains. Though it's highly recommended that you use the recommended domain for almost all cases, alternative domains are spread across the globe for redundancy and backup requirements.
@@ -107,7 +105,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
       "bhash": "454a3938da3d09aa...303d8c7fecb7abc2",
       "phash": "7ec34c376c5cbd72...b6aa90d70a1973515"
     },
-    ... 7 more results
+    { "...": "7 more results" }
   ]
 }
 ```
@@ -191,7 +189,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
       "balance": 75456516340552,
       "delta": -2745000000500
     },
-    ... 2 more results
+    { "...": "2 more results" }
   ]
 }
 ```
@@ -221,12 +219,8 @@ Alternatively, you can opt to use one of the various regional domains, via their
       "timestamp": 1624711676837,
       "uptimestamp": 1624669216091
     },
-    "sg": {
-      ... like connection.de
-    },
-    "us": {
-      ... like connection.de
-    }
+    "sg": { "...": "like connection.de" },
+    "us": { "...": "like connection.de" }
   },
   "pversion": 4,
   "cbits": 17,
@@ -240,7 +234,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
     "5.188.4.25",
     "35.208.22.197",
     "68.148.89.244",
-    ... 28 more peers
+    { "...": "28 more peers" }
   ]
 }
 ```
@@ -272,12 +266,8 @@ Alternatively, you can opt to use one of the various regional domains, via their
           "timestamp": 1623901791833,
           "uptimestamp": -1
         },
-        "sg": {
-          ... like connection.de
-        },
-        "us": {
-          ... like connection.de
-        }
+        "sg": { "...": "like connection.de" },
+        "us": { "...": "like connection.de" }
       },
       "pversion": 4,
       "cbits": 17,
@@ -291,7 +281,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
         "5.183.8.183",
         "144.91.67.74",
         "139.162.252.168",
-        ... 28 more peers
+        { "...": "28 more peers" }
       ]
     }
   ]
@@ -357,7 +347,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
       "changetotal": 501,
       "txfee": 500
     },
-    ... 7 more results
+    { "...": "7 more results" }
   ]
 }
 ```
