@@ -135,14 +135,14 @@ const visualizeHaiku = async (haiku, shadow) => {
   // heuristically determine best picture query for haiku
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
   const query = search.join('%20');
-  const data = { img: { haiku, shadow } };
+  let data = { img: { haiku, shadow } };
   let results;
   try { // request results from Pexels
-    results = await readWeb({
+    results = process.env.PEXELS ? await readWeb({
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
       headers: { Authorization: process.env.PEXELS }
-    }); // apply algorithm or throw error
+    }) : {}; // apply algorithm or throw error
     if (results.photos && results.photos.length) {
       const sol = algo(results.photos, 'url');
       if (!data.sol || data.sol.ps > sol.ps) {
@@ -158,11 +158,11 @@ const visualizeHaiku = async (haiku, shadow) => {
     } else throw new Error(results.error || 'no "photos" in results');
   } catch (error) { console.trace('Pexels request ERROR:', error); }
   try { // request results from Unsplash
-    results = await readWeb({
+    results = process.env.UNSPLASH ? await readWeb({
       hostname: 'api.unsplash.com',
       path: `/search/photos?query=${query}&per_page=30`,
       headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
-    }); // apply algorithm or throw error
+    }) : {}; // apply algorithm or throw error
     if (results.results && results.results.length) {
       const sol = algo(results.results, 'description', 'alt_description');
       if (!data.sol || data.sol.ps > sol.ps) {
@@ -177,9 +177,9 @@ const visualizeHaiku = async (haiku, shadow) => {
       }
     } else throw new Error(results.errors || 'no "results" in results');
   } catch (error) { console.trace('Unsplash request ERROR:', error); }
-  // throw error on no solution
-  if (!data.sol) throw new Error('failed to visualize Haiku');
-  delete data.sol;
+  // return data without solution
+  if (!data.sol) data = undefined;
+  else delete data.sol;
   return data;
 };
 
@@ -242,8 +242,11 @@ const processBlock = async (data, srcdir) => {
         if (nonce) { // clean shadow var and update block with haiku data
           shadow = shadow || false;
           const haiku = Mochimo.Trigg.expand(nonce, shadow);
-          const blockUpdate = visualizeHaiku(haiku, shadow);
-          logstr += `${await Db.update('block', blockUpdate, { _id })} Haiku`;
+          let haikuUpdate = visualizeHaiku(haiku, shadow);
+          if (haikuUpdate) { // apply atomic set operator and update
+            haikuUpdate = { $set: haikuUpdate };
+            logstr += `${await Db.update('block', haikuUpdate, { _id })} Haiku`;
+          }
         }
       }
     } catch (error) { logstr += '' + error; }
