@@ -24,21 +24,27 @@ const { asUint64String, readWeb } = require('./apiUtils');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 
-const buildBlockDocument = (block) => {
-  // expose bnum and bhash from block data
+const buildRichlistDocument = (block) => {
+  // expose bnum, bhash and stime from block data
   const { bnum, bhash } = block;
-  // prepend _id to minified block as JSON
-  const _id = Db.util.id.block(bnum, bhash);
-  const blockJSON = Object.assign({ _id }, block.toJSON(true));
-  // return BigInt filtered blockJSON as block document
-  return Db.util.filterBigInt(blockJSON);
+  // build ledger JSON, as array of modified ledger entries
+  const richlistJSON = block.ledger.sort((a, b) => {
+    return b.balance - a.balance; // Tested ~ 1min for 10 million samples
+  }).map((lentry, index) => {
+    const position = index + 1;
+    const { balance, tag } = lentry;
+    const address = lentry.address.slice(0, 64);
+    const addressHash = createHash('sha256').update(address).digest('hex');
+    const _id = Db.util.id.ledger(bnum, bhash, asUint64String(position));
+    return { _id, address, addressHash, tag, balance, position };
+  });
+  // return BigInt filtered richlistJSON as array of modified ledger entries
+  return Db.util.filterBigInt(richlistJSON);
 };
 
 const buildLedgerDocument = (block, srcdir) => {
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
-  // ensure block type is NEOGENESIS, before proceeding
-  if (block.type !== Mochimo.Block.NEOGENESIS) return;
   // obtain previous neogenesis block data
   const pngfname = path.join(srcdir, `b${asUint64String(bnum - 256n)}.bc`);
   const pngdata = fs.readFileSync(pngfname);
@@ -102,8 +108,6 @@ const buildLedgerDocument = (block, srcdir) => {
 const buildTransactionDocument = (block) => {
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
-  // ensure block type is NORMAL, before proceeding
-  if (block.type !== Mochimo.Block.NORMAL) return;
   // obtain and format transactions in transactionJSON
   const transactionJSON = block.transactions.map(txe => {
     // prepend _id, stime, bnum and bhash to minified txe
@@ -116,40 +120,6 @@ const buildTransactionDocument = (block) => {
   transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
   // return BigInt filtered transactionJSON as array of transaction documents
   return Db.util.filterBigInt(transactionJSON);
-};
-
-const processBlock = async (data, srcdir) => {
-  let logstr = '';
-  // perform pre-checks on data
-  if (typeof data !== 'object') {
-    throw new TypeError(`"data" is not an object: ${typeof data}`);
-  } else if (!data.length >= Mochimo.BlockTrailer.length + 4) {
-    throw new Error(`"data.length" is insufficient: ${data.length}`);
-  }
-  // interpret data as Mochimo Block and perform block hash verification check
-  const block = new Mochimo.Block(data);
-  if (!block.verifyBlockHash()) {
-    throw new Error('"block" hash could not be verified');
-  }
-  // check database for existing store
-  const _id = Db.util.id.block(block.bnum, block.bhash);
-  if (!(await Db.has('block', block.bnum, block.bhash))) {
-    try {
-      // build block component documents
-      const docs = {
-        block: buildBlockDocument(block),
-        ledger: buildLedgerDocument(block, srcdir),
-        transaction: buildTransactionDocument(block)
-      };
-      // insert applicable documents and log results
-      for (const [col, doc] of Object.entries(docs)) {
-        if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
-      }
-    } catch (error) { logstr += '' + error; }
-  } else logstr = 'database entry found';
-  console.log(_id.replace(/^0+/, '0x').slice(0, -8) + ';', logstr);
-  // return block identifier (_id)
-  return _id;
 };
 
 const visualizeHaiku = async (haiku, shadow) => {
@@ -213,10 +183,74 @@ const visualizeHaiku = async (haiku, shadow) => {
   return data;
 };
 
-module.exports = {
-  buildBlockDocument,
-  buildLedgerDocument,
-  buildTransactionDocument,
-  processBlock,
-  visualizeHaiku
+const processBlock = async (data, srcdir) => {
+  let logstr = '';
+  // perform pre-checks on data
+  if (typeof data !== 'object') {
+    throw new TypeError(`"data" is not an object: ${typeof data}`);
+  } else if (!data.length >= Mochimo.BlockTrailer.length + 4) {
+    throw new Error(`"data.length" is insufficient: ${data.length}`);
+  }
+  // interpret data as Mochimo Block and perform block hash verification check
+  const block = new Mochimo.Block(data);
+  if (!block.verifyBlockHash()) {
+    throw new Error('"block" hash could not be verified');
+  }
+  // check database for existing store
+  const { bnum, bhash } = block;
+  const _id = Db.util.id.block(bnum, bhash);
+  if (!(await Db.has('block', bnum, bhash))) {
+    // build block document and, if accepted, proceed with remaining documents
+    try { // prepend _id to minified blockJSON
+      const blockJSON = Object.assign({ _id }, block.toJSON(true));
+      // try insert BigInt-filtered blockJSON
+      if (await Db.insert('block', Db.util.filterBigInt(blockJSON))) {
+        logstr += 'block / ';
+        let nonce, shadow;
+        const docs = {};
+        const type = block.type;
+        // check block type before proceeding
+        if ([Mochimo.Block.NEOGENESIS, Mochimo.Block.GENESIS].includes(type)) {
+          // build ledger balance and richlist documents (SYNCHRONOUS/SLOW)
+          docs.richlist = buildRichlistDocument(block); // slow due to sorting
+          docs.ledger = buildLedgerDocument(block, srcdir); // slow due to pNG
+        } else if (type === Mochimo.Block.NORMAL) { // build transaction data
+          docs.transaction = buildTransactionDocument(block);
+        } else { // pseudoblock, find appropriate shadow Haiku
+          // search previous blocks (by previous block hash) until non-pseudo
+          let pblock;
+          let pbnum = block.bnum - 1n;
+          let pbhash = block.phash;
+          do {
+            const pblockid = Db.util.id.block(pbnum, pbhash);
+            pblock = await Db.findOne('block', { _id: pblockid });
+            if (pblock) {
+              if (pblock.nonce) nonce = pblock.nonce;
+              else {
+                pbnum = pblock.bnum - 1n;
+                pbhash = pblock.phash;
+              }
+            }
+          } while (!nonce && pblock);
+          shadow = true;
+        }
+        // insert applicable documents and log results
+        for (const [col, doc] of Object.entries(docs)) {
+          if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
+        }
+        // check nonce was available
+        if (nonce) { // clean shadow var and update block with haiku data
+          shadow = shadow || false;
+          const haiku = Mochimo.Trigg.expand(nonce, shadow);
+          const blockUpdate = visualizeHaiku(haiku, shadow);
+          logstr += `${await Db.update('block', blockUpdate, { _id })} Haiku`;
+        }
+      }
+    } catch (error) { logstr += '' + error; }
+  } else logstr = 'database entry found';
+  console.log(_id.replace(/^0{0,15}/, '0x').slice(0, -8), logstr);
+  // return block identifier (_id)
+  return _id;
 };
+
+module.exports = { processBlock };
