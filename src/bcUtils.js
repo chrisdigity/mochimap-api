@@ -206,9 +206,9 @@ const processBlock = async (data, srcdir) => {
       // try insert BigInt-filtered blockJSON
       if (await Db.insert('block', Db.util.filterBigInt(blockJSON))) {
         logstr += 'block / ';
-        let nonce, shadow;
         const docs = {};
         const type = block.type;
+        let { nonce, shadow } = block;
         // check block type before proceeding
         if ([Mochimo.Block.NEOGENESIS, Mochimo.Block.GENESIS].includes(type)) {
           // build ledger balance and richlist documents (SYNCHRONOUS/SLOW)
