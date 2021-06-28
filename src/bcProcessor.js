@@ -79,8 +79,10 @@ const Watcher = {
   init: () => {
     // check BCDIR is accessible
     fs.promises.access(BCDIR).then(() => { // create directory watcher
-      fs.watch(BCDIR, fileHandler);
-      console.log('// INIT: watcher started...');
+      if (!process.env.BCSCANONLY) {
+        fs.watch(BCDIR, fileHandler);
+        console.log('// INIT: watcher started...');
+      }
       fs.readdir(BCDIR, (err, files) => {
         if (err) console.error('// INIT: failed to catchup...');
         else {
