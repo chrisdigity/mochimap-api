@@ -30,7 +30,7 @@ const buildRichlistDocument = (block) => {
   const { bnum, bhash } = block;
   // build ledger JSON, as array of modified ledger entries
   const richlistJSON = block.ledger.sort((a, b) => {
-    return b.balance - a.balance; // Tested ~ 1min for 10 million samples
+    return Number(b.balance - a.balance); // ~1 minute for ~10 million samples
   }).map((lentry, index) => {
     const position = index + 1;
     const { balance, tag } = lentry;
