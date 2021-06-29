@@ -32,12 +32,13 @@ const buildRichlistDocument = (block) => {
   const richlistJSON = block.ledger.sort((a, b) => {
     return Number(b.balance - a.balance); // ~1 minute for ~10 million samples
   }).map((lentry, index, array) => {
+    let { address } = lentry;
     const position = index + 1;
     const dbpos = array.length - position;
     const { balance, tag } = lentry;
-    const address = lentry.address.slice(0, 64);
     const addressHash = createHash('sha256').update(address).digest('hex');
     const _id = Db.util.id.ledger(bnum, bhash, asUint64String(dbpos));
+    address = address.slice(0, 64);
     return { _id, address, addressHash, tag, balance, position };
   });
   // return BigInt filtered richlistJSON as array of modified ledger entries
