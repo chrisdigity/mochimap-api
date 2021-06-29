@@ -246,7 +246,7 @@ const processBlock = async (data, srcdir) => {
         if (nonce) { // clean shadow var and update block with haiku data
           shadow = shadow || false;
           const haiku = Mochimo.Trigg.expand(nonce, shadow);
-          let haikuUpdate = buildHaikuDocument(haiku, shadow);
+          let haikuUpdate = await buildHaikuDocument(haiku, shadow);
           if (haikuUpdate) { // apply atomic set operator and update
             haikuUpdate = { $set: haikuUpdate };
             logstr += `${await Db.update('block', haikuUpdate, { _id })} haiku`;
