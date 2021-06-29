@@ -79,6 +79,14 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: '/richlist/search',
+    param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
+    hint: '[BaseURL]/richlist/search?<param>=<paramValue>',
+    hintCheck: /richlist|search/gi,
+    handler: Responder.searchRichlist,
+    enabled: true
+  }, {
+    method: 'GET',
     path: /^\/transaction\/([0-9a-f]+)$/i,
     hint: '[BaseURL]/transaction/<txid>',
     hintCheck: /transaction/gi,

@@ -251,6 +251,7 @@ const Responder = {
   searchBlock: (...args) => Responder.search('block', 1, ...args),
   searchLedger: (...args) => Responder.search('ledger', 1, ...args),
   searchNetwork: (...args) => Responder.search('network', 0, ...args),
+  searchRichlist: (...args) => Responder.search('richlist', 1, ...args),
   searchTransaction: (...args) => Responder.search('transaction', 1, ...args),
   transaction: async (res, txid) => {
     try {
