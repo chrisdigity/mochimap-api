@@ -268,7 +268,7 @@ const processBlock = async (data, srcdir) => {
         // process haiku update regardless of block type
         processHaikuVisualization(block).catch(TRACE);
       }
-    } catch (error) { TRACE(_bid, error); }
+    } catch (error) { console.error(_bid, error); }
   } else console.log(_bid, 'already processed');
   // return block identifier (_id)
   return _id;
