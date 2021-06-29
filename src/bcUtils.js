@@ -25,6 +25,7 @@ const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 
 const buildRichlistDocument = (block) => {
+  if (process.env.DISABLEBCRICHLIST) return;
   // expose bnum, bhash and stime from block data
   const { bnum, bhash } = block;
   // build ledger JSON, as array of modified ledger entries
@@ -43,6 +44,7 @@ const buildRichlistDocument = (block) => {
 };
 
 const buildLedgerDocument = (block, srcdir) => {
+  if (process.env.DISABLEBCLEDGER) return;
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
   // obtain previous neogenesis block data
@@ -106,6 +108,7 @@ const buildLedgerDocument = (block, srcdir) => {
 };
 
 const buildTransactionDocument = (block) => {
+  if (process.env.DISABLEBCTRANSACTION) return;
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
   // obtain and format transactions in transactionJSON
@@ -122,7 +125,8 @@ const buildTransactionDocument = (block) => {
   return Db.util.filterBigInt(transactionJSON);
 };
 
-const visualizeHaiku = async (haiku, shadow) => {
+const buildHaikuDocument = async (haiku, shadow) => {
+  if (process.env.DISABLEBCHAIKU) return;
   const algo = (arr, ...comp) => { // condensed heuristic algorithm
     let pi, ps, is, str;
     const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
@@ -205,7 +209,7 @@ const processBlock = async (data, srcdir) => {
       const blockJSON = Object.assign({ _id }, block.toJSON(true));
       // try insert BigInt-filtered blockJSON
       if (await Db.insert('block', Db.util.filterBigInt(blockJSON))) {
-        logstr += 'block / ';
+        logstr += '/ ';
         const docs = {};
         const type = block.type;
         let { nonce, shadow } = block;
@@ -242,10 +246,10 @@ const processBlock = async (data, srcdir) => {
         if (nonce) { // clean shadow var and update block with haiku data
           shadow = shadow || false;
           const haiku = Mochimo.Trigg.expand(nonce, shadow);
-          let haikuUpdate = visualizeHaiku(haiku, shadow);
+          let haikuUpdate = buildHaikuDocument(haiku, shadow);
           if (haikuUpdate) { // apply atomic set operator and update
             haikuUpdate = { $set: haikuUpdate };
-            logstr += `${await Db.update('block', haikuUpdate, { _id })} Haiku`;
+            logstr += `${await Db.update('block', haikuUpdate, { _id })} haiku`;
           }
         }
       }
