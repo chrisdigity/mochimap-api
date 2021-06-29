@@ -23,14 +23,17 @@ const { createHash } = require('crypto');
 const { asUint64String, readWeb } = require('./apiUtils');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
+const TRACE = console.trace;
 
-const buildRichlistDocument = (block) => {
-  if (process.env.DISABLEBCRICHLIST) return;
-  // expose bnum, bhash and stime from block data
-  const { bnum, bhash } = block;
-  // build ledger JSON, as array of modified ledger entries
-  const richlistJSON = block.ledger.sort((a, b) => {
-    return Number(b.balance - a.balance); // ~1 minute for ~10 million samples
+const processRichlist = async (data) => {
+  if (!data || process.env.DISABLEBCRICHLIST) return;
+  // expose bnum, bhash and ledger from data
+  let { ledger } = data;
+  const { bnum, bhash } = data;
+  const _bid = Db.util.id.block(bnum, bhash);
+  // build ledger JSON, as array of ranked ledger entries (BigInt filtered)
+  ledger = Db.util.filterBigInt(ledger.sort((a, b) => {
+    return Number(b.balance - a.balance); // ~1 minute for ~10 million entries
   }).map((lentry, index, array) => {
     let { address } = lentry;
     const { balance, tag } = lentry;
@@ -40,15 +43,17 @@ const buildRichlistDocument = (block) => {
     const _id = Db.util.id.ledger(bnum, bhash, asUint64String(dbrank));
     address = address.slice(0, 64);
     return { _id, address, addressHash, tag, balance, rank };
-  });
-  // return BigInt filtered richlistJSON as array of modified ledger entries
-  return Db.util.filterBigInt(richlistJSON);
+  }));
+  // log database insert; array of ranked ledger entries
+  const res = await Db.insert('richlist', ledger);
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Richlist');
 };
 
-const buildLedgerDocument = (block, srcdir) => {
+const processLedger = async (block, srcdir) => {
   if (process.env.DISABLEBCLEDGER) return;
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
+  const _bid = Db.util.id.block(bnum, bhash);
   // obtain previous neogenesis block data
   const pngfname = path.join(srcdir, `b${asUint64String(bnum - 256n)}.bc`);
   const pngdata = fs.readFileSync(pngfname);
@@ -76,10 +81,12 @@ const buildLedgerDocument = (block, srcdir) => {
     pngaddr[id] = { address, addressHash, tag, balance, delta: -(balance) };
   }
   // build ledger JSON, as array of documents where address balances have deltas
-  const ledgerJSON = [];
   const ledgerPush = { bhash, timestamp: stime, bnum };
+  let ledgerJSON = [];
+  // obtain ledger list for scanning (and later richlist processing)
+  const { ledger } = block;
   // scan current neogenesis block and compare to previous
-  for (const lentry of block.ledger) {
+  for (const lentry of ledger) {
     // get appropriate address/balance and check for a change in balance
     let { address } = lentry;
     const { balance, tag } = lentry;
@@ -105,16 +112,22 @@ const buildLedgerDocument = (block, srcdir) => {
     const _id = Db.util.id.ledger(bnum, bhash, id);
     ledgerJSON.push(Object.assign({ _id }, Object.assign(ledgerPush, details)));
   }
-  // return BigInt filtered ledgerJSON as array of ledger documents
-  return Db.util.filterBigInt(ledgerJSON);
+  // filter BigInt from ledgerJSON
+  ledgerJSON = Db.util.filterBigInt(ledgerJSON);
+  // log database insert; array of ledger balance deltas
+  const res = await Db.insert('ledger', ledgerJSON);
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Ledger');
+  // return ledger list for further processing
+  return { bnum, bhash, ledger };
 };
 
-const buildTransactionDocument = (block) => {
-  if (process.env.DISABLEBCTRANSACTION) return;
+const processTransactions = async (block) => {
+  if (process.env.DISABLEBCTRANSACTIONS) return;
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
+  const _bid = Db.util.id.block(bnum, bhash);
   // obtain and format transactions in transactionJSON
-  const transactionJSON = block.transactions.map(txe => {
+  let transactionJSON = block.transactions.map(txe => {
     // prepend _id, stime, bnum and bhash to minified txe
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
@@ -123,13 +136,37 @@ const buildTransactionDocument = (block) => {
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
   transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
-  // return BigInt filtered transactionJSON as array of transaction documents
-  return Db.util.filterBigInt(transactionJSON);
+  // filter BigInt from transactionJSON
+  transactionJSON = Db.util.filterBigInt(transactionJSON);
+  // log database insert; array of ledger balance deltas
+  const res = await Db.insert('transaction', transactionJSON);
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Transaction');
 };
 
-const buildHaikuDocument = async (haiku, shadow) => {
+const processHaikuVisualization = async (block) => {
   if (process.env.DISABLEBCHAIKU) return;
-  const algo = (arr, ...comp) => { // condensed heuristic algorithm
+  // expose bnum, bhash, phash and nonce from block
+  let { nonce } = block;
+  const { bnum, bhash, phash } = block;
+  const _id = Db.util.id.block(bnum, bhash);
+  // if necessary search previous blocks until there's no shadow (shadow == 0)
+  let shadow = Number(block.type !== Mochimo.Block.NORMAL);
+  let pblock;
+  while (shadow) {
+    const pbnum = (pblock ? pblock.bnum : bnum) - 1n;
+    const pbhash = pblock ? pblock.phash : phash;
+    const pblockid = Db.util.id.block(pbnum, pbhash);
+    pblock = await Db.findOne('block', { _id: pblockid });
+    if (!pblock) throw new Error('Cannot visualize haiku, missing ' + pblockid);
+    nonce = pblock.nonce;
+    shadow += nonce ? -1 : 1;
+  }
+  // return shadow to previous state as a Boolean
+  shadow = Boolean(block.type !== Mochimo.Block.NORMAL);
+  // expand nonce to Haiku
+  const haiku = Mochimo.Trigg.expand(nonce, shadow);
+  // heuristically determine best picture query for haiku
+  const algo = (haiku, arr, ...comp) => { // condensed heuristic algorithm
     let pi, ps, is, str;
     const ts = haiku.match(/\b\w{3,}\b/g).map(t => new RegExp(t, 'g'));
     for (let i = pi = ps = is = 0; i < arr.length; i++, is = 0, str = '') {
@@ -138,19 +175,18 @@ const buildHaikuDocument = async (haiku, shadow) => {
       if (is > ps) { ps = is; pi = i; }
     } return { photo: arr[pi], ps };
   };
-  // heuristically determine best picture query for haiku
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
   const query = search.join('%20');
-  let data = { img: { haiku, shadow } };
-  let results;
+  const data = { img: { haiku, shadow } };
+  let res;
   try { // request results from Pexels
-    results = process.env.PEXELS ? await readWeb({
+    res = process.env.PEXELS ? await readWeb({
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
       headers: { Authorization: process.env.PEXELS }
     }) : {}; // apply algorithm or throw error
-    if (results.photos && results.photos.length) {
-      const sol = algo(results.photos, 'url');
+    if (res.photos && res.photos.length) {
+      const sol = algo(haiku, res.photos, 'url');
       if (!data.sol || data.sol.ps > sol.ps) {
         data.sol = sol; // derive pexels photo data
         data.img.author = sol.photo.photographer || 'Unknown';
@@ -161,16 +197,16 @@ const buildHaikuDocument = async (haiku, shadow) => {
         data.img.srcurl = sol.photo.url;
         data.img.thumb = sol.photo.src.tiny;
       }
-    } else throw new Error(results.error || 'no "photos" in results');
+    } else throw new Error(res.error || 'no "photos" in results');
   } catch (error) { console.trace('Pexels request ERROR:', error); }
   try { // request results from Unsplash
-    results = process.env.UNSPLASH ? await readWeb({
+    res = process.env.UNSPLASH ? await readWeb({
       hostname: 'api.unsplash.com',
       path: `/search/photos?query=${query}&per_page=30`,
       headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
     }) : {}; // apply algorithm or throw error
-    if (results.results && results.results.length) {
-      const sol = algo(results.results, 'description', 'alt_description');
+    if (res.results && res.results.length) {
+      const sol = algo(haiku, res.results, 'description', 'alt_description');
       if (!data.sol || data.sol.ps > sol.ps) {
         data.sol = sol; // derive pexels photo data
         data.img.author = sol.photo.user.name || 'Unknown';
@@ -181,16 +217,19 @@ const buildHaikuDocument = async (haiku, shadow) => {
         data.img.srcurl = sol.photo.links.html;
         data.img.thumb = sol.photo.urls.thumb;
       }
-    } else throw new Error(results.errors || 'no "results" in results');
+    } else throw new Error(res.errors || 'no "results" in results');
   } catch (error) { console.trace('Unsplash request ERROR:', error); }
   // return data without solution
-  if (!data.sol) data = undefined;
-  else delete data.sol;
-  return data;
+  if (!data.sol) throw new Error('Unable to determine visualization for Haiku');
+  delete data.sol;
+  // apply atomic operators to document update
+  const haikuUpdate = { $set: data };
+  // log database update; haiku visualization data block update
+  res = await Db.update('block', haikuUpdate, { _id });
+  console.log(_id.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Haiku');
 };
 
 const processBlock = async (data, srcdir) => {
-  let logstr = '';
   // perform pre-checks on data
   if (typeof data !== 'object') {
     throw new TypeError(`"data" is not an object: ${typeof data}`);
@@ -205,59 +244,32 @@ const processBlock = async (data, srcdir) => {
   // check database for existing store
   const { bnum, bhash } = block;
   const _id = Db.util.id.block(bnum, bhash);
+  const _bid = _id.replace(/^0{0,15}/, '0x').slice(0, -8);
   if (!(await Db.has('block', bnum, bhash))) {
     // build block document and, if accepted, proceed with remaining documents
     try { // prepend _id to minified blockJSON
       const blockJSON = Object.assign({ _id }, block.toJSON(true));
-      // try insert BigInt-filtered blockJSON
-      if (await Db.insert('block', Db.util.filterBigInt(blockJSON))) {
-        logstr += '/ ';
-        const docs = {};
-        const type = block.type;
-        let { nonce, shadow } = block;
-        // check block type before proceeding
-        if ([Mochimo.Block.NEOGENESIS, Mochimo.Block.GENESIS].includes(type)) {
-          // build ledger balance and richlist documents (SYNCHRONOUS/SLOW)
-          docs.richlist = buildRichlistDocument(block); // slow due to sorting
-          docs.ledger = buildLedgerDocument(block, srcdir); // slow due to pNG
-        } else if (type === Mochimo.Block.NORMAL) { // build transaction data
-          docs.transaction = buildTransactionDocument(block);
-        } else { // pseudoblock, find appropriate shadow Haiku
-          // search previous blocks (by previous block hash) until non-pseudo
-          let pblock;
-          let pbnum = block.bnum - 1n;
-          let pbhash = block.phash;
-          do {
-            const pblockid = Db.util.id.block(pbnum, pbhash);
-            pblock = await Db.findOne('block', { _id: pblockid });
-            if (pblock) {
-              if (pblock.nonce) nonce = pblock.nonce;
-              else {
-                pbnum = pblock.bnum - 1n;
-                pbhash = pblock.phash;
-              }
-            }
-          } while (!nonce && pblock);
-          shadow = true;
+      // record result of, and log, database insert; BigInt filtered block data
+      const res = await Db.insert('block', Db.util.filterBigInt(blockJSON));
+      console.log(_bid, res, 'x Block');
+      if (res) {
+        // BLOCK TYPE:
+        // - GENESIS or NEOGENESIS; process ledger balance deltas and richlist
+        // - NORMAL; process transactions
+        switch (block.type) {
+          case Mochimo.Block.GENESIS:
+          case Mochimo.Block.NEOGENESIS:
+            processLedger(block, srcdir).then(processRichlist).catch(TRACE);
+            break;
+          case Mochimo.Block.NORMAL:
+            processTransactions(block).catch(TRACE);
+            break;
         }
-        // insert applicable documents and log results
-        for (const [col, doc] of Object.entries(docs)) {
-          if (doc) logstr += `${await Db.insert(col, doc)} ${col} / `;
-        }
-        // check nonce was available
-        if (nonce) { // clean shadow var and update block with haiku data
-          shadow = shadow || false;
-          const haiku = Mochimo.Trigg.expand(nonce, shadow);
-          let haikuUpdate = await buildHaikuDocument(haiku, shadow);
-          if (haikuUpdate) { // apply atomic set operator and update
-            haikuUpdate = { $set: haikuUpdate };
-            logstr += `${await Db.update('block', haikuUpdate, { _id })} haiku`;
-          }
-        }
+        // process haiku update regardless of block type
+        processHaikuVisualization(block).catch(TRACE);
       }
-    } catch (error) { logstr += '' + error; }
-  } else logstr = 'database entry found';
-  console.log(_id.replace(/^0{0,15}/, '0x').slice(0, -8), logstr);
+    } catch (error) { TRACE(_bid, error); }
+  } else console.log(_bid, 'already processed');
   // return block identifier (_id)
   return _id;
 };
