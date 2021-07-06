@@ -160,19 +160,21 @@ const Responder = {
             }
             json.bnum = bnum;
             json.mfee = mfee;
-            json.txfees = isNeogenesis ? 0 : BigInt(tcount) * mfee;
-            json.reward = isNeogenesis ? 0 : blockReward(bnum);
-            json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
-            json.tcount = tcount;
-            json.tcount_avg =
-              Math.round((transactions / nonNeogenesis) * 100) / 100;
-            json.tcount_psec =
-              Math.round((transactions / blockTimes) * 100) / 100;
             json.time0 = time0;
             json.stime = stime;
             json.blocktime = isNeogenesis ? 0 : stime - time0;
             json.blocktime_avg =
               Math.round((blockTimes / nonNeogenesis) * 100) / 100;
+            json.tcount = tcount;
+            json.tcount_avg =
+              Math.round((transactions / nonNeogenesis) * 100) / 100;
+            json.tcountpsec =
+              Math.round((tcount / json.blocktime) * 100) / 100;
+            json.tcountpsec_avg =
+              Math.round((transactions / blockTimes) * 100) / 100;
+            json.txfees = isNeogenesis ? 0 : BigInt(tcount) * mfee;
+            json.reward = isNeogenesis ? 0 : blockReward(bnum);
+            json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
             json.difficulty = difficulty;
             json.difficulty_avg =
               Math.round((difficulties / nonNeogenesis) * 100) / 100;
