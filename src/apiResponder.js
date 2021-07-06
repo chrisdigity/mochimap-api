@@ -165,18 +165,21 @@ const Responder = {
             json.reward = isNeogenesis ? 0 : blockReward(bnum);
             json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
             json.tcount = tcount;
-            json.tcount_avg = transactions / nonNeogenesis;
+            json.tcount_avg =
+              Math.round((transactions / nonNeogenesis) * 100) / 100;
             json.time0 = time0;
             json.stime = stime;
             json.blocktime = isNeogenesis ? 0 : stime - time0;
             json.blocktime_avg =
-              (Math.floor((blockTimes / nonNeogenesis) * 100)) / 100;
+              Math.round((blockTimes / nonNeogenesis) * 100) / 100;
             json.difficulty = difficulty;
-            json.difficulty_avg = Math.sqrt(allHashes / blockTimes);
+            json.difficulty_avg =
+              Math.round(Math.sqrt(allHashes / blockTimes) * 100) / 100;
             json.hashrate = json.tcount === 0 ? 0
-              : Math.floor(Math.pow(2, difficulty) / json.blocktime);
-            json.hashrate_avg = Math.floor(hashes / hashesTimes);
-            json.pseudorate_avg = pseudorate / nonNeogenesis;
+              : Math.round(Math.pow(2, difficulty) / json.blocktime);
+            json.hashrate_avg = Math.round(hashes / hashesTimes);
+            json.pseudorate_avg =
+              Math.round((pseudorate / nonNeogenesis) * 100) / 100;
             // add json trailer data of requested block number to chain request
             chain = Object.assign(json, chain);
           }
