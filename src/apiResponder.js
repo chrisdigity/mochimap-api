@@ -174,7 +174,7 @@ const Responder = {
               Math.round((blockTimes / nonNeogenesis) * 100) / 100;
             json.difficulty = difficulty;
             json.difficulty_avg =
-              Math.round(Math.sqrt(allHashes / blockTimes) * 100) / 100;
+              Math.round(Math.log2(allHashes / blockTimes) * 100) / 100;
             json.hashrate = json.tcount === 0 ? 0
               : Math.round(Math.pow(2, difficulty) / json.blocktime);
             json.hashrate_avg = Math.round(hashes / hashesTimes);
