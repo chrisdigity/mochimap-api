@@ -96,12 +96,13 @@ const Responder = {
   chain: async (res, blockNumber, blockHex) => {
     try {
       let chain;
+      const target = 768;
       // convert blockNumber to Number value
       if (typeof blockNumber === 'undefined') blockNumber = blockHex;
-      if (typeof blockNumber === 'undefined') blockNumber = -768;
+      if (typeof blockNumber === 'undefined') blockNumber = -target;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
-      const count = blockNumber < 768 ? Math.abs(blockNumber) + 1 : 768;
+      const count = blockNumber < target ? Math.abs(blockNumber) + 1 : target;
       const start = blockNumber > -1 ? blockNumber - (count - 1) : blockNumber;
       const tfile = await Mochimo.getTfile(process.env.FULLNODE, start, count);
       if (tfile) { // ensure tfile contains the requested block
@@ -109,68 +110,74 @@ const Responder = {
         const rTrailer = tfile.trailer(tfileCount - 1);
         if (blockNumber < 0 || blockNumber === Number(rTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
-          let supply, temp;
-          let aeonPseudoblocks = 0;
-          let aeonRewards = 0n;
-          const blocktimes = [];
-          const hashestimes = [];
-          const hashes = [];
+          let supply;
+          let rewards = 0n;
+          let pseudorate = 0;
+          let nonNeogenesis = 0;
+          let transactions = 0;
+          let blockTimes = 0;
+          let hashesTimes = 0;
+          let hashes = 0;
+          let allHashes = 0;
           let index = tfile.length / Mochimo.BlockTrailer.length;
           for (index--; index >= 0; index--) {
             const trailer = tfile.trailer(index);
             const { bnum, bhash, mfee, tcount } = trailer;
-            if (!supply) {
-              if (!(bnum & 0xffn)) {
-                if (!temp) temp = { aeonRewards, aeonPseudoblocks };
-                try { // obtain ledger amount from database
-                  const query = { _id: Db.util.id.block(bnum, bhash) };
-                  const ng = await Db.findOne('block', query);
-                  Db.util.filterLong(ng); // ensure long values are BigInt
-                  if (ng && ng.amount) { // preform supply calculations
-                    supply = ng.amount + aeonRewards;
-                    // calculate lost supply and subtract from max supply
-                    const lostSupply = projectedSupply(rTrailer.bnum) - supply;
-                    const maxSupply = projectedSupply() - lostSupply;
-                    Object.assign(temp, { maxSupply, supply });
-                  }
-                } catch (ignore) {}
-              } else if (!tcount) aeonPseudoblocks++;
-              else aeonRewards += blockReward(bnum) + (mfee * BigInt(tcount));
-            }
-            if (bnum & 0xffn) {
+            if (bnum & 0xffn) { // NON-(NEO)GENSIS block type
+              const blockHashes = Math.pow(2, trailer.difficulty);
               const dT = trailer.stime - trailer.time0;
-              blocktimes.push(dT);
-              if (tcount) {
-                hashestimes.push(dT);
-                hashes.push(Math.pow(2, trailer.difficulty));
-              }
+              allHashes += blockHashes;
+              blockTimes += dT;
+              nonNeogenesis++;
+              if (tcount) { // NORMAL block types
+                transactions += tcount;
+                hashesTimes += dT;
+                hashes += blockHashes;
+                rewards += blockReward(bnum) + (mfee * BigInt(tcount));
+              } else pseudorate++; // PSEUDO block types
+            } else if (!supply) { // (NEO)GENSIS block types
+              try { // obtain ledger amount from database
+                const query = { _id: Db.util.id.block(bnum, bhash) };
+                const ng = await Db.findOne('block', query);
+                Db.util.filterLong(ng); // ensure long values are BigInt
+                if (ng && ng.amount) { // preform supply calculations
+                  supply = ng.amount + rewards;
+                  // calculate lost supply and subtract from max supply
+                  const lostSupply = projectedSupply(rTrailer.bnum) - supply;
+                  const maxSupply = projectedSupply() - lostSupply;
+                  Object.assign(chain, { maxSupply, supply });
+                }
+              } catch (ignore) {}
             }
-          }
-          // transfer ownership of trailer to chain if supply was successfull
-          if (temp && 'supply' in temp) chain = temp;
-          // if chain is undefined by this point, neogenesis search failed ~3x
+          } // if chain is undefined by this point, neogenesis search failed ~3x
           if (chain) { // chain is available, perform remaining calculations
-            const json = rTrailer.toJSON();
-            const isNeogenesis = Boolean(!(json.bnum & 0xffn));
-            json.txfees = isNeogenesis ? 0 : json.mfee * BigInt(json.tcount);
-            json.reward = isNeogenesis ? 0 : blockReward(json.bnum);
+            const rTrailerJSON = rTrailer.toJSON();
+            const { bhash, phash, mroot, nonce, bnum, mfee } = rTrailerJSON;
+            const { difficulty, tcount, time0, stime } = rTrailerJSON;
+            const isNeogenesis = Boolean(!(bnum & 0xffn));
+            const json = { bhash, phash, mroot, nonce };
+            if (nonce !== ''.padStart(64, 0)) {
+              json.haiku = Mochimo.Trigg.expand(nonce);
+            }
+            json.bnum = bnum;
+            json.mfee = mfee;
+            json.txfees = isNeogenesis ? 0 : BigInt(tcount) * mfee;
+            json.reward = isNeogenesis ? 0 : blockReward(bnum);
             json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
-            json.blocktime = isNeogenesis ? 0 : json.stime - json.time0;
-            if (blocktimes.length) {
-              json.blocktime_avg = (((blocktimes.reduce((acc, curr) => {
-                return acc + curr;
-              }, 0) / blocktimes.length) * 100) | 0) / 100;
-            }
-            json.hashrate = json.blocktime === 0 || json.tcount === 0 ? 0
-              : Math.floor(Math.pow(2, json.difficulty) / json.blocktime);
-            if (hashes) {
-              json.hashrate_avg = (hashes.reduce((acc, curr) => {
-                return acc + curr;
-              }, 0) / hashestimes.reduce((acc, curr) => {
-                return acc + curr;
-              }, 0)) | 0;
-            }
-            // add json trailer of requested block number to chain request
+            json.tcount = tcount;
+            json.tcount_avg = transactions / nonNeogenesis;
+            json.time0 = time0;
+            json.stime = stime;
+            json.blocktime = isNeogenesis ? 0 : stime - time0;
+            json.blocktime_avg =
+              (Math.floor((blockTimes / nonNeogenesis) * 100)) / 100;
+            json.difficulty = difficulty;
+            json.difficulty_avg = Math.sqrt(allHashes / blockTimes);
+            json.hashrate = json.tcount === 0 ? 0
+              : Math.floor(Math.pow(2, difficulty) / json.blocktime);
+            json.hashrate_avg = Math.floor(hashes / hashesTimes);
+            json.pseudorate_avg = pseudorate / nonNeogenesis;
+            // add json trailer data of requested block number to chain request
             chain = Object.assign(json, chain);
           }
         }
