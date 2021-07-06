@@ -30,7 +30,7 @@ if (typeof process.env.FULLNODE === 'undefined') {
 }
 
 const { createHash } = require('crypto');
-const { blockReward, projectedSupply } = require('./apiUtils');
+const { blockReward, projectedSupply, round } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
@@ -163,26 +163,20 @@ const Responder = {
             json.time0 = time0;
             json.stime = stime;
             json.blocktime = isNeogenesis ? 0 : stime - time0;
-            json.blocktime_avg =
-              Math.round((blockTimes / nonNeogenesis) * 100) / 100;
+            json.blocktime_avg = round(blockTimes / nonNeogenesis);
             json.tcount = tcount;
-            json.tcount_avg =
-              Math.round((transactions / nonNeogenesis) * 100) / 100;
-            json.tcountpsec =
-              Math.round((tcount / json.blocktime) * 100) / 100;
-            json.tcountpsec_avg =
-              Math.round((transactions / blockTimes) * 100) / 100;
+            json.tcount_avg = round(transactions / nonNeogenesis);
+            json.tcountpsec = round(tcount / json.blocktime);
+            json.tcountpsec_avg = round(transactions / blockTimes);
             json.txfees = isNeogenesis ? 0 : BigInt(tcount) * mfee;
             json.reward = isNeogenesis ? 0 : blockReward(bnum);
             json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
             json.difficulty = difficulty;
-            json.difficulty_avg =
-              Math.round((difficulties / nonNeogenesis) * 100) / 100;
+            json.difficulty_avg = round(difficulties / nonNeogenesis);
             json.hashrate = json.tcount === 0 ? 0
-              : Math.round(Math.pow(2, difficulty) / json.blocktime);
-            json.hashrate_avg = Math.round(hashes / hashesTimes);
-            json.pseudorate_avg =
-              Math.round((pseudorate / nonNeogenesis) * 100) / 100;
+              : round(Math.pow(2, difficulty) / json.blocktime);
+            json.hashrate_avg = round(hashes / hashesTimes);
+            json.pseudorate_avg = round(pseudorate / nonNeogenesis);
             // add json trailer data of requested block number to chain request
             chain = Object.assign(json, chain);
           }

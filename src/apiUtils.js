@@ -223,6 +223,11 @@ const projectedSupply = (bnum) => {
   return Instamine + allblocks - neogen;
 };
 
+const round = (value, places = 2) => {
+  const multiplier = Math.pow(10, places);
+  return Math.round(value * multiplier) / multiplier;
+};
+
 module.exports = {
   asUint64String,
   objectIsEmpty,
@@ -234,5 +239,6 @@ module.exports = {
   informedShutdown,
   ms,
   blockReward,
-  projectedSupply
+  projectedSupply,
+  round
 };
