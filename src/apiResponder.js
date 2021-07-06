@@ -145,7 +145,7 @@ const Responder = {
                   // calculate lost supply and subtract from max supply
                   const lostSupply = projectedSupply(rTrailer.bnum) - supply;
                   const maxSupply = projectedSupply() - lostSupply;
-                  Object.assign(chain, { maxSupply, supply });
+                  chain = { maxSupply, supply };
                 }
               } catch (ignore) {}
             }
