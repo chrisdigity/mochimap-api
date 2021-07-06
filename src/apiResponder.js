@@ -30,7 +30,7 @@ if (typeof process.env.FULLNODE === 'undefined') {
 }
 
 const { createHash } = require('crypto');
-const { isPrivateIPv4, blockReward, projectedSupply } = require('./apiUtils');
+const { blockReward, projectedSupply } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
@@ -214,12 +214,6 @@ const Responder = {
     try {
       // move ip argument if no status was provided
       ip = ip || status;
-      // check IPv4 for private formats
-      if (isPrivateIPv4(ip)) {
-        const error = 'Invalid IPv4 address';
-        const message = 'private Iv4 addresses are not supported';
-        return Responder._respond(res, 400, { error, message });
-      }
       // perform network query
       const node = await Db.findOne('network', { 'host.ip': ip });
       // apply applicable status filter
