@@ -166,6 +166,8 @@ const Responder = {
             json.tcount = tcount;
             json.tcount_avg =
               Math.round((transactions / nonNeogenesis) * 100) / 100;
+            json.tcount_psec =
+              Math.round((transactions / blockTimes) * 100) / 100;
             json.time0 = time0;
             json.stime = stime;
             json.blocktime = isNeogenesis ? 0 : stime - time0;
