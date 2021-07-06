@@ -118,21 +118,20 @@ const Responder = {
           let blockTimes = 0;
           let hashesTimes = 0;
           let hashes = 0;
-          let allHashes = 0;
+          let difficulties = 0;
           let index = tfile.length / Mochimo.BlockTrailer.length;
           for (index--; index >= 0; index--) {
             const trailer = tfile.trailer(index);
             const { bnum, bhash, mfee, tcount } = trailer;
             if (bnum & 0xffn) { // NON-(NEO)GENSIS block type
-              const blockHashes = Math.pow(2, trailer.difficulty);
               const dT = trailer.stime - trailer.time0;
-              allHashes += blockHashes;
+              difficulties += trailer.difficulty;
               blockTimes += dT;
               nonNeogenesis++;
               if (tcount) { // NORMAL block types
                 transactions += tcount;
                 hashesTimes += dT;
-                hashes += blockHashes;
+                hashes += Math.pow(2, trailer.difficulty);
                 rewards += blockReward(bnum) + (mfee * BigInt(tcount));
               } else pseudorate++; // PSEUDO block types
             } else if (!supply) { // (NEO)GENSIS block types
@@ -174,7 +173,7 @@ const Responder = {
               Math.round((blockTimes / nonNeogenesis) * 100) / 100;
             json.difficulty = difficulty;
             json.difficulty_avg =
-              Math.round(Math.log2(allHashes / blockTimes) * 100) / 100;
+              Math.round((difficulties / nonNeogenesis) * 100) / 100;
             json.hashrate = json.tcount === 0 ? 0
               : Math.round(Math.pow(2, difficulty) / json.blocktime);
             json.hashrate_avg = Math.round(hashes / hashesTimes);
