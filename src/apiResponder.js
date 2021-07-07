@@ -142,9 +142,9 @@ const Responder = {
                 if (ng && ng.amount) { // preform supply calculations
                   supply = ng.amount + rewards;
                   // calculate lost supply and subtract from max supply
-                  const lostSupply = projectedSupply(rTrailer.bnum) - supply;
-                  const maxSupply = projectedSupply() - lostSupply;
-                  chain = { maxSupply, supply };
+                  const lostsupply = projectedSupply(rTrailer.bnum) - supply;
+                  const maxsupply = projectedSupply() - lostsupply;
+                  chain = { maxsupply, supply };
                 }
               } catch (ignore) {}
             }
@@ -270,7 +270,7 @@ const Responder = {
     const date = new Date();
     Responder.unknown(res, 500, {
       message: 'MochiMap API has encountered an unexpected error. ' +
-        'Please consider opening a issue detailing this error @ ' +
+        'Please try again later.  @ ' +
         'https://github.com/chrisdigity/api.mochimap.com/issues',
       timestamp: date.toISOString()
     });
