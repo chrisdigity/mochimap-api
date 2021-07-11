@@ -33,9 +33,7 @@ const Router = require('./apiRouter');
 /* server */
 const Server = {
   _api: null,
-  _connections: new Set(),
   _sockets: new Set(),
-  broadcast: (type, event, data) => { /* noop until websockets */ },
   init: () => new Promise((resolve, reject) => {
     const fid = 'Server.start():';
     console.log(fid, 'creating new http/s server...');
@@ -51,8 +49,8 @@ const Server = {
       Server._api.on('request', Router);
       Server._api.on('error', reject);
       Server._api.on('connect', (res, socket/* , head */) => {
-        Server._connections.add(socket); // track connections
-        socket.on('end', () => Server._apiConnections.delete(socket));
+        Server._sockets.add(socket); // track connections
+        socket.on('end', () => Server._sockets.delete(socket));
       });
       Server._api.on('listening', () => {
         const { address, port } = Server._api.address();
@@ -73,8 +71,8 @@ const cleanup = (e, src) => {
   if (Server._api) {
     console.log('// CLEANUP: initiating server shutdown...');
     Server._api.close(() => informedShutdown(e, src));
-    console.log('// CLEANUP: disconnecting current connection requests...');
-    Server._connections.forEach(socket => socket.destroy());
+    console.log('// CLEANUP: disconnecting all sockets...');
+    Server._sockets.forEach(socket => socket.destroy());
   } else return informedShutdown(e, src);
 };
 process.on('SIGINT', cleanup);
