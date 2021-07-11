@@ -52,6 +52,7 @@ const Responder = {
         case 200: statusMessage = 'OK'; break;
         case 400: statusMessage = 'Bad Request'; break;
         case 404: statusMessage = 'Not Found'; break;
+        case 406: statusMessage = 'Not Acceptable'; break;
         case 409: statusMessage = 'Conflict'; break;
         case 500: statusMessage = 'Internal Server Error'; break;
         default: statusMessage = '';

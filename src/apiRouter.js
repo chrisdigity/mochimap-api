@@ -17,6 +17,7 @@
  *
  */
 
+const EventStreamer = require('./apiEventStreamer');
 const Responder = require('./apiResponder');
 const BaseURL = 'https://api.mochimap.com/';
 const Routes = [
@@ -24,6 +25,12 @@ const Routes = [
     method: 'GET',
     path: /^\/$/,
     handler: Responder.unknown,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: /^\/(block|network|transaction)\/stream$/,
+    headers: { accept: ['text/event-stream', 'text/*', '*/*'] },
+    handler: EventStreamer.connect,
     enabled: true
   }, {
     method: 'GET',
@@ -133,30 +140,46 @@ const Router = async (req, res) => {
         }
       }
     }
-    // check for matching route
-    if (routeMatch) {
-      // ensure route is enabled
-      if (routeMatch.enabled) {
-        if (search && routeMatch.param instanceof RegExp) {
-          // ensure search query is valid
-          if (!routeMatch.param.test(search)) {
-            return Responder.unknown(res, 400, {
-              message: 'invalid search parameters, check request...',
-              parameters: search
-            });
-          } // add search query as parameter
-          params.push(search);
-        }
-        return await routeMatch.handler(res, ...params);
-      } // route is not enabled, respond with 409
-      return Responder.unknown(res, 409,
-        { message: 'this request is currently disabled, try again later...' });
+    // ensure route was matched, otherwise respond with 400 and suggest intent
+    if (!routeMatch) {
+      return Responder.unknown(res, 400, {
+        message: `The request was not understood, ${intent.detected
+          ? `did you mean ${intent.hint}?` : 'check request...'}`
+      });
     }
-    // unkown request: suggest detected intent or check path
-    let message = 'the request was not understood, ';
-    if (intent.detected) message += `did you mean ${intent.hint}?`;
-    else message += 'check request...';
-    Responder.unknown(res, 400, { message });
+    // ensure route is enabled, otherwise respond with 409
+    if (!routeMatch.enabled) {
+      return Responder.unknown(res, 409, {
+        message: 'this request is currently disabled, try again later...'
+      });
+    }
+    // ensure acceptable headers were included, otherwise respond with 406
+    if (req.headers.accept && routeMatch.headers && routeMatch.headers.accept) {
+      const acceptable = routeMatch.headers.accept;
+      const accept = req.headers.accept;
+      let i;
+      // scan acceptable MIME types for requested acceptable MIME types
+      for (i = 0; i < acceptable.length; i++) if (accept.includes) break;
+      if (i === acceptable.length) {
+        return Responder.unknown(res, 406, {
+          message: 'Server was not able to match any MIME types specified in ' +
+            'the Accept request HTTP header. To use this resource, please ' +
+            'specify one of the following: ' + acceptable.join(', ')
+        });
+      }
+    }
+    // if a search query is included, ensure query is valid
+    if (search && routeMatch.param instanceof RegExp) {
+      if (!routeMatch.param.test(search)) {
+        return Responder.unknown(res, 400, {
+          message: 'invalid search parameters, check request...',
+          parameters: search
+        });
+      } // add search query as parameter
+      params.push(search);
+    }
+    // return resulting parameters to handler
+    return await routeMatch.handler(res, ...params);
   } catch (error) { Responder.unknownInternal(res, error); }
 };
 
