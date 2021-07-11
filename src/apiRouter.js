@@ -124,12 +124,13 @@ const Router = async (req, res) => {
         // route matched, break loop
         routeMatch = route;
         break;
-      }
-      // rank possible intentions
-      const intentCheck = pathname.match(route.hintCheck);
-      if (intentCheck && intentCheck.length > intent.detected) {
-        intent.detected = intentCheck.length;
-        intent.hint = route.hint;
+      } else if (route.hint && route.hintCheck) {
+        // no routes matched (yet), rank possible intentions
+        const intentCheck = pathname.match(route.hintCheck);
+        if (intentCheck && intentCheck.length > intent.detected) {
+          intent.detected = intentCheck.length;
+          intent.hint = route.hint;
+        }
       }
     }
     // check for matching route
