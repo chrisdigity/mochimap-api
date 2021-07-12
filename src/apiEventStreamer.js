@@ -33,7 +33,7 @@ let TXCLEANPOS = 0;
 
 // initialize ServerSideEvent broadcast function
 const Broadcast = (json, eventObj) => {
-  if (eventObj.cache.length >= MAXCACHE) eventObj.last.pop();
+  if (eventObj.cache.length >= MAXCACHE) eventObj.cache.pop();
   const data = JSON.stringify(json);
   eventObj.cache.unshift(data);
   eventObj.connections.forEach((connection) => {
