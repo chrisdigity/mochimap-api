@@ -44,8 +44,8 @@ const Broadcast = (json, eventObj) => {
 
 // initialize Event types and base properties
 const EventList = ['block', 'network', 'transaction'];
-const Events = EventList.reduce((obj, curr) =>
-  (obj[curr] = { connections: new Set(), cache: [], initialized: false }), {});
+const Events = EventList.reduce((obj, curr) => (obj[curr] =
+  { connections: new Set(), cache: [], initialized: false }) && obj, {});
 
 // initialize Event handlers
 Events.block.handler = (event) => Broadcast(event, Events.block);
@@ -111,14 +111,10 @@ const EventStreamer = {
       // synchronously initialize all event streams
       for (const [name, event] of Object.entries(Events)) {
         if (!event.initialized) {
-          if (event.filepath) {
-            // initialize watcher for specified filepath
-            fs.watchFile(event.filepath, event.handler);
-          } else {
-            // initialize change stream for named database collection
-            (await Db.stream(name)).on('change', event.handler);
-          }
-          // flag event as already initialized
+          // initialize filewatcher, or change stream for database collection
+          if (event.filepath) fs.watchFile(event.filepath, event.handler);
+          else (await Db.stream(name)).on('change', event.handler);
+          // flag event type as initialized
           event.initialized = true;
         }
       }
