@@ -1,6 +1,5 @@
-#!/usr/bin/env node
 /**
- *  bcProcessor.js; Mochimo Blockchain processor for MochiMap
+ *  apiEventStreamer.js; Mochimo Network event streamer for MochiMap
  *  Copyright (C) 2021  Chrisdigity
  *
  *  This program is free software: you can redistribute it and/or modify
@@ -20,41 +19,119 @@
 
 console.log('\n// START:', __filename);
 
-/* environment variables */
-require('dotenv').config();
-
 /* modules and utilities */
-const { informedShutdown, ms } = require('./apiUtils');
+const fs = require('fs');
+const path = require('path');
+const { ms } = require('./apiUtils');
 const Db = require('./apiDatabase');
+const Mochimo = require('mochimo');
 
-/* watcher */
-const Watcher = {
+const HDIR = require('os').homedir();
+const TXCLEAN = process.env.TXCLEAN || 'txclean.dat';
+const MAXCACHE = 5;
+let TXCLEANPOS = 0;
+
+// initialize ServerSideEvent broadcast function
+const Broadcast = (json, eventObj) => {
+  if (eventObj.cache.length >= MAXCACHE) eventObj.last.pop();
+  const data = JSON.stringify(json);
+  eventObj.cache.unshift(data);
+  eventObj.connections.forEach((connection) => {
+    connection.write('id: ' + new Date().toISOString() + '\n');
+    connection.write('data: ' + data + '\n\n');
+  });
+};
+
+// initialize Event types and base properties
+const EventList = ['block', 'network', 'transaction'];
+const Events = EventList.reduce((obj, curr) =>
+  (obj[curr] = { connections: new Set(), cache: [], initialized: false }), {});
+
+// initialize Event handlers
+Events.block.handler = (event) => Broadcast(event, Events.block);
+Events.network.handler = (event) => Broadcast(event, Events.network);
+Events.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
+Events.transaction.handler = async (stats) => {
+  try {
+    const eventObj = Events.transaction;
+    const { length } = Mochimo.TXEntry.length;
+    const { size } = stats;
+    // if txclean reduces filesize, reset TXCLEAN position
+    if (size < TXCLEANPOS) TXCLEANPOS = 0;
+    let position = TXCLEANPOS;
+    // ensure TXCLEAN has valid filesize
+    let remainingBytes = size - position;
+    const invalidBytes = remainingBytes % length;
+    if (remainingBytes === 0) {
+      return console.log('TXCLEAN position === size, not sure what to do...');
+    } else if (invalidBytes) {
+      const details = { size, position, invalidBytes };
+      return console.error(`TXCLEAN size invalid... ${JSON.stringify(details)}`);
+    } // otherwise, open txclean file for reading
+    const filehandle = await fs.promises.open(eventObj.filepath);
+    for (; remainingBytes; position += length, remainingBytes -= length) {
+      const result = await filehandle.read({ length, position });
+      // check read result for sufficient bytes
+      if (result.bytesRead === length) {
+        // if sufficient bytes were read, Broadcast txentry
+        Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), eventObj);
+      } else { // otherwise, report details as an error
+        const details = { position, byteRead: result.byteRead };
+        console.error('insufficient txentry bytes,', JSON.stringify(details));
+      }
+    }
+  } catch (error) { console.trace(error); }
+};
+
+/* EventStreamer */
+const EventStreamer = {
   _timeout: undefined,
+  connect: (res, event) => {
+    // add response to appropriate connections Set
+    Events[event].connections.add(res);
+    // add close event handler to response for removal from connections Set
+    res.on('close', () => Events[event].connections.delete(res));
+    // write header to response
+    res.writeHead(200, {
+      'X-XSS-Protection': '1; mode=block',
+      'X-Robots-Tag': 'none',
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Content-Type': 'text/event-stream',
+      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+      Connection: 'keep-alive',
+      'Cache-Control': 'no-cache',
+      'Access-Control-Allow-Origin': '*'
+    });
+  },
   init: async () => {
-    try { // create change stream on network collection
-      (await Db.stream('network')).on('change', (changeEvent) => {
-        console.log(changeEvent);
-      });
+    console.log('// INIT: EventStreamer');
+    try {
+      // synchronously initialize all event streams
+      for (const [name, event] of Object.entries(Events)) {
+        if (!event.initialized) {
+          if (event.filepath) {
+            // initialize watcher for specified filepath
+            fs.watchFile(event.filepath, event.handler);
+          } else {
+            // initialize change stream for named database collection
+            (await Db.stream(name)).on('change', event.handler);
+          }
+          // flag event as already initialized
+          event.initialized = true;
+        }
+      }
     } catch (error) {
       console.error('// INIT:', error);
-      console.error('// INIT: failure, could not create change stream');
-      console.error('// INIT: attempting restart in 60 seconds...');
-      Watcher._timeout = setTimeout(Watcher.init, ms.minute);
+      console.error('// INIT: failed to initialize Watcher');
+      console.error('// INIT: ( block / network / transaction ) status');
+      console.error('// INIT: (', Events.block.initialized, '/',
+        Events.transaction.initialized, '/', Events.network.initialized, ')');
+      console.error('// INIT: resuming initialization in 60 seconds...');
+      EventStreamer._timeout = setTimeout(EventStreamer.init, ms.minute);
     }
   } // end init...
 }; // end const Watcher...
 
-/* set cleanup signal traps */
-const cleanup = (e, src) => {
-  if (Watcher._timeout) {
-    console.log('// CLEANUP: terminating watcher timeout...');
-    clearTimeout(Watcher._timeout);
-  }
-  return informedShutdown(e, src);
-};
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('uncaughtException', console.trace);
-
-/* initialize watcher */
-Watcher.init();
+module.exports = EventStreamer;
