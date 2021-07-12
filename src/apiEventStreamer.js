@@ -86,7 +86,7 @@ Events.transaction.handler = async (stats) => {
 /* EventStreamer */
 const EventStreamer = {
   _timeout: undefined,
-  connect: (res, event) => {
+  connect: async (res, event) => {
     // add response to appropriate connections Set
     Events[event].connections.add(res);
     // add close event handler to response for removal from connections Set
@@ -104,6 +104,7 @@ const EventStreamer = {
       'Cache-Control': 'no-cache',
       'Access-Control-Allow-Origin': '*'
     });
+    res.write('\n\n');
   },
   init: async () => {
     console.log('// INIT: EventStreamer');
@@ -129,5 +130,8 @@ const EventStreamer = {
     }
   } // end init...
 }; // end const Watcher...
+
+// initialize EventStreamer
+EventStreamer.init();
 
 module.exports = EventStreamer;
