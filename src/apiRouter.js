@@ -159,7 +159,10 @@ const Router = async (req, res) => {
       const accept = req.headers.accept;
       let i;
       // scan acceptable MIME types for requested acceptable MIME types
-      for (i = 0; i < acceptable.length; i++) if (accept.includes) break;
+      for (i = 0; i < acceptable.length; i++) {
+        if (accept.includes(acceptable[i])) break;
+      }
+      // check acceptable MIME type was found
       if (i === acceptable.length) {
         return Responder.unknown(res, 406, {
           message: 'Server was not able to match any MIME types specified in ' +
