@@ -34,10 +34,11 @@ let TXCLEANPOS = 0;
 // initialize ServerSideEvent broadcast function
 const Broadcast = (json, eventObj) => {
   if (eventObj.cache.length >= MAXCACHE) eventObj.cache.pop();
-  const data = JSON.stringify(json);
-  eventObj.cache.unshift(data);
+  const id = new Date().toISOString();
+  const data = JSON.stringify(json || {});
+  if (json) eventObj.cache.unshift({ id, data });
   eventObj.connections.forEach((connection) => {
-    connection.write('id: ' + new Date().toISOString() + '\n');
+    connection.write('id: ' + id + '\n');
     connection.write('data: ' + data + '\n\n');
   });
 };
@@ -100,7 +101,8 @@ Events.transaction.handler = async (stats) => {
 
 /* EventStreamer */
 const EventStreamer = {
-  _timeout: undefined,
+  _stale: ms.second * 30,
+  _timer: undefined,
   connect: async (res, event) => {
     // add response to appropriate connections Set
     Events[event].connections.add(res);
@@ -120,7 +122,16 @@ const EventStreamer = {
       'Access-Control-Allow-Origin': '*'
     });
     res.write('\n\n');
-  },
+  }, // end connect...
+  heartbeat: () => {
+    const pingBefore = new Date() - EventStreamer._stale;
+    // synchronously ping all event streams lacking activity
+    for (const event of Object.values(Events)) {
+      if (event.cache.length < 1 || event.cache[0].id < pingBefore) {
+        Broadcast(undefined, event); // ping
+      }
+    }
+  }, // end heartbeat...
   init: async () => {
     console.log('// INIT: EventStreamer');
     try {
@@ -134,6 +145,9 @@ const EventStreamer = {
           event.initialized = true;
         }
       }
+      // set heartbeat timer
+      EventStreamer._timer =
+        setInterval(EventStreamer.heartbeat, EventStreamer._stale);
     } catch (error) {
       console.error('// INIT:', error);
       console.error('// INIT: failed to initialize Watcher');
@@ -141,10 +155,10 @@ const EventStreamer = {
       console.error('// INIT: (', Events.block.initialized, '/',
         Events.transaction.initialized, '/', Events.network.initialized, ')');
       console.error('// INIT: resuming initialization in 60 seconds...');
-      EventStreamer._timeout = setTimeout(EventStreamer.init, ms.minute);
+      EventStreamer._timer = setTimeout(EventStreamer.init, ms.minute);
     }
   } // end init...
-}; // end const Watcher...
+}; // end const EventStreamer...
 
 // initialize EventStreamer
 EventStreamer.init();
