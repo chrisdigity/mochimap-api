@@ -56,7 +56,7 @@ Events.transaction.handler = async (stats) => {
   let filehandle;
   try {
     const eventObj = Events.transaction;
-    const { length } = Mochimo.TXEntry.length;
+    const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // if txclean reduces filesize, reset TXCLEAN position
     if (size < TXCLEANPOS) TXCLEANPOS = 0;
