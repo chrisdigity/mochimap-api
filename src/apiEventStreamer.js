@@ -54,7 +54,7 @@ Events.network.handler = (event) => {
   const update = {
     ip: event.documentKey._id.replace('-', '.'),
     updated: Object.keys(event.updateDescription.updatedFields).filter(
-      key => !key.contains('connection'))
+      key => !key.includes('connection'))
   };
   if (update.updated.length) Broadcast(update, Events.network);
 };
