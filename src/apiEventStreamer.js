@@ -49,7 +49,14 @@ const Events = EventList.reduce((obj, curr) => (obj[curr] =
 
 // initialize Event handlers
 Events.block.handler = (event) => Broadcast(event, Events.block);
-Events.network.handler = (event) => Broadcast(event, Events.network);
+Events.network.handler = (event) => {
+  const update = {
+    ip: event.documentKey._id.replace('-', '.'),
+    updated: Object.keys(event.updateDescription.updatedFields).filter(
+      key => !key.contains('connection'))
+  };
+  if (update.updated.length) Broadcast(update, Events.network);
+};
 Events.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
 Events.transaction.handler = async (stats) => {
   if (!stats) return; // ignore events with missing "current" stats object
