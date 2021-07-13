@@ -68,17 +68,17 @@ Events.transaction.handler = async (stats) => {
       const invalidBytes = remainingBytes % length;
       if (invalidBytes) {
         const details = { size, position, invalidBytes };
-        return console.error(`TXCLEAN size invalid, ${JSON.stringify(details)}`);
+        return console.error(`TXCLEAN invalid, ${JSON.stringify(details)}`);
       } // otherwise, open txclean file for reading
       filehandle = await fs.promises.open(eventObj.filepath);
       for (; remainingBytes; position += length, remainingBytes -= length) {
-        const result = await filehandle.read({ length, position });
-        // check read result for sufficient bytes
+        const buffer = Buffer.alloc(length);
+        const result = await filehandle.read({ buffer, position });
+        // if sufficient bytes were read, Broadcast txentry
         if (result.bytesRead === length) {
-          // if sufficient bytes were read, Broadcast txentry
           Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), eventObj);
         } else { // otherwise, report details as an error
-          const details = { position, byteRead: result.byteRead };
+          const details = { position, bytesRead: result.bytesRead };
           console.error('insufficient txentry bytes,', JSON.stringify(details));
         }
       }
