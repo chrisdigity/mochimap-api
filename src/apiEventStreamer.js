@@ -127,7 +127,7 @@ const EventStreamer = {
     const pingBefore = new Date() - EventStreamer._stale;
     // synchronously ping all event streams lacking activity
     for (const event of Object.values(Events)) {
-      if (event.cache.length < 1 || event.cache[0].id < pingBefore) {
+      if (event.cache.length < 1 || new Date(event.cache[0].id) < pingBefore) {
         Broadcast(undefined, event); // ping
       }
     }
