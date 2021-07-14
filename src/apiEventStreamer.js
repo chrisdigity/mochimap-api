@@ -32,10 +32,12 @@ const MAXCACHE = 5;
 let TXCLEANPOS = 0;
 
 // initialize ServerSideEvent broadcast function
-const Broadcast = (data, eventObj) => {
+const Broadcast = (json, eventObj) => {
   const id = new Date().toISOString();
   // for empty broadcasts, simply send the id in a comment as a heartbeat
-  if (!data) return eventObj.connections.forEach((res) => res.write(`: ${id}`));
+  if (!json) return eventObj.connections.forEach((res) => res.write(`: ${id}`));
+  // convert json to data
+  const data = JSON.stringify(json);
   // manage FILO cache length at MAXCACHE length
   while (eventObj.cache.length >= MAXCACHE) eventObj.cache.pop();
   eventObj.cache.unshift({ id, data });
