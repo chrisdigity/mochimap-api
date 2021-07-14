@@ -32,12 +32,10 @@ const MAXCACHE = 5;
 let TXCLEANPOS = 0;
 
 // initialize ServerSideEvent broadcast function
-const Broadcast = (json, eventObj) => {
+const Broadcast = (data, eventObj) => {
   const id = new Date().toISOString();
   // for empty broadcasts, simply send the id in a comment as a heartbeat
-  if (!json) return eventObj.connections.forEach((res) => res.write(`: ${id}`));
-  // convert json to string data
-  const data = JSON.stringify(json || {});
+  if (!data) return eventObj.connections.forEach((res) => res.write(`: ${id}`));
   // manage FILO cache length at MAXCACHE length
   while (eventObj.cache.length >= MAXCACHE) eventObj.cache.pop();
   eventObj.cache.unshift({ id, data });
@@ -54,14 +52,19 @@ const Events = EventList.reduce((obj, curr) => (obj[curr] =
   { connections: new Set(), cache: [], initialized: false }) && obj, {});
 
 // initialize Event handlers
-Events.block.handler = (event) => Broadcast(event, Events.block);
+Events.block.handler = (event) => {
+  const { fullDocument, operationType } = event;
+  // only stream new block updates
+  if (operationType === 'insert') Broadcast(fullDocument, Events.block);
+};
 Events.network.handler = (event) => {
-  const update = {
-    ip: event.documentKey._id.replace('-', '.'),
-    updated: Object.keys(event.updateDescription.updatedFields).filter(
-      key => !key.includes('connection'))
-  };
-  if (update.updated.length) Broadcast(update, Events.network);
+  // expose _id from event.documentKey
+  const { _id } = event.documentKey;
+  // obtain updated fields' keys for updates that aren't connect- type updates
+  const fields = event.updateDescription.updatedFields;
+  const updated = Object.keys(fields).filter(key => !key.includes('connect'));
+  // broadcast updates for updated fields existing in addition to connect- type
+  if (updated.length) Broadcast(Object.assign({ _id }, fields), Events.network);
 };
 Events.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
 Events.transaction.handler = async (stats) => {
