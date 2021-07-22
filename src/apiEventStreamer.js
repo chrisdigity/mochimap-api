@@ -40,16 +40,15 @@ const Broadcast = (json, event) => {
   const id = new Date().toISOString();
   // for empty broadcasts, simply send the id in a comment as a heartbeat
   if (!json) return eObj.connections.forEach((res) => res.write(`: ${id}\n\n`));
-  // convert json to data
-  const data = JSON.stringify(json);
+  // add event to json and convert json to data
+  const data = JSON.stringify(Object.assign(json, { event }));
   // manage FILO cache length at MAXCACHE length
   while (eObj.cache.length >= MAXCACHE) eObj.cache.pop();
   eObj.cache.unshift({ id, data });
   // broadcast data to all relevant connections
   eObj.connections.forEach((connection) => {
     connection.write('id: ' + id + '\n');
-    connection.write('data: ' + data + '\n');
-    connection.write('event: ' + event + '\n\n');
+    connection.write('data: ' + data + '\n\n');
   });
 };
 
@@ -115,12 +114,13 @@ const EventStreamer = {
   _stale: ms.second * 30,
   _timer: undefined,
   connect: async (res, events) => {
-    const keys = new URLSearchParams(events).keys();
-    const connections = Array.from(keys, ([event]) => Event[event].connections);
+    events = Array.from(new URLSearchParams(events).keys());
     // add response reference to appropriate event connection sets
-    connections.forEach((conn) => conn.add(res));
+    events.forEach((event) => Event[event].connections.add(res));
     // add close event handler to response for removal from connections Set
-    res.on('close', () => connections.forEach((conn) => conn.delete(res)));
+    res.on('close', () => {
+      events.forEach((event) => Event[event].connections.delete(res));
+    });
     // write header to response
     res.writeHead(200, {
       'X-XSS-Protection': '1; mode=block',
