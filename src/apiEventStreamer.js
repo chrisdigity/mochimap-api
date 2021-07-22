@@ -17,8 +17,6 @@
  *
  */
 
-console.log('\n// START:', __filename);
-
 /* modules and utilities */
 const fs = require('fs');
 const path = require('path');
@@ -32,48 +30,48 @@ const MAXCACHE = 5;
 let TXCLEANPOS = 0;
 
 // initialize ServerSideEvent broadcast function
-const Broadcast = (json, eventObj) => {
+const Broadcast = (json, eObj) => {
   const id = new Date().toISOString();
   // for empty broadcasts, simply send the id in a comment as a heartbeat
-  if (!json) return eventObj.connections.forEach((res) => res.write(`: ${id}`));
+  if (!json) return eObj.connections.forEach((res) => res.write(`: ${id}\n\n`));
   // convert json to data
   const data = JSON.stringify(json);
   // manage FILO cache length at MAXCACHE length
-  while (eventObj.cache.length >= MAXCACHE) eventObj.cache.pop();
-  eventObj.cache.unshift({ id, data });
+  while (eObj.cache.length >= MAXCACHE) eObj.cache.pop();
+  eObj.cache.unshift({ id, data });
   // broadcast data to all relevant connections
-  eventObj.connections.forEach((connection) => {
+  eObj.connections.forEach((connection) => {
     connection.write('id: ' + id + '\n');
     connection.write('data: ' + data + '\n\n');
   });
 };
 
 // initialize Event types and base properties
-const EventList = ['block', 'network', 'transaction'];
-const Events = EventList.reduce((obj, curr) => (obj[curr] =
-  { connections: new Set(), cache: [], initialized: false }) && obj, {});
+const Events = ['block', 'network', 'transaction'];
+const EventGen = () => ({ cache: [], connections: new Set(), initd: false });
+const Event = Events.reduce((obj, cur) => ({ ...obj, [cur]: EventGen() }), {});
 
 // initialize Event handlers
-Events.block.handler = (event) => {
+Event.block.handler = (event) => {
   const { fullDocument, operationType } = event;
   // only stream new block updates
-  if (operationType === 'insert') Broadcast(fullDocument, Events.block);
+  if (operationType === 'insert') Broadcast(fullDocument, Event.block);
 };
-Events.network.handler = (event) => {
+Event.network.handler = (event) => {
   // expose _id from event.documentKey
   const { _id } = event.documentKey;
   // obtain updated fields' keys for updates that aren't connect- type updates
   const fields = event.updateDescription.updatedFields;
   const updated = Object.keys(fields).filter(key => !key.includes('connect'));
   // broadcast updates for updated fields existing in addition to connect- type
-  if (updated.length) Broadcast(Object.assign({ _id }, fields), Events.network);
+  if (updated.length) Broadcast(Object.assign({ _id }, fields), Event.network);
 };
-Events.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
-Events.transaction.handler = async (stats) => {
+Event.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
+Event.transaction.handler = async (stats) => {
   if (!stats) return; // ignore events with missing "current" stats object
   let filehandle;
   try {
-    const eventObj = Events.transaction;
+    const eObj = Events.transaction;
     const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // if txclean reduces filesize, reset TXCLEAN position
@@ -88,13 +86,13 @@ Events.transaction.handler = async (stats) => {
         const details = { size, position, invalidBytes };
         return console.error(`TXCLEAN invalid, ${JSON.stringify(details)}`);
       } // otherwise, open txclean file for reading
-      filehandle = await fs.promises.open(eventObj.filepath);
+      filehandle = await fs.promises.open(eObj.filepath);
       for (; remainingBytes; position += length, remainingBytes -= length) {
         const buffer = Buffer.alloc(length);
         const result = await filehandle.read({ buffer, position });
         // if sufficient bytes were read, Broadcast txentry
         if (result.bytesRead === length) {
-          Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), eventObj);
+          Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), eObj);
         } else { // otherwise, report details as an error
           const details = { position, bytesRead: result.bytesRead };
           console.error('insufficient txentry bytes,', JSON.stringify(details));
@@ -113,11 +111,13 @@ Events.transaction.handler = async (stats) => {
 const EventStreamer = {
   _stale: ms.second * 30,
   _timer: undefined,
-  connect: async (res, event) => {
-    // add response to appropriate connections Set
-    Events[event].connections.add(res);
+  connect: async (res, events) => {
+    const params = new URLSearchParams(events);
+    const connections = params.keys().map((event) => Event[event].connections);
+    // add response reference to appropriate event connection sets
+    connections.forEach((conn) => conn.add(res));
     // add close event handler to response for removal from connections Set
-    res.on('close', () => Events[event].connections.delete(res));
+    res.on('close', () => connections.forEach((conn) => conn.delete(res)));
     // write header to response
     res.writeHead(200, {
       'X-XSS-Protection': '1; mode=block',
@@ -143,21 +143,23 @@ const EventStreamer = {
     }
   }, // end heartbeat...
   init: async () => {
-    console.log('// INIT: EventStreamer');
+    console.log('// INIT: EventStreamer...');
     try {
       // synchronously initialize all event streams
       for (const [name, event] of Object.entries(Events)) {
-        if (!event.initialized) {
+        if (!event.initd) {
           // initialize filewatcher, or change stream for database collection
           if (event.filepath) fs.watchFile(event.filepath, event.handler);
           else (await Db.stream(name)).on('change', event.handler);
           // flag event type as initialized
-          event.initialized = true;
+          event.initd = true;
         }
       }
       // set heartbeat timer
       EventStreamer._timer =
         setInterval(EventStreamer.heartbeat, EventStreamer._stale);
+      // report initialization
+      console.log('// INIT: EventStreamer done!');
     } catch (error) {
       console.error('// INIT:', error);
       console.error('// INIT: failed to initialize Watcher');

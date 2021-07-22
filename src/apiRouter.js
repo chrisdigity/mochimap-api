@@ -28,12 +28,6 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/(block|network|transaction)\/stream$/,
-    headers: { accept: ['text/event-stream', 'text/*', '*/*'] },
-    handler: EventStreamer.connect,
-    enabled: true
-  }, {
-    method: 'GET',
     path: /^\/block(?:\/(?:([0-9]+)|(0x[0-9a-f]+))?)?$/i,
     hint: '[BaseURL]/block/<optional BlockNumber>',
     hintCheck: /block|0x/gi,
@@ -91,6 +85,16 @@ const Routes = [
     hint: '[BaseURL]/richlist/search?<param>=<paramValue>',
     hintCheck: /richlist|search/gi,
     handler: Responder.searchRichlist,
+    enabled: true
+  }, {
+    method: 'GET',
+    path: '/stream',
+    param: /^[?]?(?:(?:block|network|transaction)+(?:=on)?(?:$|&))+$/i,
+    paramRequired: true,
+    hint: '[BaseURL]/stream?<streamTypes>',
+    hintCheck: /stream|block|network|transaction/gi,
+    headers: { accept: ['text/event-stream'] },
+    handler: EventStreamer.connect,
     enabled: true
   }, {
     method: 'GET',
@@ -177,6 +181,10 @@ const Router = async (req, res) => {
         return Responder.unknown(res, 400, {
           message: 'invalid search parameters, check request...',
           parameters: search
+        });
+      } else if (routeMatch.paramRequired) {
+        return Responder.unknown(res, 422, {
+          message: 'no stream paramters were specified, check request...'
         });
       } // add search query as parameter
       params.push(search);

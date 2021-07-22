@@ -54,6 +54,7 @@ const Responder = {
         case 404: statusMessage = 'Not Found'; break;
         case 406: statusMessage = 'Not Acceptable'; break;
         case 409: statusMessage = 'Conflict'; break;
+        case 422: statusMessage = 'Unprocessable Entity'; break;
         case 500: statusMessage = 'Internal Server Error'; break;
         default: statusMessage = '';
       }
