@@ -57,7 +57,7 @@ const Broadcast = (json, event) => {
 Event.block.handler = (event) => {
   const { fullDocument, operationType } = event;
   // only stream new block updates
-  if (operationType === 'insert') Broadcast(fullDocument, Event.block);
+  if (operationType === 'insert') Broadcast(fullDocument, 'block');
 };
 Event.network.handler = (event) => {
   // expose _id from event.documentKey
@@ -66,14 +66,15 @@ Event.network.handler = (event) => {
   const fields = event.updateDescription.updatedFields;
   const updated = Object.keys(fields).filter(key => !key.includes('connect'));
   // broadcast updates for updated fields existing in addition to connect- type
-  if (updated.length) Broadcast(Object.assign({ _id }, fields), Event.network);
+  if (updated.length) Broadcast(Object.assign({ _id }, fields), 'network');
 };
 Event.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
 Event.transaction.handler = async (stats) => {
   if (!stats) return; // ignore events with missing "current" stats object
   let filehandle;
   try {
-    const eObj = Event.transaction;
+    const type = 'transaction';
+    const eObj = Event[type];
     const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // if txclean reduces filesize, reset TXCLEAN position
@@ -94,7 +95,7 @@ Event.transaction.handler = async (stats) => {
         const result = await filehandle.read({ buffer, position });
         // if sufficient bytes were read, Broadcast txentry
         if (result.bytesRead === length) {
-          Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), eObj);
+          Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), type);
         } else { // otherwise, report details as an error
           const details = { position, bytesRead: result.bytesRead };
           console.error('insufficient txentry bytes,', JSON.stringify(details));
@@ -138,9 +139,9 @@ const EventStreamer = {
   heartbeat: () => {
     const pingBefore = new Date() - EventStreamer._stale;
     // synchronously ping all event streams lacking activity
-    for (const event of Object.values(Event)) {
+    for (const [type, event] of Object.entries(Event)) {
       if (event.cache.length < 1 || new Date(event.cache[0].id) < pingBefore) {
-        Broadcast(undefined, event); // ping
+        Broadcast(undefined, type); // ping
       }
     }
   }, // end heartbeat...
