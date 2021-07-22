@@ -71,7 +71,7 @@ Event.transaction.handler = async (stats) => {
   if (!stats) return; // ignore events with missing "current" stats object
   let filehandle;
   try {
-    const eObj = Events.transaction;
+    const eObj = Event.transaction;
     const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // if txclean reduces filesize, reset TXCLEAN position
@@ -136,7 +136,7 @@ const EventStreamer = {
   heartbeat: () => {
     const pingBefore = new Date() - EventStreamer._stale;
     // synchronously ping all event streams lacking activity
-    for (const event of Object.values(Events)) {
+    for (const event of Object.values(Event)) {
       if (event.cache.length < 1 || new Date(event.cache[0].id) < pingBefore) {
         Broadcast(undefined, event); // ping
       }
@@ -146,7 +146,7 @@ const EventStreamer = {
     console.log('// INIT: EventStreamer...');
     try {
       // synchronously initialize all event streams
-      for (const [name, event] of Object.entries(Events)) {
+      for (const [name, event] of Object.entries(Event)) {
         if (!event.initd) {
           // initialize filewatcher, or change stream for database collection
           if (event.filepath) fs.watchFile(event.filepath, event.handler);
@@ -164,8 +164,8 @@ const EventStreamer = {
       console.error('// INIT:', error);
       console.error('// INIT: failed to initialize Watcher');
       console.error('// INIT: ( block / network / transaction ) status');
-      console.error('// INIT: (', Events.block.initialized, '/',
-        Events.transaction.initialized, '/', Events.network.initialized, ')');
+      console.error('// INIT: (', Event.block.initialized, '/',
+        Event.transaction.initialized, '/', Event.network.initialized, ')');
       console.error('// INIT: resuming initialization in 60 seconds...');
       EventStreamer._timer = setTimeout(EventStreamer.init, ms.minute);
     }
