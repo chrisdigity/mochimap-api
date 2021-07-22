@@ -29,8 +29,14 @@ const TXCLEAN = process.env.TXCLEAN || 'txclean.dat';
 const MAXCACHE = 5;
 let TXCLEANPOS = 0;
 
+// initialize Event types and base properties
+const Events = ['block', 'network', 'transaction'];
+const EventGen = () => ({ cache: [], connections: new Set(), initd: false });
+const Event = Events.reduce((obj, cur) => ({ ...obj, [cur]: EventGen() }), {});
+
 // initialize ServerSideEvent broadcast function
-const Broadcast = (json, eObj) => {
+const Broadcast = (json, event) => {
+  const eObj = Event[event];
   const id = new Date().toISOString();
   // for empty broadcasts, simply send the id in a comment as a heartbeat
   if (!json) return eObj.connections.forEach((res) => res.write(`: ${id}\n\n`));
@@ -42,14 +48,10 @@ const Broadcast = (json, eObj) => {
   // broadcast data to all relevant connections
   eObj.connections.forEach((connection) => {
     connection.write('id: ' + id + '\n');
-    connection.write('data: ' + data + '\n\n');
+    connection.write('data: ' + data + '\n');
+    connection.write('event: ' + event + '\n\n');
   });
 };
-
-// initialize Event types and base properties
-const Events = ['block', 'network', 'transaction'];
-const EventGen = () => ({ cache: [], connections: new Set(), initd: false });
-const Event = Events.reduce((obj, cur) => ({ ...obj, [cur]: EventGen() }), {});
 
 // initialize Event handlers
 Event.block.handler = (event) => {
