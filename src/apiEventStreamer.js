@@ -115,8 +115,8 @@ const EventStreamer = {
   _stale: ms.second * 30,
   _timer: undefined,
   connect: async (res, events) => {
-    const params = new URLSearchParams(events);
-    const connections = params.keys().map((event) => Event[event].connections);
+    const keys = new URLSearchParams(events).keys();
+    const connections = Array.from(keys, ([event]) => Event[event].connections);
     // add response reference to appropriate event connection sets
     connections.forEach((conn) => conn.add(res));
     // add close event handler to response for removal from connections Set
