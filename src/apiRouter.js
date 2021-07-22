@@ -89,8 +89,8 @@ const Routes = [
   }, {
     method: 'GET',
     path: '/stream',
-    param: /^[?]?(?:(?:block|network|transaction)+(?:=on)?(?:$|&))+$/i,
-    paramRequired: true,
+    param: /^[?]?(?:(?:block|network|transaction)+(?:=|=on)?(?:$|&))+$/i,
+    paramsRequired: true,
     hint: '[BaseURL]/stream?<streamTypes>',
     hintCheck: /stream|block|network|transaction/gi,
     headers: { accept: ['text/event-stream'] },
@@ -182,12 +182,13 @@ const Router = async (req, res) => {
           message: 'invalid search parameters, check request...',
           parameters: search
         });
-      } else if (routeMatch.paramRequired) {
-        return Responder.unknown(res, 422, {
-          message: 'no stream paramters were specified, check request...'
-        });
-      } // add search query as parameter
+      }
+      // add search query as parameter
       params.push(search);
+    } else if (routeMatch.paramsRequired) {
+      return Responder.unknown(res, 422, {
+        message: 'stream parameters are REQUIRED, check request...'
+      });
     }
     // return resulting parameters to handler
     return await routeMatch.handler(res, ...params);
