@@ -111,7 +111,7 @@ Event.transaction.handler = async (stats) => {
 
 /* EventStreamer */
 const EventStreamer = {
-  _stale: ms.second * 30,
+  _stale: ms.second * 15,
   _timer: undefined,
   connect: async (res, events) => {
     events = Array.from(new URLSearchParams(events).keys());
