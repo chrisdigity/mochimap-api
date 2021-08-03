@@ -134,8 +134,9 @@ const Db = {
     return cmd.result.n;
   },
   util: {
-    dotNotationUpdateExpression: (obj, depth = 0, keychain = '', add) => {
+    dotNotationUpdateExpression: (obj, depth = 0, keychain = '') => {
       return Object.entries(obj).reduce((expr, [key, value]) => {
+        let add = {};
         const d1 = depth - 1;
         const keyring = keychain + key;
         if (typeof value === 'object' && !Array.isArray(value) && d1 !== 0) {
@@ -177,7 +178,7 @@ const Db = {
         if (typeof category !== 'undefined') agg.push(category); // optional
         return agg.join('-');
       },
-      // richlist: (bnum, bhash, addr) => Db.util.id.ledger(bnum, bhash, addr),
+      // richlist: (...args) => Db.util.id.ledger(...args),
       transaction: (bnum, bhash, txid) => {
         return [Db.util.id.block(bnum, bhash), txid].join('-');
       }
