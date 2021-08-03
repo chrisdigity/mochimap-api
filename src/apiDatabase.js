@@ -134,8 +134,9 @@ const Db = {
     return cmd.result.n;
   },
   util: {
-    dotNotationUpdateExpression: (obj, depth = 0, keychain = '', add) => {
+    dotNotationUpdateExpression: (obj, depth = 0, keychain = '') => {
       return Object.entries(obj).reduce((expr, [key, value]) => {
+        let add = {};
         const d1 = depth - 1;
         const keyring = keychain + key;
         if (typeof value === 'object' && !Array.isArray(value) && d1 !== 0) {
