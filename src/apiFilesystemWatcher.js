@@ -23,6 +23,19 @@ const fs = require('fs');
 /* FilesystemWatcher */
 class FilesystemWatcher {
   init (path, options, callback) {
+    // parameter forwarding for callback when undefined
+    if (typeof callback === 'undefined') {
+      callback = options;
+      options = {};
+    } // end parameter forwarding
+    // parameter type checks
+    if (typeof path !== 'string') {
+      throw new Error('path parameter must be a string');
+    } else if (typeof options !== 'object') {
+      throw new Error('options parameter must be n object');
+    } else if (typeof callback !== 'function') {
+      throw new Error('callback parameter must be a function');
+    } // end parameter type checks
     // initialize cleanup crew
     if (!this.cleanupInitialized) {
       this.cleanupInitialized = true;
@@ -83,4 +96,5 @@ class FilesystemWatcher {
   } // end cleanup...
 } // end class FilesystemWatcher...
 
+/* export FilesystemWatcher class */
 module.exports = FilesystemWatcher;
