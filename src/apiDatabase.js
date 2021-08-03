@@ -171,11 +171,13 @@ const Db = {
       ledger: (bnum, bhash, addr) => {
         return [Db.util.id.block(bnum, bhash), addr].join('-');
       },
+      mempool: (txid) => txid,
       network: (ip, category) => {
         const agg = [...ip.split('.')];
         if (typeof category !== 'undefined') agg.push(category); // optional
         return agg.join('-');
       },
+      // richlist: (bnum, bhash, addr) => Db.util.id.ledger(bnum, bhash, addr),
       transaction: (bnum, bhash, txid) => {
         return [Db.util.id.block(bnum, bhash), txid].join('-');
       }
