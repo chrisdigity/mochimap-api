@@ -177,6 +177,7 @@ const Db = {
         if (typeof category !== 'undefined') agg.push(category); // optional
         return agg.join('-');
       },
+      // richlist: (...args) => Db.util.id.ledger(...args),
       transaction: (bnum, bhash, txid) => {
         return [Db.util.id.block(bnum, bhash), txid].join('-');
       }
