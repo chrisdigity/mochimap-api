@@ -18,19 +18,13 @@
  */
 
 /* modules and utilities */
-const fs = require('fs');
-const path = require('path');
 const { ms } = require('./apiUtils');
 const Db = require('./apiDatabase');
-const Mochimo = require('mochimo');
 
-const HDIR = require('os').homedir();
-const TXCLEAN = process.env.TXCLEAN || 'txclean.dat';
 const MAXCACHE = 5;
-let TXCLEANPOS = 0;
 
 // initialize Event types and base properties
-const Events = ['block', 'network', 'transaction'];
+const Events = ['block', 'mempool', 'network'];
 const EventGen = () => ({ cache: [], connections: new Set(), initd: false });
 const Event = Events.reduce((obj, cur) => ({ ...obj, [cur]: EventGen() }), {});
 
@@ -58,6 +52,11 @@ Event.block.handler = (event) => {
   // only stream new block updates
   if (operationType === 'insert') Broadcast(fullDocument, 'block');
 };
+Event.mempool.handler = (event) => {
+  const { fullDocument, operationType } = event;
+  // only stream new mempool updates
+  if (operationType === 'insert') Broadcast(fullDocument, 'mempool');
+};
 Event.network.handler = (event) => {
   // expose _id from event.documentKey
   const { _id } = event.documentKey;
@@ -66,47 +65,6 @@ Event.network.handler = (event) => {
   const updated = Object.keys(fields).filter(key => !key.includes('connect'));
   // broadcast updates for updated fields existing in addition to connect- type
   if (updated.length) Broadcast(Object.assign({ _id }, fields), 'network');
-};
-Event.transaction.filepath = path.join(HDIR, 'mochimo', 'bin', 'd', TXCLEAN);
-Event.transaction.handler = async (stats) => {
-  if (!stats) return; // ignore events with missing "current" stats object
-  let filehandle;
-  try {
-    const type = 'transaction';
-    const eObj = Event[type];
-    const { length } = Mochimo.TXEntry;
-    const { size } = stats;
-    // if txclean reduces filesize, reset TXCLEAN position
-    if (size < TXCLEANPOS) TXCLEANPOS = 0;
-    let position = TXCLEANPOS;
-    // ensure TXCLEAN has data
-    let remainingBytes = size - position;
-    if (remainingBytes) {
-      // ensure remainingBytes is valid size
-      const invalidBytes = remainingBytes % length;
-      if (invalidBytes) {
-        const details = { size, position, invalidBytes };
-        return console.error(`TXCLEAN invalid, ${JSON.stringify(details)}`);
-      } // otherwise, open txclean file for reading
-      filehandle = await fs.promises.open(eObj.filepath);
-      for (; remainingBytes; position += length, remainingBytes -= length) {
-        const buffer = Buffer.alloc(length);
-        const result = await filehandle.read({ buffer, position });
-        // if sufficient bytes were read, Broadcast txentry
-        if (result.bytesRead === length) {
-          Broadcast(new Mochimo.TXEntry(result.buffer).toJSON(true), type);
-        } else { // otherwise, report details as an error
-          const details = { position, bytesRead: result.bytesRead };
-          console.error('insufficient txentry bytes,', JSON.stringify(details));
-        }
-      }
-    }
-  } catch (error) {
-    console.trace(error);
-  } finally {
-    // ensure filehandle is closed after use
-    if (filehandle) await filehandle.close();
-  }
 };
 
 /* EventStreamer */
@@ -151,9 +109,8 @@ const EventStreamer = {
       // synchronously initialize all event streams
       for (const [name, event] of Object.entries(Event)) {
         if (!event.initd) {
-          // initialize filewatcher, or change stream for database collection
-          if (event.filepath) fs.watchFile(event.filepath, event.handler);
-          else (await Db.stream(name)).on('change', event.handler);
+          // initialize change stream for database collection
+          (await Db.stream(name)).on('change', event.handler);
           // flag event type as initialized
           event.initd = true;
         }
@@ -168,7 +125,7 @@ const EventStreamer = {
       console.error('// INIT: failed to initialize Watcher');
       console.error('// INIT: ( block / network / transaction ) status');
       console.error('// INIT: (', Event.block.initialized, '/',
-        Event.transaction.initialized, '/', Event.network.initialized, ')');
+        Event.mempool.initialized, '/', Event.network.initialized, ')');
       console.error('// INIT: resuming initialization in 60 seconds...');
       EventStreamer._timer = setTimeout(EventStreamer.init, ms.minute);
     }
