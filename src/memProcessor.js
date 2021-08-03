@@ -24,9 +24,7 @@ console.log('\n// START:', __filename);
 require('dotenv').config();
 
 /* modules and utilities */
-const {
-  informedShutdown, ms
-} = require('./apiUtils');
+const FilesystemWatcher = require('./apiFilesystemWatcher');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 const path = require('path');
@@ -37,6 +35,9 @@ const HDIR = require('os').homedir();
 const MEMDIR = path.join(HDIR, 'mochimo', 'bin', 'd');
 const MEMPOOLPATH = path.join(MEMDIR, process.env.MEMPOOL || 'txclean.dat');
 let MEMPOS = 0; // stores last position in MEMPATH
+
+/* declare watcher instance */
+const Watcher = new FilesystemWatcher();
 
 /* routines */
 const fileHandler = async (stats) => {
@@ -84,38 +85,8 @@ const fileHandler = async (stats) => {
   } finally {
     // ensure filehandle is closed after use
     if (filehandle) await filehandle.close();
-  }
+  } // end try... catch... finally...
 }; // end const fileHandler...
 
-/* watcher */
-const Watcher = {
-  _timeout: undefined,
-  init: () => {
-    // check MEMPOOLPATH is readable
-    fs.promises.access(MEMPOOLPATH, fs.constants.R_OK).then(() => {
-      // create directory watcher
-      fs.watchFile(path.join, fileHandler);
-      console.log('// INIT: watcher started...');
-    }).catch((error) => { // MEMPOOLPATH is unreadable, set reinit timout
-      console.error('// INIT:', error);
-      console.error('// INIT: failure, could not access', MEMPOOLPATH);
-      console.error('// INIT: attempting restart in 60 seconds...');
-      Watcher._timeout = setTimeout(Watcher.init, ms.minute);
-    });
-  } // end init...
-}; // end const Watcher...
-
-/* set cleanup signal traps */
-const cleanup = (e, src) => {
-  if (Watcher._timeout) {
-    console.log('// CLEANUP: terminating watcher timeout...');
-    clearTimeout(Watcher._timeout);
-  }
-  return informedShutdown(e, src);
-};
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('uncaughtException', console.trace);
-
 /* initialize watcher */
-Watcher.init();
+Watcher.init(MEMPOOLPATH, fileHandler);
