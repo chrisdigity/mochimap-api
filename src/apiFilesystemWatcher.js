@@ -52,11 +52,11 @@ class FilesystemWatcher {
             return fs.promises.readdir(path).then((files) => {
               return files.map((file) => require('path').join(path, file));
             }).then((files) => fs.stat(files, function (err, stats) {
-              if (err) logerr(err); else callback(eventType, filename, stats);
+              if (err) logerr(err); else callback(stats, eventType, filename);
             })).catch(logerr); // end return fs.promises.readdir...
           } // end if (eventType...
         case stats.isFile(): // eslint-disable-line no-fallthrough
-          return callback(eventType, filename, stats);
+          return callback(stats, eventType, filename);
         case stats.isSymbolicLink():
         case stats.isFIFO():
         case stats.isSocket():
