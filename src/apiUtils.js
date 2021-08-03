@@ -24,31 +24,19 @@ const asUint64String = (bigint) => {
   return BigInt.asUintN(64, BigInt(bigint)).toString(16).padStart(16, '0');
 };
 
-const objectIsEmpty = (obj) => {
-  for (const prop in obj) {
-    if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
-  }
-  return true;
-};
-
-const fidFormat = (fid, ...args) => {
-  const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
-  const tJoin = (array, max, d) => {
-    const end = array.length - 1;
-    return array.reduce((a, c, i) => a + t(c, max) + (i < end ? d : ''), '');
-  };
-  return [fid, '(', tJoin(args, 8, ', '), '):'].join('');
-};
-
-const invalidHexString = (hexStr, name) => {
-  if (typeof hexStr !== 'string') {
-    // string is the only acceptable type for hexStr
-    return 'invalid type, ' + name;
-  } else {
-    // check for remaining data after removing valid hexadecimal characters
-    if (hexStr.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, ' + name;
-  }
-  return false;
+const blockReward = (bnum) => {
+  // 'delta' reward adjustments, 'base' rewards & 'trigger' blocks
+  const delta = [56000n, 150000n, 28488n];
+  const base = [5000000000n, 5917392000n, 59523942000n];
+  const trigger = [17185n, 373761n, 2097152n];
+  // Reward after final block reward distribution + block height check
+  if (bnum > trigger[2] || bnum <= 0n) return 0n;
+  // Reward before v2.0 block trigger 0x4000
+  if (bnum < trigger[0]) return (base[0] + delta[0] * --bnum);
+  // Reward first remaining ~4 years (post v2.0) of distribution
+  if (bnum < trigger[1]) return (base[1] + delta[1] * (bnum - trigger[0]));
+  // Reward for last ~18 years of distribution
+  return (base[2] - delta[2] * (bnum - trigger[1]));
 };
 
 const checkRequest = (req, defaults) => {
@@ -128,6 +116,31 @@ const compareWeight = (weight1, weight2) => {
   return 0;
 };
 
+const fidFormat = (fid, ...args) => {
+  const t = (s, m) => `${s}`.length > m ? `${s}`.slice(0, m) + '~' : `${s}`;
+  const tJoin = (array, max, d) => {
+    const end = array.length - 1;
+    return array.reduce((a, c, i) => a + t(c, max) + (i < end ? d : ''), '');
+  };
+  return [fid, '(', tJoin(args, 8, ', '), '):'].join('');
+};
+
+const invalidHexString = (hexStr, name) => {
+  if (typeof hexStr !== 'string') {
+    // string is the only acceptable type for hexStr
+    return 'invalid type, ' + name;
+  } else {
+    // check for remaining data after removing valid hexadecimal characters
+    if (hexStr.replace(/[0-9A-Fa-f]/g, '')) return 'invalid data, ' + name;
+  }
+  return false;
+};
+
+const informedShutdown = (signal, origin = 'unknown') => {
+  console.log(`// SHUTDOWN: recv'd ${signal} from ${origin}`);
+  process.exit(Number(signal) || 1);
+};
+
 const isPrivateIPv4 = (ip) => {
   const b = new ArrayBuffer(4);
   const c = new Uint8Array(b);
@@ -144,6 +157,52 @@ const isPrivateIPv4 = (ip) => {
   if (c[0] === 192 && (c[1] & 0xff) === 168) return 3; // class C
   if (c[0] === 169 && (c[1] & 0xff) === 254) return 4; // auto
   return 0; // public IP
+};
+
+const ms = {
+  second: 1000,
+  minute: 60000,
+  hour: 3600000,
+  day: 86400000,
+  week: 604800000
+};
+
+const objectIsEmpty = (obj) => {
+  for (const prop in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, prop)) return false;
+  }
+  return true;
+};
+
+const projectedSupply = (bnum) => {
+  const Instamine = 4757066000000000n; // inclusive of any locked dev coins
+  const BigIntMin = (...args) => args.reduce((m, e) => e < m ? e : m);
+  const Sn = (n, b1, bn) => {
+    return n * (blockReward(b1) + blockReward(bn)) / 2n;
+  }; // Sum of an Arithmetic Sequence; Sn = n(A1+An)/2
+  // without input, project maximum supply at block 0x200000
+  bnum = bnum || 2097152n;
+  // Due to hard fork @ 0x4321, formula is split into 3 separate calculations
+  let allblocks = 0n;
+  let neogen = 0n;
+  let nn = 0n;
+  // 0x1 to 0x4320...
+  nn = BigIntMin(0x4320n, bnum); // max 0x4320
+  allblocks += Sn(nn, 1n, nn);
+  nn = BigIntMin(0x4300n, bnum) >> 8n << 8n; // max 0x4300
+  neogen += Sn(nn >> 8n, 256n, nn);
+  // 0x4321 to 0x5B400...
+  nn = BigIntMin(0x5B400n, bnum); // max 0x5B400
+  allblocks += Sn(bnum > 0x4320n ? nn - 0x4320n : 0n, 0x4321n, nn);
+  nn = BigIntMin(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
+  neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8n : 0n, 0x4400n, nn);
+  // 0x5B401 to 0x200000
+  nn = BigIntMin(0x200000n, bnum); // max 0x200000
+  allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
+  nn = BigIntMin(0x200000n, bnum) >> 8n << 8n; // max 0x200000
+  neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400n) >> 8n : 0n, 0x5B500n, nn);
+  // return the result of instamine plus all block rewards minus neogen rewards
+  return Instamine + allblocks - neogen;
 };
 
 const readWeb = (options, postData) => {
@@ -164,65 +223,6 @@ const readWeb = (options, postData) => {
   });
 };
 
-const informedShutdown = (signal, origin = 'unknown') => {
-  console.log(`// SHUTDOWN: recv'd ${signal} from ${origin}`);
-  process.exit(Number(signal) || 1);
-};
-
-const ms = {
-  second: 1000,
-  minute: 60000,
-  hour: 3600000,
-  day: 86400000,
-  week: 604800000
-};
-
-const blockReward = (bnum) => {
-  // 'delta' reward adjustments, 'base' rewards & 'trigger' blocks
-  const delta = [56000n, 150000n, 28488n];
-  const base = [5000000000n, 5917392000n, 59523942000n];
-  const trigger = [17185n, 373761n, 2097152n];
-  // Reward after final block reward distribution + block height check
-  if (bnum > trigger[2] || bnum <= 0n) return 0n;
-  // Reward before v2.0 block trigger 0x4000
-  if (bnum < trigger[0]) return (base[0] + delta[0] * --bnum);
-  // Reward first remaining ~4 years (post v2.0) of distribution
-  if (bnum < trigger[1]) return (base[1] + delta[1] * (bnum - trigger[0]));
-  // Reward for last ~18 years of distribution
-  return (base[2] - delta[2] * (bnum - trigger[1]));
-};
-
-const projectedSupply = (bnum) => {
-  const Instamine = 4757066000000000n; // inclusive of any locked dev coins
-  const BigIntMin = (...args) => args.reduce((m, e) => e < m ? e : m);
-  const Sn = (n, b1, bn) => {
-    return n * (blockReward(b1) + blockReward(bn)) / 2n;
-  }; // Sum of an Arithmetic Sequence; Sn = n(A1+An)/2
-  // without input, project maximum supply at block 0x200000
-  bnum = bnum || 2097152n;
-  // Due to hard fork @ 0x4321, formula is split into 3 separate calculations
-  var allblocks = 0n;
-  var neogen = 0n;
-  var nn = 0n;
-  // 0x1 to 0x4320...
-  nn = BigIntMin(0x4320n, bnum); // max 0x4320
-  allblocks += Sn(nn, 1n, nn);
-  nn = BigIntMin(0x4300n, bnum) >> 8n << 8n; // max 0x4300
-  neogen += Sn(nn >> 8n, 256n, nn);
-  // 0x4321 to 0x5B400...
-  nn = BigIntMin(0x5B400n, bnum); // max 0x5B400
-  allblocks += Sn(bnum > 0x4320n ? nn - 0x4320n : 0n, 0x4321n, nn);
-  nn = BigIntMin(0x5B400n, bnum) >> 8n << 8n; // max 0x5B400
-  neogen += Sn(bnum > 0x4300n ? (nn - 0x4300n) >> 8n : 0n, 0x4400n, nn);
-  // 0x5B401 to 0x200000
-  nn = BigIntMin(0x200000n, bnum); // max 0x200000
-  allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
-  nn = BigIntMin(0x200000n, bnum) >> 8n << 8n; // max 0x200000
-  neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400n) >> 8n : 0n, 0x5B500n, nn);
-  // return the result of instamine plus all block rewards minus neogen rewards
-  return Instamine + allblocks - neogen;
-};
-
 const round = (value, places = 2) => {
   const multiplier = Math.pow(10, places);
   return Math.round(value * multiplier) / multiplier;
@@ -230,15 +230,15 @@ const round = (value, places = 2) => {
 
 module.exports = {
   asUint64String,
-  objectIsEmpty,
-  fidFormat,
+  blockReward,
   checkRequest,
   compareWeight,
-  isPrivateIPv4,
-  readWeb,
+  fidFormat,
   informedShutdown,
+  isPrivateIPv4,
   ms,
-  blockReward,
+  objectIsEmpty,
   projectedSupply,
+  readWeb,
   round
 };
