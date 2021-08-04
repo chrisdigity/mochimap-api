@@ -40,42 +40,42 @@ let MEMPOS = 0; // stores last position in MEMPATH
 const Watcher = new FilesystemWatcher();
 
 /* routines */
-const fileHandler = async (stats) => {
-  if (!stats) return; // ignore events with missing "current" stats object
+const fileHandler = async (stats, eventType) => {
+  // ignore 'rename' events or events missing stats object
+  if (!stats || eventType === 'rename') return;
   let filehandle; // declare file handle for reading mempool
   try { // determine if MEMPOOL has valid bytes to read
     const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // check mempool for filesize reduction, reset MEMPOS
     if (size < MEMPOS) MEMPOS = 0;
-    let position = MEMPOS;
     // ensure mempool has data
-    let remainingBytes = size - position;
+    let remainingBytes = size - MEMPOS;
     if (remainingBytes) {
       // ensure remainingBytes is valid factor of TXEntry.length
       const invalidBytes = remainingBytes % length;
-      if (invalidBytes) { // report error in position or (likely) filesize
-        const details = { size, position, invalidBytes };
+      if (invalidBytes) { // report error in MEMPOS or (likely) filesize
+        const details = { size, MEMPOS, remainingBytes, invalidBytes };
         return console.error(`MEMPOOL invalid, ${JSON.stringify(details)}`);
       } // otherwise, open mempool for reading
       filehandle = await fs.promises.open(MEMPOOLPATH);
-      for (; remainingBytes; position += length, remainingBytes -= length) {
+      for (; remainingBytes; MEMPOS += length, remainingBytes -= length) {
         const buffer = Buffer.alloc(length);
         // read from filehandle "TXEntry.length" bytes, into buffer
-        const result = await filehandle.read({ buffer, position });
+        const result = await filehandle.read({ buffer, MEMPOS });
         if (result.bytesRead === length) { // sufficient bytes were read
           // build JSON TXEntry
-          const txentry = new Mochimo.TXEntry(result.buffer).toJSON(true);
+          const txentry = new Mochimo.TXEntry(result.buffer);
           const _txid = Db.util.id.mempool(txentry.txid);
           if (!(await Db.has('mempool', txentry.txid))) {
-            try { // insert txentry in mempool
-              const insertDoc = { _id: _txid, ...txentry };
+            try { // insert txentry JSON in mempool
+              const insertDoc = { _id: _txid, ...txentry.toJSON(true) };
               await Db.insert('mempool', Db.util.filterBigInt(insertDoc));
-              console.log(_txid, ': processed');
-            } catch (error) { console.error(_txid, error); }
-          } else console.log(_txid, 'already processed');
+              console.log(_txid.slice(0, 16), ': processed');
+            } catch (error) { console.error(_txid.slice(0, 16), error); }
+          } else console.log(_txid.slice(0, 16), 'already processed');
         } else { // otherwise, report error in read result
-          const details = { position, result };
+          const details = { MEMPOS, result };
           console.error('insufficient txentry bytes,', JSON.stringify(details));
         } // end if (result.bytesRead...
       } // end for (; remainingBytes...
