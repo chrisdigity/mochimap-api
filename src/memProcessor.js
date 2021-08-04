@@ -16,6 +16,12 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
+ **
+ * By utilizing the FilesystemWatcher, the Mempool Processor detects changes in
+ * a mempool file (txclean.dat) and inserts them into the transaction database
+ * as unconfirmed transactions. Operating separately, the Blockchain Processor
+ * upserts transactions as they are baked into blocks, updating transactions
+ * with confirmation details or leaving them unconfirmed.
  */
 
 console.log('\n// START:', __filename);
