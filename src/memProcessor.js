@@ -69,7 +69,8 @@ const fileHandler = async (stats) => {
           const _txid = Db.util.id.mempool(txentry.txid);
           if (!(await Db.has('mempool', txentry.txid))) {
             try { // insert txentry in mempool
-              await Db.insert('mempool', { _id: _txid, ...txentry });
+              const insertDoc = { _id: _txid, ...txentry };
+              await Db.insert('mempool', Db.util.filterBigInt(insertDoc));
               console.log(_txid, ': processed');
             } catch (error) { console.error(_txid, error); }
           } else console.log(_txid, 'already processed');
