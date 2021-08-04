@@ -50,7 +50,7 @@ class FilesystemWatcher {
     // declare initialization error count
     this._ecount = this._ecount || 0;
     try { // try ... perform initial stat of path
-      fs.stat(path, this.handleStat.bind(this, 'init', this.fpath));
+      fs.stat(this.fpath, this.handleStat.bind(this, 'init', this.fpath));
       if (!options.scanOnly) { // try ... watching for path changes
         if (this._watch) this._watch.close(); // close existing watchers
         this._watch = fs.watch(this.fpath, this.handleWatch.bind(this));
@@ -129,11 +129,11 @@ class FilesystemWatcher {
 
   cleanup () {
     if (this._watch) {
-      console.log(`// CLEANUP: terminating watch on ${this.target} watch...`);
+      console.log(`// CLEANUP: terminating watch on ${this.fpath} watch...`);
       this._watch.close();
     } // end _watch cleanup
     if (this._timeout) {
-      console.log(`// CLEANUP: terminating ${this.target} watcher timeout...`);
+      console.log(`// CLEANUP: terminating ${this.fpath} watcher timeout...`);
       clearTimeout(this._timeout);
     } // end _timeout cleanup
   } // end cleanup...
