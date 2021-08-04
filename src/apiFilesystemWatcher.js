@@ -18,18 +18,19 @@
  */
 
 /* modules and utilities */
+const path = require('path');
 const fs = require('fs');
 
 /* FilesystemWatcher */
 class FilesystemWatcher {
-  init (path, options, callback) {
+  init (fpath = this.fpath, options = this.options, callback = this.callback) {
     // parameter forwarding for callback when undefined
     if (typeof callback === 'undefined') {
       callback = options;
       options = {};
     } // end parameter forwarding
     // parameter type checks
-    if (typeof path !== 'string') {
+    if (typeof fpath !== 'string') {
       throw new Error('path parameter must be a string');
     } else if (typeof options !== 'object') {
       throw new Error('options parameter must be n object');
@@ -39,60 +40,102 @@ class FilesystemWatcher {
     // initialize cleanup crew
     if (!this.cleanupInitialized) {
       this.cleanupInitialized = true;
-      process.on('SIGINT', this.cleanup);
-      process.on('SIGTERM', this.cleanup);
+      process.on('SIGINT', this.cleanup.bind(this));
+      process.on('SIGTERM', this.cleanup.bind(this));
     } // end if (!this.cleanupInitialized...
+    // store parameters in instance
+    this.fpath = fpath;
+    this.options = options;
+    this.callback = callback;
+    // declare initialization error count
+    this._ecount = this._ecount || 0;
     try { // try ... perform initial stat of path
-      fs.stat(path, this.handleStat.bind(this, path, 'init', null, callback));
-      if (!options.scanOnly) { // try ... watching for changes on path
-        fs.watch(path, function (eventType, filename) {
-          fs.stat(path, this.handleStat.bind(
-            this, path, eventType, filename, callback));
-        }).on('error', this.reinit.bind(this, path, options, callback));
-        console.log(`// INIT: ${path} watcher started...`);
+      fs.stat(this.fpath, this.handleStat.bind(this, 'init', this.fpath));
+      if (!options.scanOnly) { // try ... watching for path changes
+        if (this._watch) this._watch.close(); // close existing watchers
+        this._watch = fs.watch(this.fpath, this.handleWatch.bind(this));
+        this._watch.on('error', this.handleWatchError.bind(this));
+        this._ecount = 0; // reset initialization error count
+        this.log('INIT', 'watcher started...');
       } // end if (!options.scanOnly...
     } catch (error) { // an error occurred initializing watcher, report/retry
-      this.reinit(path, options, callback, error);
+      this._ecount++; // increment initialization error count
+      this.log('INIT', `reinitializing in ${this._ecount} seconds...`, error);
+      this._timeout = setTimeout(this.init.bind(this), this._ecount * 1000);
     } // end try...
   } // end init...
 
-  handleStat (path, eventType, filename, callback, error, stats) {
-    const logerr = (err) => console.error(`// WATCHER ERROR: ${path}, ${err}`);
-    if (error) logerr(error); else {
-      switch (true) { // check fs.Dirent type
+  handleStat (eventType, filename, errstat, stats) {
+    if (errstat) { // handle immediate stat error
+      if (errstat.code === 'ENOENT') { // acknowledge ENOENT errors
+        this.log('STAT', `ENOENT ${eventType} event on ${filename}`);
+        if (eventType === 'rename' && filename === path.basename(this.fpath)) {
+          this.log('STAT', 'reinitializing in 1 second...');
+          this._timeout = setTimeout(this.init.bind(this), 1000);
+        } // end if (eventType === 'rename'...
+      } else this.error('STAT', `-> ${filename}, ${errstat}`);
+    } else { // handle successful stat result
+      switch (true) { // handle Dirent type
         case stats.isDirectory():
           if (eventType === 'init') {
-            return fs.promises.readdir(path).then((files) => {
-              return files.map((file) => require('path').join(path, file));
-            }).then((files) => fs.stat(files, function (err, stats) {
-              if (err) logerr(err); else callback(stats, eventType, filename);
-            })).catch(logerr); // end return fs.promises.readdir...
+            const options = { withFileTypes: true };
+            return fs.readdir(this.fpath, options, this.handleDir.bind(this));
           } // end if (eventType...
         case stats.isFile(): // eslint-disable-line no-fallthrough
-          return callback(stats, eventType, filename);
+          return this.callback(stats, eventType, filename);
         case stats.isSymbolicLink():
         case stats.isFIFO():
         case stats.isSocket():
         case stats.isCharacterDevice():
         case stats.isBlockDevice():
-          return logerr('Dirent must describe a file or directory');
+          return this.error('STAT', 'Dirent must describe a file or directory');
         default: // unknown Dirent type
-          return logerr('unknown Dirent type');
+          return this.error('STAT', 'unknown Dirent type');
       } // end switch (true...
     } // end if (error... else...
   } // end handleStat...
 
-  reinit (path, options, callback, error) {
-    console.error(`// WATCHER ERROR: ${path}, ${error}`);
-    console.error('// INIT: reinitializing in 60 seconds...');
-    this._timeout =
-      setTimeout(this.init.bind(this, path, options, callback), 60 * 1000);
-  } // end reinit...
+  handleWatchError (error) {
+    this.error('', error);
+    return this.init();
+  } // end handleWatch...
+
+  handleWatch (eventType, filename) {
+    fs.stat(this.fpath, this.handleStat.bind(this, eventType, filename));
+  } // end handleWatch...
+
+  handleDir (error, statsArray) {
+    if (error) this.error('READDIR', error);
+    else { // report on size of, and handle, statsArray
+      this.log('INIT', `found ${statsArray.length} entities...`);
+      for (const stats of statsArray) {
+        this.handleStat.bind(this)('rename', stats.name, undefined, stats);
+      } // end for...
+    } // end if (err... else...
+  } // end handleDir...
+
+  log (type, message, error) {
+    if (error) this.error(type, error);
+    return console.log(
+      `// WATCHER${type ? ` ${type}` : ''}: ${this.fpath}, ${message}`
+    ); // end return...
+  } // end log...
+
+  error (type, message) {
+    return console.error(
+      `// WATCHER${type ? ` ${type}` : ''} ERROR: ${this.fpath}, ${message}`
+    ); // end return...
+  } // end error...
 
   cleanup () {
-    if (!this._timeout) return;
-    console.log(`// CLEANUP: terminating ${this.target} watcher timeout...`);
-    clearTimeout(this._timeout);
+    if (this._watch) {
+      console.log(`// CLEANUP: terminating watch on ${this.fpath} watch...`);
+      this._watch.close();
+    } // end _watch cleanup
+    if (this._timeout) {
+      console.log(`// CLEANUP: terminating ${this.fpath} watcher timeout...`);
+      clearTimeout(this._timeout);
+    } // end _timeout cleanup
   } // end cleanup...
 } // end class FilesystemWatcher...
 
