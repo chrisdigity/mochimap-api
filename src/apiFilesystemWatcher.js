@@ -18,18 +18,19 @@
  */
 
 /* modules and utilities */
+const path = require('path');
 const fs = require('fs');
 
 /* FilesystemWatcher */
 class FilesystemWatcher {
-  init (path = this.path, options = this.options, callback = this.callback) {
+  init (fpath = this.fpath, options = this.options, callback = this.callback) {
     // parameter forwarding for callback when undefined
     if (typeof callback === 'undefined') {
       callback = options;
       options = {};
     } // end parameter forwarding
     // parameter type checks
-    if (typeof path !== 'string') {
+    if (typeof fpath !== 'string') {
       throw new Error('path parameter must be a string');
     } else if (typeof options !== 'object') {
       throw new Error('options parameter must be n object');
@@ -43,16 +44,16 @@ class FilesystemWatcher {
       process.on('SIGTERM', this.cleanup.bind(this));
     } // end if (!this.cleanupInitialized...
     // store parameters in instance
-    this.path = path;
+    this.fpath = fpath;
     this.options = options;
     this.callback = callback;
     // declare initialization error count
     this._ecount = this._ecount || 0;
     try { // try ... perform initial stat of path
-      fs.stat(path, this.handleStat.bind(this, 'init', this.path));
+      fs.stat(path, this.handleStat.bind(this, 'init', this.fpath));
       if (!options.scanOnly) { // try ... watching for path changes
         if (this._watch) this._watch.close(); // close existing watchers
-        this._watch = fs.watch(path, this.handleWatch.bind(this));
+        this._watch = fs.watch(this.fpath, this.handleWatch.bind(this));
         this._watch.on('error', this.handleWatchError.bind(this));
         this._ecount = 0; // reset initialization error count
         this.log('INIT', 'watcher started...');
@@ -68,7 +69,7 @@ class FilesystemWatcher {
     if (errstat) { // handle immediate stat error
       if (errstat.code === 'ENOENT') { // acknowledge ENOENT errors
         this.log('STAT', `ENOENT ${eventType} event on ${filename}`);
-        if (eventType === 'rename' && filename === this.path) {
+        if (eventType === 'rename' && filename === path.basename(this.fpath)) {
           this.log('STAT', 'reinitializing in 1 second...');
           this._timeout = setTimeout(this.init.bind(this), 1000);
         } // end if (eventType === 'rename'...
@@ -78,7 +79,7 @@ class FilesystemWatcher {
         case stats.isDirectory():
           if (eventType === 'init') {
             const options = { withFileTypes: true };
-            return fs.readdir(this.path, options, this.handleDir.bind(this));
+            return fs.readdir(this.fpath, options, this.handleDir.bind(this));
           } // end if (eventType...
         case stats.isFile(): // eslint-disable-line no-fallthrough
           return this.callback(stats, eventType, filename);
@@ -100,12 +101,13 @@ class FilesystemWatcher {
   } // end handleWatch...
 
   handleWatch (eventType, filename) {
-    fs.stat(this.path, this.handleStat.bind(this, eventType, filename));
+    fs.stat(this.fpath, this.handleStat.bind(this, eventType, filename));
   } // end handleWatch...
 
   handleDir (error, statsArray) {
     if (error) this.error('READDIR', error);
-    else {
+    else { // report on size of, and handle, statsArray
+      this.log('INIT', `found ${statsArray.length} entities...`);
       for (const stats of statsArray) {
         this.handleStat.bind(this)('rename', stats.name, undefined, stats);
       } // end for...
@@ -115,13 +117,13 @@ class FilesystemWatcher {
   log (type, message, error) {
     if (error) this.error(type, error);
     return console.log(
-      `// WATCHER${type ? ` ${type}` : ''}: ${this.path}, ${message}`
+      `// WATCHER${type ? ` ${type}` : ''}: ${this.fpath}, ${message}`
     ); // end return...
   } // end log...
 
   error (type, message) {
     return console.error(
-      `// WATCHER${type ? ` ${type}` : ''} ERROR: ${this.path}, ${message}`
+      `// WATCHER${type ? ` ${type}` : ''} ERROR: ${this.fpath}, ${message}`
     ); // end return...
   } // end error...
 
