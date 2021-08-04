@@ -45,10 +45,8 @@ class FilesystemWatcher {
     try { // try ... perform initial stat of path
       fs.stat(path, this.handleStat.bind(this, path, 'init', null, callback));
       if (!options.scanOnly) { // try ... watching for changes on path
-        fs.watch(path, function (eventType, filename) {
-          fs.stat(path, this.handleStat.bind(
-            this, path, eventType, filename, callback));
-        }).on('error', this.reinit.bind(this, path, options, callback));
+        fs.watch(path, this.handleWatch.bind(this, path, callback)
+        ).on('error', this.reinit.bind(this, path, options, callback));
         console.log(`// INIT: ${path} watcher started...`);
       } // end if (!options.scanOnly...
     } catch (error) { // an error occurred initializing watcher, report/retry
@@ -81,6 +79,11 @@ class FilesystemWatcher {
       } // end switch (true...
     } // end if (error... else...
   } // end handleStat...
+
+  handleWatch (path, callback, eventType, filename) {
+    fs.stat(path, this.handleStat.bind(
+      this, path, eventType, filename, callback));
+  } // end handleWatch...
 
   reinit (path, options, callback, error) {
     console.error(`// WATCHER ERROR: ${path}, ${error}`);
