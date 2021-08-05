@@ -56,19 +56,20 @@ const fileHandler = async (stats, eventType) => {
     // check mempool for filesize reduction, reset MEMPOS
     if (size < MEMPOS) MEMPOS = 0;
     // ensure mempool has data
-    let remainingBytes = size - MEMPOS;
+    let position = MEMPOS;
+    let remainingBytes = size - position;
     if (remainingBytes) {
       // ensure remainingBytes is valid factor of TXEntry.length
       const invalidBytes = remainingBytes % length;
-      if (invalidBytes) { // report error in MEMPOS or (likely) filesize
-        const details = { size, MEMPOS, remainingBytes, invalidBytes };
+      if (invalidBytes) { // report error in position or (likely) filesize
+        const details = { size, position, remainingBytes, invalidBytes };
         return console.error(`MEMPOOL invalid, ${JSON.stringify(details)}`);
-      } // otherwise, open mempool for reading
+      } else MEMPOS = size; // adjust MEMPOS and open mempool for reading
       filehandle = await fs.promises.open(MEMPOOLPATH);
-      for (; remainingBytes; MEMPOS += length, remainingBytes -= length) {
+      for (; remainingBytes; position += length, remainingBytes -= length) {
         const buffer = Buffer.alloc(length);
         // read from filehandle "TXEntry.length" bytes, into buffer
-        const result = await filehandle.read({ buffer, MEMPOS });
+        const result = await filehandle.read({ buffer, position });
         if (result.bytesRead === length) { // sufficient bytes were read
           // build JSON TXEntry
           const txentry = new Mochimo.TXEntry(result.buffer);
