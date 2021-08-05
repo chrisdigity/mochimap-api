@@ -133,13 +133,17 @@ const processTransactions = async (block) => {
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
   });
-  const operations = transactions.map((txe) => ({
-    replaceOne: { // prepend _id, stime, bnum and bhash to minified txe
-      filter: { _id: Db.util.id.mempool(txe.txid) },
-      replacement: { _id, stime, bnum, bhash, ...txe.toJSON(true) },
-      upsert: true
-    }
-  }));
+  const operations = transactions.map((txe) => {
+    // prepend _id, stime, bnum and bhash to minified txe
+    const _id = Db.util.id.mempool(txe.txid);
+    return {
+      replaceOne: {
+        filter: { _id },
+        replacement: { _id, stime, bnum, bhash, ...txe.toJSON(true) },
+        upsert: true
+      }
+    };
+  });
   // push mining reward as extra transaction
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
