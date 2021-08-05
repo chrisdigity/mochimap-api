@@ -16,6 +16,12 @@
  *  You should have received a copy of the GNU Affero General Public License
  *  along with this program.  If not, see <https://www.gnu.org/licenses/>.
  *
+ **
+ * By utilizing the FilesystemWatcher, the Mempool Processor detects changes in
+ * a mempool file (txclean.dat) and inserts them into the transaction database
+ * as unconfirmed transactions. Operating separately, the Blockchain Processor
+ * upserts transactions as they are baked into blocks, updating transactions
+ * with confirmation details or leaving them unconfirmed.
  */
 
 console.log('\n// START:', __filename);
@@ -24,9 +30,7 @@ console.log('\n// START:', __filename);
 require('dotenv').config();
 
 /* modules and utilities */
-const {
-  informedShutdown, ms
-} = require('./apiUtils');
+const FilesystemWatcher = require('./apiFilesystemWatcher');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 const path = require('path');
@@ -38,25 +42,29 @@ const MEMDIR = path.join(HDIR, 'mochimo', 'bin', 'd');
 const MEMPOOLPATH = path.join(MEMDIR, process.env.MEMPOOL || 'txclean.dat');
 let MEMPOS = 0; // stores last position in MEMPATH
 
+/* declare watcher instance */
+const Watcher = new FilesystemWatcher();
+
 /* routines */
-const fileHandler = async (stats) => {
-  if (!stats) return; // ignore events with missing "current" stats object
+const fileHandler = async (stats, eventType) => {
+  // ignore 'rename' events or events missing stats object
+  if (!stats || eventType === 'rename') return;
   let filehandle; // declare file handle for reading mempool
   try { // determine if MEMPOOL has valid bytes to read
     const { length } = Mochimo.TXEntry;
     const { size } = stats;
     // check mempool for filesize reduction, reset MEMPOS
     if (size < MEMPOS) MEMPOS = 0;
-    let position = MEMPOS;
     // ensure mempool has data
+    let position = MEMPOS;
     let remainingBytes = size - position;
     if (remainingBytes) {
       // ensure remainingBytes is valid factor of TXEntry.length
       const invalidBytes = remainingBytes % length;
       if (invalidBytes) { // report error in position or (likely) filesize
-        const details = { size, position, invalidBytes };
+        const details = { size, position, remainingBytes, invalidBytes };
         return console.error(`MEMPOOL invalid, ${JSON.stringify(details)}`);
-      } // otherwise, open mempool for reading
+      } else MEMPOS = size; // adjust MEMPOS and open mempool for reading
       filehandle = await fs.promises.open(MEMPOOLPATH);
       for (; remainingBytes; position += length, remainingBytes -= length) {
         const buffer = Buffer.alloc(length);
@@ -64,16 +72,17 @@ const fileHandler = async (stats) => {
         const result = await filehandle.read({ buffer, position });
         if (result.bytesRead === length) { // sufficient bytes were read
           // build JSON TXEntry
-          const txentry = new Mochimo.TXEntry(result.buffer).toJSON(true);
+          const txentry = new Mochimo.TXEntry(result.buffer);
           const _txid = Db.util.id.mempool(txentry.txid);
           if (!(await Db.has('mempool', txentry.txid))) {
-            try { // insert txentry in mempool
-              await Db.insert('mempool', { _id: _txid, ...txentry });
-              console.log(_txid, ': processed');
-            } catch (error) { console.error(_txid, error); }
-          } else console.log(_txid, 'already processed');
+            try { // insert txentry JSON in mempool
+              const insertDoc = { _id: _txid, ...txentry.toJSON(true) };
+              await Db.insert('mempool', Db.util.filterBigInt(insertDoc));
+              console.log(_txid.slice(0, 16), ': processed');
+            } catch (error) { console.error(_txid.slice(0, 16), error); }
+          } else console.log(_txid.slice(0, 16), 'already processed');
         } else { // otherwise, report error in read result
-          const details = { position, result };
+          const details = { MEMPOS, result };
           console.error('insufficient txentry bytes,', JSON.stringify(details));
         } // end if (result.bytesRead...
       } // end for (; remainingBytes...
@@ -84,38 +93,8 @@ const fileHandler = async (stats) => {
   } finally {
     // ensure filehandle is closed after use
     if (filehandle) await filehandle.close();
-  }
+  } // end try... catch... finally...
 }; // end const fileHandler...
 
-/* watcher */
-const Watcher = {
-  _timeout: undefined,
-  init: () => {
-    // check MEMPOOLPATH is readable
-    fs.promises.access(MEMPOOLPATH, fs.constants.R_OK).then(() => {
-      // create directory watcher
-      fs.watchFile(path.join, fileHandler);
-      console.log('// INIT: watcher started...');
-    }).catch((error) => { // MEMPOOLPATH is unreadable, set reinit timout
-      console.error('// INIT:', error);
-      console.error('// INIT: failure, could not access', MEMPOOLPATH);
-      console.error('// INIT: attempting restart in 60 seconds...');
-      Watcher._timeout = setTimeout(Watcher.init, ms.minute);
-    });
-  } // end init...
-}; // end const Watcher...
-
-/* set cleanup signal traps */
-const cleanup = (e, src) => {
-  if (Watcher._timeout) {
-    console.log('// CLEANUP: terminating watcher timeout...');
-    clearTimeout(Watcher._timeout);
-  }
-  return informedShutdown(e, src);
-};
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('uncaughtException', console.trace);
-
 /* initialize watcher */
-Watcher.init();
+Watcher.init(MEMPOOLPATH, fileHandler);
