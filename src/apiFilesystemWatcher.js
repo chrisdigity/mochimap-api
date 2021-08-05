@@ -18,7 +18,6 @@
  */
 
 /* modules and utilities */
-const path = require('path');
 const fs = require('fs');
 
 /* FilesystemWatcher */
@@ -47,6 +46,8 @@ class FilesystemWatcher {
     this.fpath = fpath;
     this.options = options;
     this.callback = callback;
+    // declare fpath basename
+    this.fbase = require('path').basename(fpath);
     // declare initialization error count
     this._ecount = this._ecount || 0;
     try { // try ... perform initial stat of path
@@ -103,7 +104,7 @@ class FilesystemWatcher {
   } // end handleWatch...
 
   handleUnwatch (eventType, filename) {
-    if (eventType === 'rename' && filename === path.basename(this.fpath)) {
+    if (eventType === 'rename' && filename === this.fbase) {
       this.log('STAT', 'reinitializing in 1 second...');
       this._timeout = setTimeout(this.init.bind(this), 1000);
       return true; // watch reinitialization
@@ -124,23 +125,23 @@ class FilesystemWatcher {
   log (type, message, error) {
     if (error) this.error(type, error);
     return console.log(
-      `// WATCHER${type ? ` ${type}` : ''}: ${this.fpath}, ${message}`
+      `// WATCHER${type ? ` ${type}` : ''}: ${this.fbase}, ${message}`
     ); // end return...
   } // end log...
 
   error (type, message) {
     return console.error(
-      `// WATCHER${type ? ` ${type}` : ''} ERROR: ${this.fpath}, ${message}`
+      `// WATCHER${type ? ` ${type}` : ''} ERROR: ${this.fbase}, ${message}`
     ); // end return...
   } // end error...
 
   cleanup () {
     if (this._watch) {
-      console.log(`// CLEANUP: terminating watch on ${this.fpath} watch...`);
+      console.log(`// CLEANUP: terminating watch on ${this.fbase}...`);
       this._watch.close();
     } // end _watch cleanup
     if (this._timeout) {
-      console.log(`// CLEANUP: terminating ${this.fpath} watcher timeout...`);
+      console.log(`// CLEANUP: terminating watch timeout for ${this.fbase}...`);
       clearTimeout(this._timeout);
     } // end _timeout cleanup
   } // end cleanup...
