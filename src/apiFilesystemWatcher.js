@@ -69,13 +69,11 @@ class FilesystemWatcher {
     if (errstat) { // handle immediate stat error
       if (errstat.code === 'ENOENT') { // acknowledge ENOENT errors
         this.log('STAT', `ENOENT ${eventType} event on ${filename}`);
-        if (eventType === 'rename' && filename === path.basename(this.fpath)) {
-          this.log('STAT', 'reinitializing in 1 second...');
-          this._timeout = setTimeout(this.init.bind(this), 1000);
-        } // end if (eventType === 'rename'...
+        this.handleUnwatch(eventType, filename); // unnecessary return
       } else this.error('STAT', `-> ${filename}, ${errstat}`);
-    } else { // handle successful stat result
-      switch (true) { // handle Dirent type
+    } else if (!this.handleUnwatch(eventType, filename)) {
+      // handle successful stat result
+      switch (true) { // check Dirent type
         case stats.isDirectory():
           if (eventType === 'init') {
             const options = { withFileTypes: true };
@@ -103,6 +101,15 @@ class FilesystemWatcher {
   handleWatch (eventType, filename) {
     fs.stat(this.fpath, this.handleStat.bind(this, eventType, filename));
   } // end handleWatch...
+
+  handleUnwatch (eventType, filename) {
+    if (eventType === 'rename' && filename === path.basename(this.fpath)) {
+      this.log('STAT', 'reinitializing in 1 second...');
+      this._timeout = setTimeout(this.init.bind(this), 1000);
+      return true; // watch reinitialization
+    } // end if (eventType === 'rename'...
+    return false; // watch ok
+  } // end handleUnwatch...
 
   handleDir (error, statsArray) {
     if (error) this.error('READDIR', error);
