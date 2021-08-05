@@ -73,8 +73,8 @@ const Db = {
     return Client.db().collection(cName);
   },
   insert: async (cName, docs) => {
-    const fid = fidFormat('Db.insert', cName, docs);
-    const col = await Db._collection(cName, fid);
+    // const fid = fidFormat('Db.insert', cName, docs);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'insert documents...');
     const cmd = Array.isArray(docs)
       ? await col.insertMany(docs)
@@ -83,8 +83,8 @@ const Db = {
     return cmd.result.n;
   },
   find: async (cName, query, options = {}) => {
-    const fid = fidFormat('Db.find', cName, query, options);
-    const col = await Db._collection(cName, fid);
+    // const fid = fidFormat('Db.find', cName, query, options);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
@@ -95,8 +95,8 @@ const Db = {
     return cursor;
   },
   findOne: async (cName, query, options = {}) => {
-    const fid = fidFormat('Db._oneFind', cName, query, options);
-    const col = await Db._collection(cName, fid);
+    // const fid = fidFormat('Db._oneFind', cName, query, options);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'force unnatural sort (desc)...');
     Object.assign(options, { sort: { _id: -1 } });
     // console.debug(fid, 'query applied;', JSON.stringify(query));
@@ -107,8 +107,8 @@ const Db = {
     return doc;
   },
   has: async (cName, ...args) => {
-    const fid = fidFormat('Db.has', cName, ...args);
-    const col = await Db._collection(cName, fid);
+    // const fid = fidFormat('Db.has', cName, ...args);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'determine _id for query...');
     const query = { _id: Db.util.id[cName](...args) };
     // console.debug(fid, 'count documents...');
@@ -118,14 +118,14 @@ const Db = {
     return count;
   },
   stream: async (cName, pipeline = [], options = {}) => {
-    const fid = fidFormat('Db.stream', cName, pipeline, options);
-    const col = await Db._collection(cName, fid);
+    /// const fid = fidFormat('Db.stream', cName, pipeline, options);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'obtain change stream...');
     return col.watch(pipeline, options);
   },
   update: async (cName, update, query, options) => {
-    const fid = fidFormat('Db.update', cName, update, query);
-    const col = await Db._collection(cName, fid);
+    // const fid = fidFormat('Db.update', cName, update, query);
+    const col = await Db._collection(cName);
     // console.debug(fid, 'update documents...');
     const cmd = Array.isArray(update)
       ? await col.updateMany(query, update, options)
