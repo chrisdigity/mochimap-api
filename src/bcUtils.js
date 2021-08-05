@@ -124,29 +124,36 @@ const processLedger = async (block, srcdir) => {
 const processTransactions = async (block) => {
   if (process.env.DISABLEBCTRANSACTIONS) return;
   // expose bnum, bhash and stime from block data
-  const { bnum, bhash, stime } = block;
+  const { bnum, bhash, stime, maddr, mreward } = block;
   const _bid = Db.util.id.block(bnum, bhash);
   // obtain and format transactions in transactionArray
   const { transactions } = block;
-  const queryArray =
-    transactions.map((txe) => ({ _id: Db.util.id.mempool(txe.txid) }));
-  let transactionArray = block.transactions.map(txe => {
+  let transactionJSON = transactions.map(txe => {
     // prepend _id, stime, bnum and bhash to minified txe
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
   });
+  const operations = transactions.map((txe) => ({
+    replaceOne: { // prepend _id, stime, bnum and bhash to minified txe
+      filter: { _id: Db.util.id.mempool(txe.txid) },
+      replacement: { _id, stime, bnum, bhash, ...txe.toJSON(true) },
+      upsert: true
+    }
+  }));
   // push mining reward as extra transaction
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
-  transactionArray.push(Object.assign({ _id, stime, bnum, bhash }, txe));
+  const doc = { _id, stime, bnum, bhash, maddr: maddr.slice(0, 64), mreward };
+  transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
+  operations.push({ insertOne: { document: doc } });
   // filter BigInt from transactionArray
-  transactionArray = Db.util.filterBigInt(transactionArray);
+  transactionJSON = Db.util.filterBigInt(transactionJSON);
   // log database insert; array of ledger balance deltas
-  const res = await Db.insert('transaction', transactionArray);
+  const res = await Db.insert('transaction', transactionJSON);
   console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Transaction');
 
   const memres =
-    await Db.update('mempool', transactionArray, queryArray, { upsert: true });
+    await Db.bulk('mempool', Db.util.filterBigInt(operations));
   console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), memres, 'x MemPool');
 };
 
