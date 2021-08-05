@@ -126,8 +126,11 @@ const processTransactions = async (block) => {
   // expose bnum, bhash and stime from block data
   const { bnum, bhash, stime } = block;
   const _bid = Db.util.id.block(bnum, bhash);
-  // obtain and format transactions in transactionJSON
-  let transactionJSON = block.transactions.map(txe => {
+  // obtain and format transactions in transactionArray
+  const { transactions } = block;
+  const queryArray =
+    transactions.map((txe) => ({ _id: Db.util.id.mempool(txe.txid) }));
+  let transactionArray = block.transactions.map(txe => {
     // prepend _id, stime, bnum and bhash to minified txe
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
@@ -135,12 +138,16 @@ const processTransactions = async (block) => {
   // push mining reward as extra transaction
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
-  transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
-  // filter BigInt from transactionJSON
-  transactionJSON = Db.util.filterBigInt(transactionJSON);
+  transactionArray.push(Object.assign({ _id, stime, bnum, bhash }, txe));
+  // filter BigInt from transactionArray
+  transactionArray = Db.util.filterBigInt(transactionArray);
   // log database insert; array of ledger balance deltas
-  const res = await Db.insert('transaction', transactionJSON);
+  const res = await Db.insert('transaction', transactionArray);
   console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Transaction');
+
+  const memres =
+    await Db.update('mempool', transactionArray, queryArray, { upsert: true });
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), memres, 'x MemPool');
 };
 
 const processHaikuVisualization = async (block) => {
