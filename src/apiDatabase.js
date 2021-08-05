@@ -72,6 +72,14 @@ const Db = {
     // console.debug(fid, 'fetch collection...');
     return Client.db().collection(cName);
   },
+  bulk: async (cName, operations, options = {}) => {
+    // const fid = fidFormat('Db.bulk', cName, operations);
+    const col = await Db._collection(cName);
+    // console.debug(fid, 'perform operations...');
+    const cmd = col.bulkWrite(operations, options);
+    // console.debug(fid, cmd.result.n, 'operations succeeded!');
+    return cmd.result.n;
+  },
   insert: async (cName, docs) => {
     // const fid = fidFormat('Db.insert', cName, docs);
     const col = await Db._collection(cName);
@@ -127,18 +135,7 @@ const Db = {
     // const fid = fidFormat('Db.update', cName, update, query);
     const col = await Db._collection(cName);
     // console.debug(fid, 'update documents...');
-    let cmd;
-    if (Array.isArray(update)) {
-      if (Array.isArray(query) && update.length === query.length) {
-        cmd = await col.bulkWrite(update.map((doc, index) => ({
-          updateOne: {
-            filter: query[index],
-            update: { $set: update[index] },
-            ...options
-          }
-        })));
-      } else cmd = await col.updateMany(query, update, options);
-    } else await col.updateOne(query, update, options);
+    const cmd = await col.updateOne(query, update, options);
     // console.debug(fid, cmd.result.n, 'documents updated!');
     return cmd.result.n;
   },
