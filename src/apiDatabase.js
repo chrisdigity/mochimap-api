@@ -123,13 +123,22 @@ const Db = {
     // console.debug(fid, 'obtain change stream...');
     return col.watch(pipeline, options);
   },
-  update: async (cName, update, query, options) => {
+  update: async (cName, update, query, options = {}) => {
     // const fid = fidFormat('Db.update', cName, update, query);
     const col = await Db._collection(cName);
     // console.debug(fid, 'update documents...');
-    const cmd = Array.isArray(update)
-      ? await col.updateMany(query, update, options)
-      : await col.updateOne(query, update, options);
+    let cmd;
+    if (Array.isArray(update)) {
+      if (Array.isArray(query) && update.length === query.length) {
+        cmd = await col.bulkWrite(update.map((doc, index) => ({
+          updateOne: {
+            filter: query[index],
+            update: { $set: update[index] },
+            ...options
+          }
+        })));
+      } else cmd = await col.updateMany(query, update, options);
+    } else await col.updateOne(query, update, options);
     // console.debug(fid, cmd.result.n, 'documents updated!');
     return cmd.result.n;
   },
