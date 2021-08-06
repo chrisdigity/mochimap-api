@@ -84,14 +84,14 @@ const fileHandler = async (stats, eventType) => {
         try { // update database with transaction entry
           if (!(await Db.has('transaction', -1, -1, txid))) {
             const updateArgs = [ // arguments for Db.update operation
-              Db.util.filterBigInt({ // BigInt filtered update
+              Db.util.filterBigInt({ // [BigInt filtered update, query, options]
                 $setOnInsert: { _id, ...txentry.toJSON(true) }
                 /* Using a $setOnInsert update in this manner allows us to
                  * avoid an uncontrolled condition where a memProcessor synced
                  * to a node from one server inserts an unconfirmed transaction
                  * AFTER the same confirmed transaction is inserted by a
                  * bcProcessor synced to a node from another server. */
-              }), { txid }, { upsert: true } // query and options
+              }), { txid }, { upsert: true, collation: { locale: 'simple' } }
             ]; // setOnInsert txentry JSON to transaction database
             if (await Db.updateAll('transaction', ...updateArgs)) {
               console.log('TxID', txid.slice(0, 8), 'processed!');
