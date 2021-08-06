@@ -135,10 +135,11 @@ const processTransactions = async (block) => {
   });
   const operations = transactions.map((txe) => {
     // prepend _id, stime, bnum and bhash to minified txe
-    const _id = Db.util.id.mempool(-1, -1, txe.txid);
+    const _txid = Db.util.id.mempool(-1, -1, txe.txid);
+    const _id = Db.util.id.mempool(bnum, bhash, txe.txid);
     return {
       replaceOne: {
-        filter: { _id },
+        filter: { _id: _txid },
         replacement: { _id, stime, bnum, bhash, ...txe.toJSON(true) },
         upsert: true
       }
