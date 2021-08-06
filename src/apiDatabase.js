@@ -178,7 +178,7 @@ const Db = {
           bhash = bhash.slice(0, 16).padStart(16, '0');
         } else if (typeof bhash === 'number' || typeof bhash === 'bigint') {
           // console.debug('Db.util.id.block: force 64-bit hex bhash');
-          bhash = asUint64String(bnum);
+          bhash = asUint64String(bhash);
         }
         return [bnum, bhash].join('-');
       },
