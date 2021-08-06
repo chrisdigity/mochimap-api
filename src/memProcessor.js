@@ -47,8 +47,9 @@ const Watcher = new FilesystemWatcher();
 
 /* routines */
 const fileHandler = async (stats, eventType) => {
-  // ignore 'rename' events or events missing stats object
-  if (!stats || eventType === 'rename') return;
+  // 'rename' events trigger MEMPOS reset ONLY; events missing stats are ignored
+  if (eventType === 'rename') MEMPOS = 0;
+  if (eventType === 'rename' || !stats) return;
   let filehandle; // declare file handle for reading mempool
   try { // determine if MEMPOOL has valid bytes to read
     const { length } = Mochimo.TXEntry;
@@ -57,42 +58,52 @@ const fileHandler = async (stats, eventType) => {
     if (size < MEMPOS) MEMPOS = 0;
     // ensure mempool has data
     let position = MEMPOS;
-    let remainingBytes = size - position;
+    const remainingBytes = size - position;
     if (remainingBytes) {
       // ensure remainingBytes is valid factor of TXEntry.length
       const invalidBytes = remainingBytes % length;
       if (invalidBytes) { // report error in position or (likely) filesize
         const details = { size, position, remainingBytes, invalidBytes };
-        return console.error(`MEMPOOL invalid, ${JSON.stringify(details)}`);
-      } else MEMPOS = size; // adjust MEMPOS and open mempool for reading
+        throw new Error(`MEMPOOL invalid, ${JSON.stringify(details)}`);
+      } else MEMPOS = size; // adjust MEMPOS to size
+      // obtain mempool filehandle
       filehandle = await fs.promises.open(MEMPOOLPATH);
-      for (; remainingBytes; position += length, remainingBytes -= length) {
-        const buffer = Buffer.alloc(length);
-        // read from filehandle "TXEntry.length" bytes, into buffer
-        const result = await filehandle.read({ buffer, position });
-        if (result.bytesRead === length) { // sufficient bytes were read
-          // build JSON TXEntry
-          const txentry = new Mochimo.TXEntry(result.buffer);
-          const _txid = Db.util.id.mempool(txentry.txid);
-          if (!(await Db.has('mempool', txentry.txid))) {
-            try { // insert txentry JSON in mempool
-              const insertDoc = { _id: _txid, ...txentry.toJSON(true) };
-              await Db.insert('mempool', Db.util.filterBigInt(insertDoc));
-              console.log(_txid.slice(0, 16), ': processed');
-            } catch (error) { console.error(_txid.slice(0, 16), error); }
-          } else console.log(_txid.slice(0, 16), 'already processed');
-        } else { // otherwise, report error in read result
-          const details = { MEMPOS, result };
-          console.error('insufficient txentry bytes,', JSON.stringify(details));
-        } // end if (result.bytesRead...
-      } // end for (; remainingBytes...
+      // read chunk of data into buffer
+      const buffer = Buffer.alloc(remainingBytes);
+      const result = filehandle.read({ buffer, position });
+      // ensure sufficient bytes were read
+      if (result.bytesRead !== remainingBytes) {
+        const details = JSON.stringify({ position, result });
+        throw new Error(`Insufficient Mempool bytes read, ${details}`);
+      } // interpret 'length' segments of bytes as TXEntry's
+      for (position = 0; position < remainingBytes; position += length) {
+        const txebuffer = result.buffer.slice(position, position + length);
+        const txentry = new Mochimo.TXEntry(txebuffer);
+        const txid = txentry.txid;
+        const _id = Db.util.id.transaction(-1, -1, txid);
+        try { // update database with transaction entry
+          if (!(await Db.has('mempool', -1, -1, txid))) {
+            const updateArgs = [ // arguments for Db.update operation
+              Db.util.filterBigInt({ // BigInt filtered update
+                $setOnInsert: { _id, ...txentry.toJSON(true) }
+                /* Using a $setOnInsert update in this manner allows us to
+                 * avoid an uncontrolled condition where a memProcessor synced
+                 * to a node from one server inserts an unconfirmed transaction
+                 * AFTER the same confirmed transaction is inserted by a
+                 * bcProcessor synced to a node from another server. */
+              }), { txid }, { upsert: true } // query and options
+            ]; // setOnInsert txentry JSON to transaction database
+            if (await Db.update('mempool', ...updateArgs)) {
+              console.log('TxID', txid.slice(0, 8), 'processed!');
+            } else console.log('TxID', txid.slice(0, 8), 'denied...');
+          } else console.log('TxID', txid.slice(0, 8), 'already exists...');
+        } catch (error) { console.error(txid.slice(0, 8), error); }
+      } // end for (position...
     } // end if (remainingBytes...
-  } catch (error) {
-    // trace error for troubleshooting
+  } catch (error) { // trace error for troubleshooting
     console.trace(error);
-  } finally {
-    // ensure filehandle is closed after use
-    if (filehandle) await filehandle.close();
+  } finally { // ensure filehandle is closed after use
+    if (filehandle) filehandle.close();
   } // end try... catch... finally...
 }; // end const fileHandler...
 
