@@ -133,18 +133,17 @@ const processTransactions = async (block) => {
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
   });
-  const operations = transactions.map((txe) => {
-    // prepend _id, stime, bnum and bhash to minified txe
-    const _txid = Db.util.id.mempool(-1, -1, txe.txid);
-    const _id = Db.util.id.mempool(bnum, bhash, txe.txid);
-    return {
-      replaceOne: {
-        filter: { _id: _txid },
-        replacement: { _id, stime, bnum, bhash, ...txe.toJSON(true) },
-        upsert: true
-      }
+  const operations = [...transactions.map((txe) => {
+    // insert transaction as minified txe...
+    const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
+    return { // ... prepended with _id, stime, bnum and bhash
+      insertOne: { document: { _id, stime, bnum, bhash, ...txe.toJSON(true) } }
     };
-  });
+  }), ...transactions.map((txe) => {
+    // delete mempool recorded transactions found in this block
+    const _id = Db.util.id.mempool(-1, -1, txe.txid);
+    return { deleteOne: { filter: { _id } } };
+  })];
   // push mining reward as extra transaction
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
