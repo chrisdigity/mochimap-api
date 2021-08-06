@@ -93,7 +93,7 @@ const fileHandler = async (stats, eventType) => {
                  * bcProcessor synced to a node from another server. */
               }), { txid }, { upsert: true } // query and options
             ]; // setOnInsert txentry JSON to transaction database
-            if (await Db.update('transaction', ...updateArgs)) {
+            if (await Db.updateAll('transaction', ...updateArgs)) {
               console.log('TxID', txid.slice(0, 8), 'processed!');
             } else console.log('TxID', txid.slice(0, 8), 'denied...');
           } else console.log('TxID', txid.slice(0, 8), 'already exists...');
