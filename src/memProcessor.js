@@ -91,9 +91,9 @@ const fileHandler = async (stats, eventType) => {
                  * to a node from one server inserts an unconfirmed transaction
                  * AFTER the same confirmed transaction is inserted by a
                  * bcProcessor synced to a node from another server. */
-              }), { txid }, { upsert: true, collation: { locale: 'simple' } }
+              }), { txid }, { upsert: true }
             ]; // setOnInsert txentry JSON to transaction database
-            if (await Db.updateAll('transaction', ...updateArgs)) {
+            if (await Db.update('transaction', ...updateArgs)) {
               console.log('TxID', txid.slice(0, 8), 'processed!');
             } else console.log('TxID', txid.slice(0, 8), 'denied...');
           } else console.log('TxID', txid.slice(0, 8), 'already exists...');
