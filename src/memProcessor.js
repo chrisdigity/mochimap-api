@@ -70,7 +70,7 @@ const fileHandler = async (stats, eventType) => {
       filehandle = await fs.promises.open(MEMPOOLPATH);
       // read chunk of data into buffer
       const buffer = Buffer.alloc(remainingBytes);
-      const result = filehandle.read({ buffer, position });
+      const result = await filehandle.read({ buffer, position });
       // ensure sufficient bytes were read
       if (result.bytesRead !== remainingBytes) {
         const details = JSON.stringify({ position, result });
@@ -103,7 +103,7 @@ const fileHandler = async (stats, eventType) => {
   } catch (error) { // trace error for troubleshooting
     console.trace(error);
   } finally { // ensure filehandle is closed after use
-    if (filehandle) filehandle.close();
+    if (filehandle) await filehandle.close();
   } // end try... catch... finally...
 }; // end const fileHandler...
 
