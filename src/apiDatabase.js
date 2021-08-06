@@ -185,7 +185,7 @@ const Db = {
       ledger: (bnum, bhash, addr) => {
         return [Db.util.id.block(bnum, bhash), addr].join('-');
       },
-      mempool: (txid) => txid,
+      mempool: (...args) => Db.util.id.transaction(...args),
       network: (ip, category) => {
         const agg = [...ip.split('.')];
         if (typeof category !== 'undefined') agg.push(category); // optional
