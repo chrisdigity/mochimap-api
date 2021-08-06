@@ -133,32 +133,32 @@ const processTransactions = async (block) => {
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return Object.assign({ _id, stime, bnum, bhash }, txe.toJSON(true));
   });
-  const operations = [...transactions.map((txe) => {
-    // insert transaction as minified txe...
-    const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
-    return { // ... prepended with _id, stime, bnum and bhash
-      insertOne: { document: { _id, stime, bnum, bhash, ...txe.toJSON(true) } }
-    };
-  }), ...transactions.map((txe) => {
-    // delete mempool recorded transactions found in this block
+  const confirmed = transactions.map((txe) => {
+    // insert as minified txe prepended with _id, stime, bnum and bhash
+    const _id = Db.util.id.mempool(bnum, bhash, txe.txid);
+    return { _id, stime, bnum, bhash, ...txe.toJSON(true) };
+  });
+  const unconfirmed = transactions.map((txe) => {
+    // delete memProcessor recorded transactions found in this block
     const _id = Db.util.id.mempool(-1, -1, txe.txid);
     return { deleteOne: { filter: { _id } } };
-  })];
+  });
   // push mining reward as extra transaction
   const txe = { dstaddr: block.maddr.slice(0, 64), sendtotal: block.mreward };
   const _id = Db.util.id.block(bnum, bhash) + '-mreward';
-  const doc = { _id, stime, bnum, bhash, maddr: maddr.slice(0, 64), mreward };
   transactionJSON.push(Object.assign({ _id, stime, bnum, bhash }, txe));
-  operations.push({ insertOne: { document: doc } });
+  const doc = { _id, stime, bnum, bhash, maddr: maddr.slice(0, 64), mreward };
+  confirmed.push(doc);
   // filter BigInt from transactionArray
   transactionJSON = Db.util.filterBigInt(transactionJSON);
   // log database insert; array of ledger balance deltas
   const res = await Db.insert('transaction', transactionJSON);
   console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Transaction');
 
-  const memres =
-    await Db.bulk('mempool', Db.util.filterBigInt(operations));
-  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), memres, 'x MemPool');
+  const conres = await Db.insert('mempool', Db.util.filterBigInt(confirmed));
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), conres, 'x Confirmed Txs (mempool)');
+  await Db.bulk('mempool', Db.util.filterBigInt(unconfirmed));
+  console.log(_bid.replace(/^0{0,15}/, '0x').slice(0, -8), -(unconfirmed.length), 'x Unconfirmed Txs (mempool)');
 };
 
 const processHaikuVisualization = async (block) => {
