@@ -82,7 +82,7 @@ const fileHandler = async (stats, eventType) => {
         const txid = txentry.txid;
         const _id = Db.util.id.transaction(-1, -1, txid);
         try { // update database with transaction entry
-          if (!(await Db.has('mempool', -1, -1, txid))) {
+          if (!(await Db.has('transaction', -1, -1, txid))) {
             const updateArgs = [ // arguments for Db.update operation
               Db.util.filterBigInt({ // BigInt filtered update
                 $setOnInsert: { _id, ...txentry.toJSON(true) }
@@ -93,7 +93,7 @@ const fileHandler = async (stats, eventType) => {
                  * bcProcessor synced to a node from another server. */
               }), { txid }, { upsert: true } // query and options
             ]; // setOnInsert txentry JSON to transaction database
-            if (await Db.update('mempool', ...updateArgs)) {
+            if (await Db.update('transaction', ...updateArgs)) {
               console.log('TxID', txid.slice(0, 8), 'processed!');
             } else console.log('TxID', txid.slice(0, 8), 'denied...');
           } else console.log('TxID', txid.slice(0, 8), 'already exists...');
