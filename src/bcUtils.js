@@ -124,22 +124,18 @@ const processLedger = async (block, srcdir) => {
 const processTransactions = async (block) => {
   if (process.env.DISABLEBCTRANSACTIONS) return;
   // expose bnum, bhash and stime from block data
-  const { bnum, bhash, stime, mreward, transactions } = block;
-  const maddr = block.maddr.slice(0, 64);
+  const { bnum, bhash, stime, transactions } = block;
   // format transactions as array of delete operations for unconfirmed
   const unconfirmed = transactions.map((txe) => {
     // delete memProcessor recorded transactions found in this block
     const _id = Db.util.id.transaction(-1, -1, txe.txid);
     return { deleteOne: { filter: { _id } } };
   }); // format transactions as array of insert operations for confirmed
-  const _id = Db.util.id.transaction(bnum, bhash, 'mreward');
-  const confirmed = [{ // include maddr and mreward as special transaction
-    _id, stime, bnum, bhash, maddr: maddr.slice(0, 64), mreward
-  }, ...transactions.map((txe) => {
+  const confirmed = transactions.map((txe) => {
     // insert as minified txe prepended with _id, stime, bnum and bhash
     const _id = Db.util.id.transaction(bnum, bhash, txe.txid);
     return { _id, stime, bnum, bhash, ...txe.toJSON(true) };
-  })]; // declare logging constants
+  }); // declare logging constants
   const _bidRegex = /^0{0,15}(.*).{8}$/;
   const _bid = Db.util.id.block(bnum, bhash).replace(_bidRegex, '0x$1');
   // execute and log confirmed transaction insertMany operation
