@@ -76,11 +76,9 @@ const Db = {
     // const fid = fidFormat('Db.bulk', cName, operations);
     const col = await Db._collection(cName);
     // console.debug(fid, 'perform operations...');
-    const cmd = col.bulkWrite(operations, options);
-    const { insertedCount, modifiedCount, deletedCount } = cmd;
-    const succeeded = (insertedCount + modifiedCount + deletedCount);
-    // console.debug(fid, succeeded, 'operations succeeded!');
-    return succeeded;
+    col.bulkWrite(operations, options);
+    // console.debug(fid, 'operations succeeded!');
+    return 1;
   },
   insert: async (cName, docs) => {
     // const fid = fidFormat('Db.insert', cName, docs);
