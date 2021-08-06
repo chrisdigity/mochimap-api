@@ -173,8 +173,13 @@ const Db = {
           // console.debug('Db.util.id.block: force 64-bit hex bnum');
           bnum = asUint64String(bnum);
         }
-        // console.debug('Db.util.id.blockforce 16 char bhash');
-        bhash = bhash.slice(0, 16).padStart(16, '0');
+        if (typeof bhash === 'string') {
+          // console.debug('Db.util.id.blockforce 16 char bhash');
+          bhash = bhash.slice(0, 16).padStart(16, '0');
+        } else if (typeof bhash === 'number' || typeof bhash === 'bigint') {
+          // console.debug('Db.util.id.block: force 64-bit hex bhash');
+          bhash = asUint64String(bnum);
+        }
         return [bnum, bhash].join('-');
       },
       ledger: (bnum, bhash, addr) => {
