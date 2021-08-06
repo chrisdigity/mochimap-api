@@ -134,10 +134,20 @@ const Db = {
   update: async (cName, update, query, options = {}) => {
     // const fid = fidFormat('Db.update', cName, update, query);
     const col = await Db._collection(cName);
-    // console.debug(fid, 'update documents...');
+    // console.debug(fid, 'update document...');
     const cmd = await col.updateOne(query, update, options);
-    // console.debug(fid, cmd.result.n, 'documents updated!');
-    return cmd.result.n;
+    const count = cmd.modifiedCount + cmd.upsertedCount;
+    // console.debug(fid, count, 'documents updated!');
+    return count;
+  },
+  updateAll: async (cName, update, query, options = {}) => {
+    // const fid = fidFormat('Db.update', cName, update, query);
+    const col = await Db._collection(cName);
+    // console.debug(fid, 'update all documents...');
+    const cmd = await col.updateMany(query, update, options);
+    const count = cmd.modifiedCount + cmd.upsertedCount;
+    // console.debug(fid, count, 'documents updated!');
+    return count;
   },
   util: {
     dotNotationUpdateExpression: (obj, depth = 0, keychain = '') => {
