@@ -181,13 +181,14 @@ const processHaikuVisualization = async (block) => {
   const search = haiku.match(/((?<=[ ]))\w+((?=\n)|(?=\W+\n)|(?=\s$))/g);
   const query = search.join('%20');
   const data = { img: { haiku, shadow } };
-  let res;
-  try { // request results from Pexels
-    res = process.env.PEXELS ? await readWeb({
+  try { // build Pexels options
+    const pexelsOptions = {
       hostname: 'api.pexels.com',
       path: `/v1/search?query=${query}&per_page=80`,
       headers: { Authorization: process.env.PEXELS }
-    }) : {}; // apply algorithm or throw error
+    }; // request results from Pexels
+    const res = process.env.PEXELS ? await readWeb(pexelsOptions) : {};
+    // apply algorithm or throw error
     if (res.photos && res.photos.length) {
       const sol = algo(haiku, res.photos, 'url');
       if (!data.sol || data.sol.ps > sol.ps) {
@@ -202,12 +203,14 @@ const processHaikuVisualization = async (block) => {
       }
     } else throw new Error(res.error || 'no "photos" in results');
   } catch (error) { console.trace('Pexels request ERROR:', error); }
-  try { // request results from Unsplash
-    res = process.env.UNSPLASH ? await readWeb({
+  try { // build Unsplash options
+    const unsplashOptions = {
       hostname: 'api.unsplash.com',
       path: `/search/photos?query=${query}&per_page=30`,
       headers: { Authorization: 'Client-ID ' + process.env.UNSPLASH }
-    }) : {}; // apply algorithm or throw error
+    }; // request results from Unsplash
+    const res = process.env.UNSPLASH ? await readWeb(unsplashOptions) : {};
+    // apply algorithm or throw error
     if (res.results && res.results.length) {
       const sol = algo(haiku, res.results, 'description', 'alt_description');
       if (!data.sol || data.sol.ps > sol.ps) {
@@ -228,7 +231,7 @@ const processHaikuVisualization = async (block) => {
   // apply atomic operators to document update
   const haikuUpdate = { $set: data };
   // log database update; haiku visualization data block update
-  res = await Db.update('block', haikuUpdate, { _id });
+  const res = await Db.update('block', haikuUpdate, { _id });
   console.log(_id.replace(/^0{0,15}/, '0x').slice(0, -8), res, 'x Haiku');
 };
 
