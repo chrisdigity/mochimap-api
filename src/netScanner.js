@@ -154,7 +154,9 @@ const Scanner = {
     // add ip to _scanning, or bail to avoid overlapping requests
     if (Scanner._scanning.has(ip)) return; else Scanner._scanning.add(ip);
     // obtain relative offsets and previous node state
-    const updateOffset = Date.now() - INTERVAL.update; // calc update offset
+    const now = Date.now();
+    const updateOffset = now - INTERVAL.update; // calc update offset
+    const hostOffset = now - ms.week; // calc host offset
     const cachedNode = Scanner._cache.get(ip);
     // check for outdated node state
     if (!cachedNode || cachedNode.timestamp < updateOffset) {
@@ -191,6 +193,20 @@ const Scanner = {
       node = Object.assign({ host: { ip, port } }, node);
       delete node.port;
       delete node.ip;
+      /* check for outdated host data on cached state */
+      if (!cachedNode || cachedNode.host.timestamp < hostOffset) {
+        if (process.env.IPINFOTOKEN) {
+          // build host data request source
+          let hostSource = 'https://ipinfo.io/' + ip;
+          hostSource += '/json?token=' + process.env.IPINFOTOKEN;
+          const host = await readWeb(hostSource);
+          if (typeof host === 'object') {
+            delete host.ip; // not needed
+            Object.assign(host, { timestamp: now });
+            Object.assign(node, { host }); // apply host data to node
+          } else console.error('// ERROR: data was not json', hostSource);
+        }
+      }
       try { // add _id and filter BigInt
         const _id = Db.util.id.network(ip);
         node = Object.assign({ _id }, Db.util.filterBigInt(node));
@@ -203,21 +219,6 @@ const Scanner = {
           Db.update('network', { $set: node }, { _id }, { upsert: true });
         } else await Db.insert('network', node);
       } catch (error) { console.log(ip, 'database error;', error); }
-      /* check for outdated host data on cached state
-      // const hostOffset = now - ms.week; // calc host offset
-      if (!cachedNode || cachedNode.host.timestamp < hostOffset) {
-        if (process.env.IPINFOTOKEN) {
-          // build host data request source
-          let hostSource = 'https://ipinfo.io/' + ip;
-          hostSource += '/json?token=' + process.env.IPINFOTOKEN;
-          const host = await readWeb(hostSource);
-          if (typeof host === 'object') {
-            delete host.ip; // not needed
-            Object.assign(host, { timestamp: Date.now() });
-            Object.assign(node, { host }); // apply host data to node
-          } else console.error('// ERROR: data was not json', hostSource);
-        }
-      } */
     }
     // remove ip from lock-list
     Scanner._scanning.delete(ip);
