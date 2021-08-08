@@ -29,11 +29,11 @@ if (typeof process.env.REGION === 'undefined') {
   console.warn('// network region data will not be recorded...');
 }
 
-/* ipinfo token check
+/* ipinfo token check */
 if (typeof process.env.IPINFOTOKEN === 'undefined') {
   console.warn('// WARNING: ipinfo token is undefined');
   console.warn('// host data will not be recorded...');
-} */
+}
 
 /* global BigInt */
 /* eslint no-extend-native: ["error", { "exceptions": ["BigInt"] }] */
@@ -80,7 +80,8 @@ const Scanner = {
       try { // download and decipher data from source
         const sizeBefore = Scanner._recent.size;
         let data = source.startsWith('http')
-          ? await readWeb(source) : await fsp.readFile(source, 'utf8');
+          ? await readWeb(source)
+          : await fsp.readFile(source, 'utf8');
         if (typeof data === 'string') {
           data = (data.match(/(^|(?<=\n))[\w.]+/g) || []);
           data = data.filter(ip => isIPv4(ip) && !isPrivateIPv4(ip));
