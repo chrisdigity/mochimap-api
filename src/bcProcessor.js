@@ -34,18 +34,21 @@ if (typeof process.env.UNSPLASH === 'undefined') {
 }
 
 /* modules and utilities */
-const fs = require('fs');
-const path = require('path');
-const { informedShutdown, ms } = require('./apiUtils');
+const FilesystemWatcher = require('./apiFilesystemWatcher');
 const { processBlock } = require('./bcUtils');
+const path = require('path');
+const fs = require('fs');
 
 /* filesystem configuration */
 const HDIR = require('os').homedir();
 const BCDIR = process.env.BCDIR || path.join(HDIR, 'mochimo', 'bin', 'd', 'bc');
 const ARCHIVEDIR = process.env.ARCHIVEDIR || path.join(HDIR, 'archive');
 
+/* declare watcher instance */
+const Watcher = new FilesystemWatcher();
+
 /* routines */
-const fileHandler = (eventType, filename) => {
+const fileHandler = (stats, eventType, filename) => {
   // accept only 'rename' events where filename extension is '.bc'
   if (filename && filename.endsWith('.bc') && eventType === 'rename') {
     const bcpath = path.join(BCDIR, filename);
@@ -67,49 +70,11 @@ const fileHandler = (eventType, filename) => {
           return fs.promises.writeFile(archivepath, blockdata);
         }).catch((error) => {
           console.error('// ARCHIVE: failure,', filename, '::', error);
-        });
-      }
+        }); // end fs.promises.mkdir... catch...
+      } // end if (blockdata...
     }); // end }).finally...
   } // end if (filename...
 }; // end const fileHandler...
 
-/* watcher */
-const Watcher = {
-  _timeout: undefined,
-  init: () => {
-    // check BCDIR is accessible
-    fs.promises.access(BCDIR).then(() => { // create directory watcher
-      if (!process.env.BCSCANONLY) {
-        fs.watch(BCDIR, fileHandler);
-        console.log('// INIT: watcher started...');
-      }
-      fs.readdir(BCDIR, (err, files) => {
-        if (err) console.error('// INIT: failed to catchup...');
-        else {
-          files.forEach((filename) => fileHandler('rename', filename));
-          console.log('// INIT: catchup executed on', files.length, 'files...');
-        }
-      });
-    }).catch((error) => { // BCDIR is inaccessible, set reinit timout
-      console.error('// INIT:', error);
-      console.error('// INIT: failure, could not access', BCDIR);
-      console.error('// INIT: attempting restart in 60 seconds...');
-      Watcher._timeout = setTimeout(Watcher.init, ms.minute);
-    });
-  } // end init...
-}; // end const Watcher...
-
-/* set cleanup signal traps */
-const cleanup = (e, src) => {
-  if (Watcher._timeout) {
-    console.log('// CLEANUP: terminating watcher timeout...');
-    clearTimeout(Watcher._timeout);
-  }
-  return informedShutdown(e, src);
-};
-process.on('SIGINT', cleanup);
-process.on('SIGTERM', cleanup);
-process.on('uncaughtException', console.trace);
-
 /* initialize watcher */
-Watcher.init();
+Watcher.init(BCDIR, fileHandler);
