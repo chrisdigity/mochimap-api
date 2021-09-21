@@ -30,7 +30,7 @@ if (typeof process.env.REGION === 'undefined') {
 }
 
 /* ipinfo token check */
-if (typeof process.env.IPINFOTOKEN === 'undefined') {
+if (typeof process.env.IPINFO === 'undefined') {
   console.warn('// WARNING: ipinfo token is undefined');
   console.warn('// host data will not be recorded...');
 }
@@ -51,6 +51,7 @@ const {
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
 
+const IPINFOQuery = '/json?token=' + process.env.IPINFO;
 const REGION = process.env.REGION || undefined;
 const STARTLIST = [
   'https://www.mochimap.com/startnodes.lst',
@@ -59,6 +60,7 @@ const STARTLIST = [
   process.env.STARTLIST
 ];
 const INTERVAL = {
+  host: ms.week, // time between IPINFO host information requests
   idle: ms.second * 60, // allowable network communications loss
   monitor: ms.second * 337.5, // target Mochimo block time
   run: ms.second,
@@ -156,68 +158,57 @@ const Scanner = {
     // obtain relative offsets and previous node state
     const now = Date.now();
     const updateOffset = now - INTERVAL.update; // calc update offset
-    const hostOffset = now - ms.week; // calc host offset
-    const cachedNode = Scanner._cache.get(ip);
+    const hostOffset = now - INTERVAL.host; // calc host offset
+    const cachedNode = Scanner._cache.get(ip) || {};
     // check for outdated node state
-    if (!cachedNode || cachedNode.timestamp < updateOffset) {
+    if (!cachedNode.timestamp || cachedNode.timestamp < updateOffset) {
       // build node options and perform peerlist request for latest state
       const nodeOptions = { ip, opcode: Mochimo.OP_GETIPL };
       let node = await Mochimo.Node.callserver(nodeOptions);
-      // obtain latest timestamp from node and determine uptimestamp
-      const { timestamp } = node;
-      let lastVEOK;
-      let uptimestamp = (cachedNode && cachedNode.uptimestamp) || timestamp;
+      // merge node results with cachedNode state
+      node = { ...cachedNode, ...node.toJSON() };
+      // update node uptimestamp and lastVEOK
+      if (!node.uptimestamp) node.uptimestamp = -1;
+      if (!node.lastVEOK) node.lastVEOK = -1;
       if (node.status === Mochimo.VEOK) {
-        if (uptimestamp < 0) uptimestamp = timestamp;
-        lastVEOK = timestamp;
-      } else uptimestamp = -1;
-      // convert node to JSON output and prepend uptimestamp
-      node = Object.assign({ lastVEOK, uptimestamp }, node.toJSON());
-      // update local cache
-      Scanner._cache.set(ip, Object.assign(cachedNode || {}, node));
+        if (node.uptimestamp < 0) node.uptimestamp = node.timestamp;
+        node.lastVEOK = node.timestamp;
+      } else node.uptimestamp = -1;
+      // check for outdated host data on cached state
+      if (process.env.IPINFO) { // ... only if IPINFO token available
+        if (!node.host) node.host = { timestamp: -1 };
+        if (node.host.timestamp < hostOffset) {
+          // build host data request source
+          const host = await readWeb('https://ipinfo.io/' + ip + IPINFOQuery);
+          // apply host data to node or report error with host data
+          if (typeof host === 'object') {
+            node.host = { port: node.port, ...host, timestamp: now };
+          } else console.error('// ERROR: data from IPINFO was not json');
+        }
+      }
+      // update local cache with Object clone
+      Scanner._cache.set(ip, { ...node }); // note; node.host is referenced
       // move connection stats to node.connection[region] object (prepended)
       if (REGION) {
-        const connection = {};
-        const { status, ping, baud } = node;
-        connection[REGION] = { status, ping, baud, timestamp, uptimestamp };
-        node = Object.assign({ connection }, node);
+        const { status, ping, baud, timestamp, uptimestamp } = node;
+        const conn = { status, ping, baud, timestamp, uptimestamp };
+        // place connection parameter after host parameter
+        node = { host: node.host, [`connection.${REGION}`]: conn, ...node };
       }
+      // remove erroneous parameters before database update
       delete node.lastVEOK; // not included in database
       delete node.uptimestamp;
       delete node.timestamp;
       delete node.status;
       delete node.ping;
       delete node.baud;
-      // move host stats to node.host object (prepended)
-      const { port } = node;
-      node = Object.assign({ host: { ip, port } }, node);
       delete node.port;
       delete node.ip;
-      /* check for outdated host data on cached state */
-      if (!cachedNode || cachedNode.host.timestamp < hostOffset) {
-        if (process.env.IPINFOTOKEN) {
-          // build host data request source
-          let hostSource = 'https://ipinfo.io/' + ip;
-          hostSource += '/json?token=' + process.env.IPINFOTOKEN;
-          const host = await readWeb(hostSource);
-          if (typeof host === 'object') {
-            delete host.ip; // not needed
-            Object.assign(host, { timestamp: now });
-            Object.assign(node, { host }); // apply host data to node
-          } else console.error('// ERROR: data was not json', hostSource);
-        }
-      }
-      try { // add _id and filter BigInt
-        const _id = Db.util.id.network(ip);
-        node = Object.assign({ _id }, Db.util.filterBigInt(node));
-        // check appropriate update/insert operation
-        if (cachedNode || await Db.has('network', ip)) {
-          // convert connection object to dot notation before update
-          node['connection.' + REGION] = node.connection[REGION];
-          delete node.connection; // remove obsolete connection property
-          // add atomimc operator $set and asynchronously update database
-          Db.update('network', { $set: node }, { _id }, { upsert: true });
-        } else await Db.insert('network', node);
+      // add _id and filter BigInt
+      const _id = Db.util.id.network(ip);
+      node = { _id, ...Db.util.filterBigInt(node) };
+      try { // add atomimc operator $set and asynchronously update database
+        Db.update('network', { $set: node }, { _id }, { upsert: true });
       } catch (error) { console.log(ip, 'database error;', error); }
     }
     // remove ip from lock-list
