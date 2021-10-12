@@ -34,6 +34,9 @@ const Parse = {
     // network integer conversions
     port: ParseInt,
     status: ParseInt,
+    // richlist integer conversions
+    balance: ParseInt,
+    rank: ParseInt,
     // transaction integer conversions
     sendtotal: ParseInt,
     changetotal: ParseInt,
