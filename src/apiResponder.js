@@ -109,7 +109,7 @@ const Responder = {
     try {
       // check valid parameters
       const valid = [
-        'supply', 'totalsupply', 'maxsupply', 'bhash', 'phash', 'mroot',
+        'circsupply', 'totalsupply', 'maxsupply', 'bhash', 'phash', 'mroot',
         'nonce', 'haiku', 'bnum', 'mfee', 'time0', 'stime', 'blocktime',
         'blocktime_avg', 'tcount', 'tcount_avg', 'tcountpsec',
         'tcountpsec_avg', 'txfees', 'reward', 'mreward', 'difficulty',
@@ -137,7 +137,7 @@ const Responder = {
         const rTrailer = tfile.trailer(tfileCount - 1);
         if (blockNumber < 0 || blockNumber === Number(rTrailer.bnum)) {
           // deconstruct trailers and perform chain calculations
-          let supply;
+          let totalsupply;
           let rewards = 0n;
           let pseudorate = 0;
           let nonNeogenesis = 0;
@@ -161,21 +161,20 @@ const Responder = {
                 hashes += Math.pow(2, trailer.difficulty);
                 rewards += blockReward(bnum) + (mfee * BigInt(tcount));
               } else pseudorate++; // PSEUDO block types
-            } else if (!supply) { // (NEO)GENSIS block types
+            } else if (!totalsupply) { // (NEO)GENSIS block types
               try { // obtain ledger amount from database
                 const query = { _id: Db.util.id.block(bnum, bhash) };
                 const ng = await Db.findOne('block', query);
                 Db.util.filterLong(ng); // ensure long values are BigInt
                 if (ng && ng.amount) { // preform supply calculations
-                  supply = ng.amount + rewards;
+                  totalsupply = ng.amount + rewards;
                   // calculate lost supply and subtract from max supply
-                  const lost = projectedSupply(rTrailer.bnum) - supply;
-                  const totalsupply = projectedSupply() - lost;
+                  const lost = projectedSupply(rTrailer.bnum) - totalsupply;
                   const circsupply = projectedSupply(rTrailer.bnum, 1) - lost;
                   chain = {
-                    circsupply: circsupply / 10e+9,
-                    totalsupply: totalsupply / 10e+9,
-                    maxsupply: projectedSupply() / 10e+9
+                    circsupply: Number(circsupply) / 10e+9,
+                    totalsupply: Number(totalsupply) / 10e+9,
+                    maxsupply: Number(projectedSupply()) / 10e+9
                   };
                 }
               } catch (ignore) {}
