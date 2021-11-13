@@ -311,7 +311,9 @@ const Responder = {
         : Responder._respond(res, { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  unknown: (res, json, code = 200) => Responder._respond(res, json, code),
+  unknown: (res, content = 'OK', code = 200) => {
+    return Responder._respond(res, content, code);
+  },
   unknownInternal: (res, error) => {
     // log error and send alert response
     console.trace(error);
