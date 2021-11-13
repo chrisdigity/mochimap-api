@@ -311,17 +311,17 @@ const Responder = {
         : Responder._respond(res, { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  unknown: (res, json, code = 500) => Responder._respond(res, json, code),
+  unknown: (res, json, code = 200) => Responder._respond(res, json, code),
   unknownInternal: (res, error) => {
     // log error and send alert response
     console.trace(error);
-    const date = new Date();
+    const timestamp = (new Date()).toISOString();
     const message = error || (
       'MochiMap API has encountered an unexpected error. ' +
       'Tag @Chrisdigity on the Mochimo Official Discord, or detail ' +
       'this event @ https://github.com/chrisdigity/mochimap-api/issues'
     );
-    return Responder.unknown(res, { message, timestamp: date.toISOString() });
+    return Responder.unknown(res, { message, timestamp }, 500);
   }
 };
 

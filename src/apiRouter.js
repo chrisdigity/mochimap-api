@@ -146,17 +146,17 @@ const Router = async (req, res) => {
     }
     // ensure route was matched, otherwise respond with 400 and suggest intent
     if (!routeMatch) {
-      return Responder.unknown(res, 400, {
+      return Responder.unknown(res, {
         message: 'The request was not understood' +
           (intent.detected ? `, did you mean ${intent.hint}?` : '. ') +
           'Check https://github.com/chrisdigity/mochimap-api#api-endpoints'
-      });
+      }, 400);
     }
     // ensure route is enabled, otherwise respond with 409
     if (!routeMatch.enabled) {
-      return Responder.unknown(res, 409, {
+      return Responder.unknown(res, {
         message: 'this request is currently disabled, try again later...'
-      });
+      }, 409);
     }
     // ensure acceptable headers were included, otherwise respond with 406
     if (req.headers.accept && routeMatch.headers && routeMatch.headers.accept) {
@@ -169,28 +169,28 @@ const Router = async (req, res) => {
       }
       // check acceptable MIME type was found
       if (i === acceptable.length) {
-        return Responder.unknown(res, 406, {
+        return Responder.unknown(res, {
           message: 'Server was not able to match any MIME types specified in ' +
             'the Accept request HTTP header. To use this resource, please ' +
             'specify one of the following: ' + acceptable.join(', ')
-        });
+        }, 406);
       }
     }
     // if a search query is included, ensure query is valid
     if (search && routeMatch.param instanceof RegExp) {
       if (!routeMatch.param.test(search)) {
-        return Responder.unknown(res, 400, {
+        return Responder.unknown(res, {
           message: 'Invalid search parameters. Check ' +
             'https://github.com/chrisdigity/mochimap-api#api-search-parameters',
           parameters: search
-        });
+        }, 400);
       }
       // add search query as parameter
       params.push(search);
     } else if (routeMatch.paramsRequired) {
-      return Responder.unknown(res, 422, {
+      return Responder.unknown(res, {
         message: 'No stream parameters were specified...'
-      });
+      }, 422);
     }
     // return resulting parameters to handler
     return await routeMatch.handler(res, ...params);
