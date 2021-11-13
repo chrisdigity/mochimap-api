@@ -169,9 +169,14 @@ const Responder = {
                 if (ng && ng.amount) { // preform supply calculations
                   supply = ng.amount + rewards;
                   // calculate lost supply and subtract from max supply
-                  const lostsupply = projectedSupply(rTrailer.bnum) - supply;
-                  const totalsupply = projectedSupply() - lostsupply;
-                  chain = { supply, totalsupply, maxsupply: projectedSupply() };
+                  const lost = projectedSupply(rTrailer.bnum) - supply;
+                  const totalsupply = projectedSupply() - lost;
+                  const circsupply = projectedSupply(rTrailer.bnum, 1) - lost;
+                  chain = {
+                    circsupply: circsupply / 10e+9,
+                    totalsupply: totalsupply / 10e+9,
+                    maxsupply: projectedSupply() / 10e+9
+                  };
                 }
               } catch (ignore) {}
             }

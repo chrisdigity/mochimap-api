@@ -174,7 +174,10 @@ const objectIsEmpty = (obj) => {
   return true;
 };
 
-const projectedSupply = (bnum) => {
+const projectedSupply = (bnum, exclLocked) => {
+  // ... as per https://www.mochiwiki.com/w/index.php/Premine_Disposition
+  const Locked = 1990000000000000n;
+  const LockedEpoch = 1687651200000; // 25th June 2023 GM
   const Instamine = 4757066000000000n; // inclusive of any locked dev coins
   const BigIntMin = (...args) => args.reduce((m, e) => e < m ? e : m);
   const Sn = (n, b1, bn) => {
@@ -185,6 +188,7 @@ const projectedSupply = (bnum) => {
   // Due to hard fork @ 0x4321, formula is split into 3 separate calculations
   let allblocks = 0n;
   let neogen = 0n;
+  let locked = 0n;
   let nn = 0n;
   // 0x1 to 0x4320...
   nn = BigIntMin(0x4320n, bnum); // max 0x4320
@@ -201,8 +205,10 @@ const projectedSupply = (bnum) => {
   allblocks += Sn(bnum > 0x5B400n ? nn - 0x5B400n : 0n, 0x5B401n, nn);
   nn = BigIntMin(0x200000n, bnum) >> 8n << 8n; // max 0x200000
   neogen += Sn(bnum > 0x5B400n ? (nn - 0x5B400n) >> 8n : 0n, 0x5B500n, nn);
-  // return the result of instamine plus all block rewards minus neogen rewards
-  return Instamine + allblocks - neogen;
+  // instamine plus all block rewards minus neogen rewards (minus Locked)*
+  // *where exclLocked is set AND epoch is before LockedEpoch
+  if (exclLocked && Date.now() < LockedEpoch) locked = Locked;
+  return Instamine + allblocks - neogen - locked;
 };
 
 const readWeb = (options, postData) => {
