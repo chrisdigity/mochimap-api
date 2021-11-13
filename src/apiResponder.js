@@ -312,12 +312,12 @@ const Responder = {
     // log error and send alert response
     console.trace(error);
     const date = new Date();
-    Responder.unknown(res, {
-      message: 'MochiMap API has encountered an unexpected error. ' +
-        'Tag @Chrisdigity on the Mochimo Official Discord, or detail ' +
-        'this event @ https://github.com/chrisdigity/mochimap-api/issues',
-      timestamp: date.toISOString()
-    });
+    const message = error || (
+      'MochiMap API has encountered an unexpected error. ' +
+      'Tag @Chrisdigity on the Mochimo Official Discord, or detail ' +
+      'this event @ https://github.com/chrisdigity/mochimap-api/issues'
+    );
+    return Responder.unknown(res, { message, timestamp: date.toISOString() });
   }
 };
 
