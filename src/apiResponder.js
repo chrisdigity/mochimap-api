@@ -46,7 +46,7 @@ const expandResults = async (cursor, options, start) => {
 };
 
 const Responder = {
-  _respond: (res, statusCode, json, statusMessage = false) => {
+  _respond: (res, content, statusCode = 404, statusMessage = '') => {
     if (!statusMessage) {
       switch (statusCode) {
         case 200: statusMessage = 'OK'; break;
@@ -60,20 +60,29 @@ const Responder = {
       }
     }
     // assign error and message properties if required
-    if (statusCode > 299 && !json.error) {
-      json = Object.assign({ error: statusMessage }, json);
+    if (statusCode > 399 && (typeof content === 'object' && !content.error)) {
+      content = Object.assign({ error: statusMessage }, content);
     }
     // process response headers
-    const body = JSON.stringify(json, null, 2) || '';
+    let body, type;
+    if (typeof content === 'object') {
+      body = JSON.stringify(content, null, 2);
+      type = 'application/json';
+    } else {
+      body = String(content);
+      type = 'text/plain';
+    }
     const headers = {
       'X-Robots-Tag': 'none',
       'X-Content-Type-Options': 'nosniff',
       'X-Frame-Options': 'DENY',
       'X-XSS-Protection': '1; mode=block',
       'Referrer-Policy': 'no-referrer',
-      'Content-Type': 'application/json',
+      'Content-Type': type,
       'Content-Length': Buffer.byteLength(body),
-      'Content-Security-Policy': "default-src 'none'; frame-ancestors 'none'",
+      'Content-Security-Policy':
+        "base-uri 'self'; default-src 'none'; form-action 'self'; " +
+        "frame-ancestors 'none'; require-trusted-types-for 'script';",
       'Access-Control-Allow-Origin': '*'
     };
     // send response
@@ -89,18 +98,34 @@ const Responder = {
         query.bnum = Db.util.long(BigInt(blockNumber));
       }
       // perform block query
-      const block = await Db.findOne('block', query);
+      let block = await Db.findOne('block', query);
+      const status = block ? 200 : 404;
+      if (!block) block = { message: `${blockNumber} could not be found...` };
       // send successfull query or 404
-      return Responder._respond(res, block ? 200 : 404, block ||
-        { message: `${blockNumber} could not be found...` });
+      return Responder._respond(res, block, status);
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  chain: async (res, blockNumber, blockHex) => {
+  chain: async (res, blockNumber, blockHex, param) => {
     try {
+      // check valid parameters
+      const valid = [
+        'supply', 'totalsupply', 'maxsupply', 'bhash', 'phash', 'mroot',
+        'nonce', 'haiku', 'bnum', 'mfee', 'time0', 'stime', 'blocktime',
+        'blocktime_avg', 'tcount', 'tcount_avg', 'tcountpsec',
+        'tcountpsec_avg', 'txfees', 'reward', 'mreward', 'difficulty',
+        'difficulty_avg', 'hashrate', 'hashrate_avg', 'pseudorate_avg'
+      ];
+      if (param) {
+        if (!valid.includes(param)) {
+          return Responder._respond(res, {
+            message: `parameter "${param}" is not a valid chain request...`
+          });
+        }
+      }
       let chain;
       const target = 768;
       // convert blockNumber to Number value
-      if (typeof blockNumber === 'undefined') blockNumber = blockHex;
+      if (typeof blockHex === 'undefined') blockNumber = blockHex;
       if (typeof blockNumber === 'undefined') blockNumber = -target;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
@@ -145,8 +170,8 @@ const Responder = {
                   supply = ng.amount + rewards;
                   // calculate lost supply and subtract from max supply
                   const lostsupply = projectedSupply(rTrailer.bnum) - supply;
-                  const maxsupply = projectedSupply() - lostsupply;
-                  chain = { maxsupply, supply };
+                  const totalsupply = projectedSupply() - lostsupply;
+                  chain = { supply, totalsupply, maxsupply: projectedSupply() };
                 }
               } catch (ignore) {}
             }
@@ -175,8 +200,10 @@ const Responder = {
             json.mreward = isNeogenesis ? 0 : json.txfees + json.reward;
             json.difficulty = difficulty;
             json.difficulty_avg = round(difficulties / nonNeogenesis);
-            json.hashrate = json.tcount === 0 ? 0
-              : round(Math.pow(2, difficulty) / json.blocktime);
+            json.hashrate = 0;
+            if (json.tcount > 0) {
+              json.hashrate = round(Math.pow(2, difficulty) / json.blocktime);
+            }
             json.hashrate_avg = round(hashes / hashesTimes);
             json.pseudorate_avg = round(pseudorate / nonNeogenesis);
             // add json trailer data of requested block number to chain request
@@ -184,10 +211,19 @@ const Responder = {
           }
         }
       }
-      // ensure chain was filled
+      // check parameter request
+      if (chain && param) {
+        if (chain[param]) return Responder._respond(res, chain[param], 200);
+        else {
+          return Responder._respond(res, {
+            message: `chain parameter "${param}" is unavailable this block...`
+          });
+        }
+      }
       // send successfull acquisition or 404
-      return Responder._respond(res, chain ? 200 : 404, chain ||
-        { message: 'chain data unavailable...' });
+      return chain
+        ? Responder._respond(res, chain, 200)
+        : Responder._respond(res, { message: 'chain data unavailable...' });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   ledger: async (res, addressType, address) => {
@@ -202,8 +238,11 @@ const Responder = {
         le = { address, addressHash, tag, balance };
       }
       // send successfull query or 404
-      return Responder._respond(res, le ? 200 : 404, le ||
-        { message: `${isTag ? 'tag' : 'wots+'} not found in ledger...` });
+      return le
+        ? Responder._respond(res, le, 200)
+        : Responder._respond(res, {
+          message: `${isTag ? 'tag' : 'wots+'} not found in ledger...`
+        });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   network: async (res, status, ip) => {
@@ -216,20 +255,22 @@ const Responder = {
       if (node && status === 'active') {
         // check for incomplete data
         if (typeof node.connection !== 'object') {
-          Responder.unknownInternal(res,
+          return Responder.unknownInternal(res,
             { message: `${ip} is missing connection object...` });
         }
         // check all available regions
         for (const region of Object.values(node.connection)) {
           if (region.status) { // send 404 if any region returns not OK status
-            return Responder._respond(res, 404,
-              { message: `${ip} node is not OK in all regions...` });
+            return Responder._respond(res, {
+              message: `${ip} node is not OK in all regions...`
+            });
           }
         }
       }
       // send successfull query or 404
-      return Responder._respond(res, node ? 200 : 404, node ||
-        { message: `${ip} could not be found...` });
+      return node
+        ? Responder._respond(res, node, 200)
+        : Responder._respond(res, { message: `${ip} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
   search: async (cName, paged, res, ...args) => {
@@ -243,8 +284,8 @@ const Responder = {
       cursor = await Db.find(cName, search.query, search.options);
       const dbquery = await expandResults(cursor, search.options, start);
       // send succesfull query or 404
-      if (dbquery.results.length) Responder._respond(res, 200, dbquery);
-      else Responder._respond(res, 404, dbquery, 'No results');
+      if (dbquery.results.length) Responder._respond(res, dbquery, 200);
+      else Responder._respond(res, dbquery, 404, 'No results');
     } catch (error) { // send 500 on internal error
       Responder.unknownInternal(res, error);
     } finally { // cleanup cursor
@@ -261,19 +302,20 @@ const Responder = {
       // perform transaction query
       const transaction = await Db.findOne('transaction', { txid });
       // send successfull query or 404
-      return Responder._respond(res, transaction ? 200 : 404, transaction ||
-        { message: `${txid} could not be found...` });
+      return transaction
+        ? Responder._respond(res, transaction, 200)
+        : Responder._respond(res, { message: `${txid} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
   },
-  unknown: (res, code = 200, json = {}) => Responder._respond(res, code, json),
+  unknown: (res, json, code = 500) => Responder._respond(res, json, code),
   unknownInternal: (res, error) => {
     // log error and send alert response
     console.trace(error);
     const date = new Date();
-    Responder.unknown(res, 500, {
+    Responder.unknown(res, {
       message: 'MochiMap API has encountered an unexpected error. ' +
-        'Please try again later.  @ ' +
-        'https://github.com/chrisdigity/api.mochimap.com/issues',
+        'Tag @Chrisdigity on the Mochimo Official Discord, or detail ' +
+        'this event @ https://github.com/chrisdigity/mochimap-api/issues',
       timestamp: date.toISOString()
     });
   }

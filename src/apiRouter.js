@@ -43,23 +43,23 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
-    path: /^\/chain(?:\/(?:([0-9]+)|(0x[0-9a-f]+))?)?$/i,
-    hint: '[BaseURL]/chain/<optional BlockNumber>',
+    path: /^\/chain(?:\/(?:([0-9]+)|(0x[0-9a-f]+))?)?(?:\/([a-z0-9]+)?)?$/i,
+    hint: '[BaseURL]/chain/<optional blocknumber>/<optional parameter>',
     hintCheck: /chain|0x/gi,
     handler: Responder.chain,
     enabled: true
   }, {
     method: 'GET',
     path: /^\/ledger\/(tag|address)\/([0-9a-f]+)$/i,
-    hint: '[BaseURL]/ledger/<"tag" or "address">/<partial Tag or Address>',
-    hintCheck: /ledger|tag|address/gi,
+    hint: '[BaseURL]/ledger/<"tag" or "address">/<public tag or address>',
+    hintCheck: /balance|ledger|tag|address/gi,
     handler: Responder.ledger,
     enabled: true
   }, {
     method: 'GET',
     path: '/ledger/search',
     param: /^[?]?(?:[0-9a-z_.]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z.-]+(?:$|&))+$/i,
-    hint: '[BaseURL]/network/search?<param>=<paramValue>',
+    hint: '[BaseURL]/ledger/search?<param>=<paramValue>',
     hintCheck: /ledger|search/gi,
     handler: Responder.searchLedger,
     enabled: true
@@ -147,8 +147,9 @@ const Router = async (req, res) => {
     // ensure route was matched, otherwise respond with 400 and suggest intent
     if (!routeMatch) {
       return Responder.unknown(res, 400, {
-        message: `The request was not understood, ${intent.detected
-          ? `did you mean ${intent.hint}?` : 'check request...'}`
+        message: 'The request was not understood' +
+          (intent.detected ? `, did you mean ${intent.hint}?` : '. ') +
+          'Check https://github.com/chrisdigity/mochimap-api#api-endpoints'
       });
     }
     // ensure route is enabled, otherwise respond with 409
@@ -179,7 +180,8 @@ const Router = async (req, res) => {
     if (search && routeMatch.param instanceof RegExp) {
       if (!routeMatch.param.test(search)) {
         return Responder.unknown(res, 400, {
-          message: 'invalid search parameters, check request...',
+          message: 'Invalid search parameters. Check ' +
+            'https://github.com/chrisdigity/mochimap-api#api-search-parameters',
           parameters: search
         });
       }
@@ -187,7 +189,7 @@ const Router = async (req, res) => {
       params.push(search);
     } else if (routeMatch.paramsRequired) {
       return Responder.unknown(res, 422, {
-        message: 'stream parameters are REQUIRED, check request...'
+        message: 'No stream parameters were specified...'
       });
     }
     // return resulting parameters to handler
