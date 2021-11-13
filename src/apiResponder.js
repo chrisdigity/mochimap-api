@@ -70,7 +70,7 @@ const Responder = {
       type = 'application/json';
     } else {
       body = String(content);
-      type = 'text/plain';
+      type = 'text/plain; charset=utf-8';
     }
     const headers = {
       'X-Robots-Tag': 'none',
