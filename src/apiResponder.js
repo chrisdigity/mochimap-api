@@ -172,9 +172,9 @@ const Responder = {
                   const lost = projectedSupply(rTrailer.bnum) - totalsupply;
                   const circsupply = projectedSupply(rTrailer.bnum, 1) - lost;
                   chain = {
-                    circsupply: Number(circsupply) / 10e+9,
-                    totalsupply: Number(totalsupply) / 10e+9,
-                    maxsupply: Number(projectedSupply()) / 10e+9
+                    circsupply: Number(circsupply) / 1e+9,
+                    totalsupply: Number(totalsupply) / 1e+9,
+                    maxsupply: Number(projectedSupply()) / 1e+9
                   };
                 }
               } catch (ignore) {}
