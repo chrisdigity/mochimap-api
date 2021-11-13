@@ -118,14 +118,14 @@ const Responder = {
       if (param) {
         if (!valid.includes(param)) {
           return Responder._respond(res, {
-            message: `parameter "${param}" is not a valid chain request...`
+            message: `parameter '${param}' is not a valid chain request...`
           });
         }
       }
       let chain;
       const target = 768;
       // convert blockNumber to Number value
-      if (typeof blockHex === 'undefined') blockNumber = blockHex;
+      if (typeof blockNumber === 'undefined') blockNumber = blockHex;
       if (typeof blockNumber === 'undefined') blockNumber = -target;
       else blockNumber = Number(blockNumber);
       // calculate partial tfile parameters
@@ -216,7 +216,7 @@ const Responder = {
         if (chain[param]) return Responder._respond(res, chain[param], 200);
         else {
           return Responder._respond(res, {
-            message: `chain parameter "${param}" is unavailable this block...`
+            message: `chain parameter '${param}' is unavailable this block...`
           });
         }
       }
