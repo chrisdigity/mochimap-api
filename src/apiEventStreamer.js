@@ -24,7 +24,7 @@ const Db = require('./apiDatabase');
 const MAXCACHE = 5;
 
 // initialize Event types and base properties
-const Events = ['block', 'mempool', 'network'];
+const Events = ['block', 'transaction', 'network'];
 const EventGen = () => ({ cache: [], connections: new Set(), initd: false });
 const Event = Events.reduce((obj, cur) => ({ ...obj, [cur]: EventGen() }), {});
 
@@ -52,10 +52,12 @@ Event.block.handler = (event) => {
   // only stream new block updates
   if (operationType === 'insert') Broadcast(fullDocument, 'block');
 };
-Event.mempool.handler = (event) => {
+Event.transaction.handler = (event) => {
   const { fullDocument, operationType } = event;
-  // only stream new mempool updates
-  if (operationType === 'insert') Broadcast(fullDocument, 'mempool');
+  // only stream new transaction updates with time0 parameter
+  if (operationType === 'insert' && fullDocument.time0) {
+    Broadcast(fullDocument, 'transaction');
+  }
 };
 Event.network.handler = (event) => {
   // expose _id from event.documentKey
@@ -74,10 +76,14 @@ const EventStreamer = {
   connect: async (res, events) => {
     events = Array.from(new URLSearchParams(events).keys());
     // add response reference to appropriate event connection sets
-    events.forEach((event) => Event[event].connections.add(res));
+    events.forEach((event) => {
+      if (Event[event]) Event[event].connections.add(res);
+    });
     // add close event handler to response for removal from connections Set
     res.on('close', () => {
-      events.forEach((event) => Event[event].connections.delete(res));
+      events.forEach((event) => {
+        if (Event[event]) Event[event].connections.delete(res);
+      });
     });
     // write header to response
     res.writeHead(200, {
@@ -125,7 +131,7 @@ const EventStreamer = {
       console.error('// INIT: failed to initialize Watcher');
       console.error('// INIT: ( block / network / transaction ) status');
       console.error('// INIT: (', Event.block.initialized, '/',
-        Event.mempool.initialized, '/', Event.network.initialized, ')');
+        Event.transaction.initialized, '/', Event.network.initialized, ')');
       console.error('// INIT: resuming initialization in 60 seconds...');
       EventStreamer._timer = setTimeout(EventStreamer.init, ms.minute);
     }
