@@ -293,8 +293,8 @@ const Responder = {
       if (results.length) {
         // sort peers by weight, then uptime
         results.sort((a, b) => {
-          const aWeight = BigInt(`0x${a.weight}`);
-          const bWeight = BigInt(`0x${b.weight}`);
+          const aWeight = BigInt(`0x0${a.weight}`);
+          const bWeight = BigInt(`0x0${b.weight}`);
           if (aWeight < bWeight) return 1;
           if (aWeight > bWeight) return -1;
           const upRed = (uptime, region) => {
