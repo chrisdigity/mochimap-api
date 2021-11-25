@@ -17,32 +17,7 @@
  *
  */
 
-const ParseInt = (val) => isNaN(val) ? val : parseInt(val);
 const Parse = {
-  key: {
-    // block integer conversions
-    size: ParseInt,
-    bnum: ParseInt,
-    time0: ParseInt,
-    stime: ParseInt,
-    difficulty: ParseInt,
-    mreward: ParseInt,
-    mfee: ParseInt,
-    amount: ParseInt,
-    tcount: ParseInt,
-    lcount: ParseInt,
-    // network integer conversions
-    port: ParseInt,
-    status: ParseInt,
-    pversion: ParseInt,
-    // richlist integer conversions
-    balance: ParseInt,
-    rank: ParseInt,
-    // transaction integer conversions
-    sendtotal: ParseInt,
-    changetotal: ParseInt,
-    txfee: ParseInt
-  },
   mod: {
     begins: (val) => ({ $regex: new RegExp(`^${val}`) }),
     contains: (val) => ({ $regex: new RegExp(`${val}`) }),
@@ -87,11 +62,12 @@ const Interpreter = {
         const keymodSeparator = param.includes(':') ? ':' : '%3A';
         let [keymod, value] = param.split('=');
         const [key, mod] = keymod.split(keymodSeparator);
-        const finalKey = key.split('.').pop();
-        // parse known key and modifier queries
-        if (Parse.key[finalKey]) value = Parse.key[finalKey](value);
+        // parse known modifiers, else try parse as number value
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
-        else if (mod) value = { [`$${mod}`]: value };
+        else {
+          value = isNaN(value) ? value : parseInt(value);
+          if (mod) value = { [`$${mod}`]: value };
+        }
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
           value = parseInt(value);
