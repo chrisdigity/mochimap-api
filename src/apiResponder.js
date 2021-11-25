@@ -30,7 +30,7 @@ if (typeof process.env.FULLNODE === 'undefined') {
 }
 
 const { createHash } = require('crypto');
-const { blockReward, projectedSupply, round } = require('./apiUtils');
+const { blockReward, capitalize, projectedSupply, round } = require('./apiUtils');
 const Interpreter = require('./apiInterpreter');
 const Db = require('./apiDatabase');
 const Mochimo = require('mochimo');
@@ -276,6 +276,60 @@ const Responder = {
         ? Responder._respond(res, node, 200)
         : Responder._respond(res, { message: `${ip} could not be found...` });
     } catch (error) { Responder.unknownInternal(res, error); }
+  },
+  peerlist: async (res, listType) => {
+    const start = Date.now();
+    let cursor;
+    try {
+      // set defaults and interpret requested search params as necessary
+      const search = { query: {}, options: {} };
+      let query = '?connection.status=0&pversion:ge=4';
+      if (listType === 'push') query += '&cbits:bitsAllSet=1'
+      Object.assign(search, Interpreter.search(query, 0, 'network'));
+      // query database for results
+      cursor = await Db.find('network', search.query, search.options);
+      const dbquery = await expandResults(cursor, search.options, start);
+      const results = dbquery.results;
+      if (results.length) {
+        // sort peers by weight, then uptime
+        results.sort((a, b) => {
+          const aWeight = BigInt(`0x${a.weight}`);
+          const bWeight = BigInt(`0x${b.weight}`);
+          if (aWeight !== bWeight) return bWeight - aWeight;
+          const upRed = (uptime, region) => {
+            const connection = a.connection[region];
+            if (connection.uptimestamp > 0) {
+              return uptime + (connection.timestamp - connection.uptimestamp);
+            } else return 0;
+          };
+          const aRegs = Object.keys(a.connection);
+          const bRegs = Object.keys(b.connection);
+          const aUp = aRegs.length && (aRegs.reduce(upRed, 0) / aRegs.length);
+          const bUp = bRegs.length && (bRegs.reduce(upRed, 0) / bRegs.length);
+          return bUp - aUp;
+        });
+        // perform a reverse widening deletion until list size is reached
+        let b = 0;
+        const bf = Math.floor(Math.cbrt(results.length)) || 1;
+        while (results.length > 16) {
+          const u = results.length - 1; // upper bound
+          const l = Math.max(0, u - ((b++) / bf)); // lower bound
+          const r = Math.floor(Math.random() * (u - l + 1) + l); // bound rng
+          results.splice(r, 1); // remove selected index
+        }
+      }
+      // build peerlist content
+      let content = `# Mochimo ${capitalize(listType)} peerlist, `;
+      content += `built on ${new Date()}\n# Build; `;
+      content += `time= ${Date.now() - start}ms, peers= ${dbquery.found}, `;
+      content += `height= ${results[0] && results[0].cblock}, `;
+      content += `weight= ${results[0] && results[0].weight}`;
+      Responder._respond(res, content, 200);
+    } catch (error) { // send 500 on internal error
+      Responder.unknownInternal(res, error);
+    } finally { // cleanup cursor
+      if (cursor && !cursor.isClosed()) await cursor.close();
+    }
   },
   search: async (cName, paged, res, ...args) => {
     const start = Date.now();

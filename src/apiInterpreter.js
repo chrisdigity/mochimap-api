@@ -34,6 +34,7 @@ const Parse = {
     // network integer conversions
     port: ParseInt,
     status: ParseInt,
+    pversion: ParseInt,
     // richlist integer conversions
     balance: ParseInt,
     rank: ParseInt,
@@ -46,14 +47,18 @@ const Parse = {
     begins: (val) => ({ $regex: new RegExp(`^${val}`) }),
     contains: (val) => ({ $regex: new RegExp(`${val}`) }),
     ends: (val) => ({ $regex: new RegExp(`${val}$`) }),
-    exists: (val) => ({ $exists: val === 'false' ? false : Boolean(val) }),
-    gt: (val) => ({ $gt: val }),
-    gte: (val) => ({ $gte: val }),
-    lt: (val) => ({ $lt: val }),
-    lte: (val) => ({ $lte: val }),
-    ne: (val) => ({ $ne: val })
+    exists: (val) => ({ $exists: val === 'false' ? false : Boolean(val) })
   },
   special: {
+    network: {
+      'connection.status': (val) => ({
+        $or: [
+          { 'connection.de.status': val },
+          { 'connection.sg.status': val },
+          { 'connection.us.status': val }
+        ]
+      })
+    },
     transaction: {
       address: (val) => ({
         $or: [{ srcaddr: val }, { dstaddr: val }, { chgaddr: val }]
@@ -86,6 +91,7 @@ const Interpreter = {
         // parse known key and modifier queries
         if (Parse.key[finalKey]) value = Parse.key[finalKey](value);
         if (mod && Parse.mod[mod]) value = Parse.mod[mod](value);
+        else if (mod) value = { [`$${mod}`]: value };
         // parse known key options
         if (paged && key === 'page' && !isNaN(value)) {
           value = parseInt(value);

@@ -80,6 +80,13 @@ const Routes = [
     enabled: true
   }, {
     method: 'GET',
+    path: /^\/network\/peers(?:\/(push|start)?)?$/i,
+    hint: '[BaseURL]/network/peers/<"push" or "start">',
+    hintCheck: /network|peers|push|start/gi,
+    handler: Responder.peerlist,
+    enabled: true
+  }, {
+    method: 'GET',
     path: '/richlist/search',
     param: /^[?]?(?:[0-9a-z_]+(?:(:|%3A)[a-z]+)?[=]+[0-9a-z-]+(?:$|&))+$/i,
     hint: '[BaseURL]/richlist/search?<param>=<paramValue>',

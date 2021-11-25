@@ -39,6 +39,8 @@ const blockReward = (bnum) => {
   return (base[2] - delta[2] * (bnum - trigger[1]));
 };
 
+const capitalize = (s) => s.length ? s[0].toUpperCase() + s.slice(1) : '';
+
 const checkRequest = (req, defaults) => {
   // ensure request is an object
   if (typeof req === 'undefined') req = {};
@@ -237,6 +239,7 @@ const round = (value, places = 2) => {
 module.exports = {
   asUint64String,
   blockReward,
+  capitalize,
   checkRequest,
   compareWeight,
   fidFormat,
