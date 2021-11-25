@@ -298,13 +298,11 @@ const Responder = {
           if (aWeight < bWeight) return 1;
           if (aWeight > bWeight) return -1;
           const upRed = (uptime, region) => {
-            const connection = a.connection[region];
-            if (connection.uptimestamp > 0) {
-              return uptime + (connection.timestamp - connection.uptimestamp);
-            } else return 0;
+            if (region.uptimestamp < 0) return 0;
+            return uptime + (region.timestamp - region.uptimestamp);
           };
-          const aRegs = Object.keys(a.connection);
-          const bRegs = Object.keys(b.connection);
+          const aRegs = Object.values(a.connection);
+          const bRegs = Object.values(b.connection);
           const aUp = aRegs.length && (aRegs.reduce(upRed, 0) / aRegs.length);
           const bUp = bRegs.length && (bRegs.reduce(upRed, 0) / bRegs.length);
           return bUp - aUp;
