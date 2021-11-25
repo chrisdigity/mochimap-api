@@ -320,11 +320,12 @@ const Responder = {
         }
       }
       // build peerlist content
-      let content = `# Mochimo ${capitalize(listType)} peerlist, `;
+      let content = `# Mochimo ${capitalize(listType)} Peerlist, `;
       content += `built on ${new Date()}\n# Build; `;
       content += `time= ${Date.now() - start}ms, peers= ${dbquery.found}, `;
       content += `height= ${results[0] && results[0].cblock}, `;
-      content += `weight= ${results[0] && results[0].weight}`;
+      content += `weight= 0x${results[0] && results[0].weight}\n`;
+      results.forEach(peer => { content += `${peer.host && peer.host.ip}\n`; });
       Responder._respond(res, content, 200);
     } catch (error) { // send 500 on internal error
       Responder.unknownInternal(res, error);
