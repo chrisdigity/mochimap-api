@@ -295,7 +295,8 @@ const Responder = {
         results.sort((a, b) => {
           const aWeight = BigInt(`0x${a.weight}`);
           const bWeight = BigInt(`0x${b.weight}`);
-          if (aWeight !== bWeight) return bWeight - aWeight;
+          if (aWeight < bWeight) return 1;
+          if (aWeight > bWeight) return -1;
           const upRed = (uptime, region) => {
             const connection = a.connection[region];
             if (connection.uptimestamp > 0) {
