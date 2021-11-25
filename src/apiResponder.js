@@ -283,8 +283,8 @@ const Responder = {
     try {
       // set defaults and interpret requested search params as necessary
       const search = { query: {}, options: {} };
-      let query = '?connection.status=0&pversion:ge=4';
-      if (listType === 'push') query += '&cbits:bitsAllSet=1'
+      let query = '?connection.status=0&pversion:gte=4';
+      if (listType === 'push') query += '&cbits:bitsAllSet=1';
       Object.assign(search, Interpreter.search(query, 0, 'network'));
       // query database for results
       cursor = await Db.find('network', search.query, search.options);
