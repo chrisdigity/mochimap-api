@@ -60,10 +60,13 @@ Event.transaction.handler = (event) => {
   }
 };
 Event.network.handler = (event) => {
-  // expose _id from event.documentKey
+  // perform basic checks for valid data
+  if (!event || !event.documentKey || !event.updateDescription) return;
+  // expose _id from documentKey and obtain updatedFields from description
   const { _id } = event.documentKey;
-  // obtain updated fields' keys for updates that aren't connect- type updates
   const fields = event.updateDescription.updatedFields;
+  if (!_id || !fields) return; // not interested if you can't provide
+  // filter updates that aren't connect- type updates
   const updated = Object.keys(fields).filter(key => !key.includes('connect'));
   // broadcast updates for updated fields existing in addition to connect- type
   if (updated.length) Broadcast(Object.assign({ _id }, fields), 'network');
