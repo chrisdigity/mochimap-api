@@ -393,9 +393,13 @@ Modifiers can optionally be appended to search parameters to modify how a search
 *Note: the 'gt', 'gte', 'lt', 'lte' and 'ne' modifiers can produce unintended results when used with non-number type values*
 
 ## Need to get in contact? ~ ![Discord](https://img.shields.io/discord/460867662977695765?logo=discord&style=plastic)
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fchrisdigity%2Fmochimap-api.svg?type=shield)](https://app.fossa.com/projects/git%2Bgithub.com%2Fchrisdigity%2Fmochimap-api?ref=badge_shield)
 More often than not, you can find me online in the [Mochimo Official](https://discord.gg/7ma6Bk2) Discord Server.<br>
 Otherwise, checkout my [Github profile](https://github.com/chrisdigity) for other forms of contact.
 
 ## License ~ ![License](https://img.shields.io/github/license/chrisdigity/mochimap.com?logo=Open%20Source%20Initiative&style=plastic)
 This project is licensed under the GNU Affero General Public License version 3.<br>
 ... see the [LICENSE](LICENSE) file for details.
+
+
+[![FOSSA Status](https://app.fossa.com/api/projects/git%2Bgithub.com%2Fchrisdigity%2Fmochimap-api.svg?type=large)](https://app.fossa.com/projects/git%2Bgithub.com%2Fchrisdigity%2Fmochimap-api?ref=badge_large)
