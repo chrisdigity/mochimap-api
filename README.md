@@ -31,14 +31,49 @@ The MochiMap API is a selfless service *(pats self on back)* provided to the [Mo
 
 The MochiMap API interprets blockchain and transaction data from the Mochimo Cryptocurrency Network and stores it as Developer friendly JSON data. This data is publicly accessible via the MochiMap API endpoints, listed below, allowing for both simple and complex queries and search patterns for querying exactly the data you might need.
 
+## Table of Contents
+- [Table of Contents](#table-of-contents)
+- [System Requirements](#system-requirements)
+  - [Requirements Breakdown](#requirements-breakdown)
+- [API Status and Uptime](#api-status-and-uptime)
+- [API Domains](#api-domains)
+    - [Recommended](#recommended)
+    - [Regional Alternatives](#regional-alternatives)
+- [API Endpoints](#api-endpoints)
+    - [Get block data](#get-block-data)
+    - [Search for block data](#search-for-block-data)
+    - [Get blockchain data](#get-blockchain-data)
+    - [Get balance or ledger details](#get-balance-or-ledger-details)
+    - [Search for ledger balance history](#search-for-ledger-balance-history)
+    - [Get network node details](#get-network-node-details)
+    - [Search for network node details](#search-for-network-node-details)
+    - [Get transaction data](#get-transaction-data)
+    - [Search for transaction data](#search-for-transaction-data)
+- [API Search Parameters](#api-search-parameters)
+  - [Special Transaction Search Parameters:](#special-transaction-search-parameters)
+- [API Search Modifiers](#api-search-modifiers)
+- [Need to get in contact?](#need-to-get-in-contact)
+- [License](#license)
+
+## System Requirements
+The Mochimo API (Nodejs) relies on the operation of a MySQL Database, a Mochimo Full Node and the API software running in Nodejs. For this reason, system requirements can vary depending on the setup, and also for how much blockchain data you intend to store.
+
+* Recommended Server Requirements - 4 vCPU, 4GB RAM
+* Minimum Server Requirements - 2 vCPU, 2GB RAM
+
+### Requirements Breakdown
+* Mochimo API - idles at around 100M of RAM and can peak at 512M of RAM.
+* Mochimo Node - recommended requirements are 2 vCPU and 2GB RAM, but has been known to run on a 1 vCPU, 512M RAM instance.
+* MySQL Database - requirements vary depending on load, configuration, system resources and the amount of data stored. By default, MySQL should be capable of consuming as little as 512M of RAM, but will happily consume much more.
+
 ## API Status and Uptime
 The [MochiMap API status page](https://stats.uptimerobot.com/KEPZ9hqnYo) is powered by the UptimeRobot and contains global and regional uptime history of the MochiMap API across all of it's publicly accessible servers.
 
 ## API Domains
 The MochiMap API can be accessed using a few different domains. Though it's highly recommended that you use the recommended domain for almost all cases, alternative domains are spread across the globe for redundancy and backup requirements.
 
-#### Recommended <sub>( api.mochimap.com )
-Requests made to api.mochimap.com will redirected to the closest available regional domain, based on latency calculation, and is therefore the recommended domain for access to the MochiMap API.
+#### Recommended
+Requests made to api.mochimap.com will be redirected to the closest available regional domain, based on latency calculation, and is therefore the recommended domain for access to the MochiMap API.
 
 #### Regional Alternatives
 Alternatively, you can opt to use one of the various regional domains, via their associated region prefix. Regional domains are spread across the globe for redundancy and backup requirements, but requests made directly to these domains **WILL NOT be redirected to a working server in the case of downtime due to maintenance or a failure.** Regional domains currently reside in Germany, Singapore and United States under their respective domains listed below...
@@ -46,7 +81,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
  - sg.mochimap.com ~ ![Uptime Robot ratio (30 days) sg.mochimap.com](https://img.shields.io/uptimerobot/ratio/m788515360-2e1cf7221b57332febc23252?label=Uptime&logo=AIOHTTP&style=plastic)
  - us.mochimap.com ~ ![Uptime Robot ratio (30 days) us.mochimap.com](https://img.shields.io/uptimerobot/ratio/m788515370-ca620cc0578961bdd0dbb06f?label=Uptime&logo=AIOHTTP&style=plastic)
 
-## API Endpoints <sub>( METHOD [domain]/request/path/and/parameters)
+## API Endpoints
 #### Get block data
   - **GET [base]/block/&lt;blockNumber&gt;**, where
   - &lt;blockNumber&gt; is left *blank* to obtain latest block data; or
@@ -110,7 +145,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
 }
 ```
 
-#### Get chain data
+#### Get blockchain data
   - **GET [base]/chain/&lt;blockNumber&gt;**, where
     - &lt;blockNumber&gt; is left *blank* to obtain latest chain data; or
     - &lt;blockNumber&gt; is a positive integer in base-10 or hex format
@@ -146,7 +181,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
 }
 ```
 
-#### Get hashed or tagged address details <sub> ( as available in ledger.dat )
+#### Get balance or ledger details
   - **GET [base]/ledger/&lt;addressType&gt;/&lt;address&gt;**, where
     - &lt;addressType&gt; is either "address" or "tag"; and
     - &lt;address&gt; is a hashed or tagged address; respectively
@@ -239,7 +274,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
 }
 ```
 
-#### Search for network nodes
+#### Search for network node details
   - **GET [base]/network/search[?&lt;parameter&gt;[:&lt;modifier&gt;]=&lt;value&gt;]**
     - where &lt;parameter&gt; is a property of the desired ledger balance data; and
     - where &lt;modifier&gt; is used to modify how a properties value is interpreted; and
@@ -314,7 +349,7 @@ Alternatively, you can opt to use one of the various regional domains, via their
 }
 ```
 
-#### Search for transactions
+#### Search for transaction data
   - **GET [base]/transaction/search[?&lt;parameter&gt;[:&lt;modifier&gt;]=&lt;value&gt;][&]**
     - where &lt;parameter&gt; is a direct property of the transaction data; and
     - where &lt;modifier&gt; is used to modify how a property is interpreted; and
@@ -392,10 +427,10 @@ Modifiers can optionally be appended to search parameters to modify how a search
 
 *Note: the 'gt', 'gte', 'lt', 'lte' and 'ne' modifiers can produce unintended results when used with non-number type values*
 
-## Need to get in contact? ~ ![Discord](https://img.shields.io/discord/460867662977695765?logo=discord&style=plastic)
+## Need to get in contact?
 More often than not, you can find me online in the [Mochimo Official](https://discord.gg/7ma6Bk2) Discord Server.<br>
 Otherwise, checkout my [Github profile](https://github.com/chrisdigity) for other forms of contact.
 
-## License ~ ![License](https://img.shields.io/github/license/chrisdigity/mochimap.com?logo=Open%20Source%20Initiative&style=plastic)
+## License
 This project is licensed under the GNU Affero General Public License version 3.<br>
-... see the [LICENSE](LICENSE) file for details.
+... see the [LICENSE](LICENSE) file for details. 

@@ -1,22 +1,29 @@
 {
   "scripts": {
-    "restart": "pm2 restart all",
-    "start": "pm2 start all",
-    "stop": "pm2 stop all"
+    "pm2setup": "npx -c 'pm2 install pm2-logrotate && pm2 set pm2-logrotate:compress true && pm2 set pm2-logrotate:dateFormat YYYY-MM-DD'",
+    "pm2startup": "mkdir -p log && npx -c 'pm2 start src/api.js --time -o log/api.log -e log/api.err && pm2 startup && pm2 save'",
+    "preinstall": "npm install -g npm@latest",
+    "postinstall": "npm audit fix",
+    "restart": "npx pm2 restart all",
+    "start": "npx pm2 start all",
+    "stop": "npx pm2 stop all"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/chrisdigity/mochimap.com.git"
+    "url": "git+https://github.com/chrisdigity/mochimap-api.git"
   },
   "author": "chrisdigity",
   "license": "AGPL-3.0-only",
   "bugs": {
-    "url": "https://github.com/chrisdigity/mochimap.com/issues"
+    "url": "https://github.com/chrisdigity/mochimap-api/issues"
   },
-  "homepage": "https://github.com/chrisdigity/mochimap.com#readme",
+  "homepage": "https://github.com/chrisdigity/mochimap-api#readme",
   "dependencies": {
     "dotenv": "^8.2.0",
+    "lru-cache": "^6.0.0",
     "mochimo": "git://github.com/chrisdigity/mochimo-nodejs.git",
-    "mongodb": "^3.6.4"
+    "mysql2": "^2.3.3",
+    "node-ipinfo": "^3.0.2",
+    "pm2": "^5.1.2"
   }
 }
